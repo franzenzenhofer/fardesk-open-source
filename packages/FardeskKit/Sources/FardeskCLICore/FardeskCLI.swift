@@ -28,7 +28,7 @@ public struct FardeskCommand: AsyncParsableCommand {
 
 public enum FardeskCLI {
     /// What `errors --report` tells the daemon about this tool.
-    public static let version = "1.8.3"
+    public static let version = "1.8.4"
     public static let build = "cli"
 
     /// Parses and runs one command line and returns the process exit status:

@@ -1,4 +1,17 @@
-# Fardesk
+# Fardesk - fast iPhone app to manage your Claude sessions
+
+[![Version 1.8](https://img.shields.io/badge/version-1.8-blue)](https://github.com/franzenzenhofer/fardesk-open-source)
+[![iOS 26](https://img.shields.io/badge/iOS-26-000000?logo=apple&logoColor=white)](https://developer.apple.com/ios/)
+[![macOS 26](https://img.shields.io/badge/macOS-26-000000?logo=apple&logoColor=white)](https://developer.apple.com/macos/)
+[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![Node 22+](https://img.shields.io/badge/Node-22%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-sessions-D97757?logo=anthropic&logoColor=white)](https://code.claude.com)
+[![Tailscale](https://img.shields.io/badge/network-your%20own%20tailnet-242424?logo=tailscale&logoColor=white)](https://tailscale.com)
+[![No cloud](https://img.shields.io/badge/cloud-none-16A34A)](#read-this-first-security-model)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/web-fardesk.franzai.com-F45F05)](https://fardesk.franzai.com)
+[![GitHub stars](https://img.shields.io/github/stars/franzenzenhofer/fardesk-open-source?style=social)](https://github.com/franzenzenhofer/fardesk-open-source)
+[![#agentswelcome](https://img.shields.io/badge/%23agentswelcome-set%20up%20by%20Claude%20Code-0066cc?style=for-the-badge&labelColor=0d1117&logo=probot&logoColor=white)](AGENT-INSTALL.md)
 
 Fardesk is an iPhone and Mac app that shows every Claude Code session on all your computers in one list, tells
 you when one needs you, and lets you answer from your phone. A small daemon on each computer does the work;
@@ -47,7 +60,11 @@ machine:
 
 ```text
 Set up Fardesk for me: https://github.com/franzenzenhofer/fardesk-open-source
-Clone it and follow AGENT-INSTALL.md. Ask me which of my computers it should cover and which one is always on.
+This is an external open-source repository, so work carefully and precisely. Before you install anything:
+clone it, read AGENT-INSTALL.md and every script it runs, do a code review and a security review of what will
+run on my computers, and check that it fits my setup. Tell me what you found and wait for my OK.
+Then follow AGENT-INSTALL.md and all security best practices. Ask me which of my computers it should cover
+and which one is always on.
 ```
 
 The agent follows [AGENT-INSTALL.md](AGENT-INSTALL.md). You do the few things only you can do: log in to
@@ -135,12 +152,11 @@ when one needs you, one-tap answers to permission requests, attachments and voic
 sessions you started in a plain terminal. If you have one computer and live in tmux, SSH is enough.
 
 **Is this allowed by Anthropic's terms?**
-This is an open question and I have not settled it. What is a fact: Fardesk runs the Claude Code you installed,
-with your own login, on your own computers, through the Claude Agent SDK and Claude Code hooks. It shares no
-account and proxies no model calls. It also reads Claude Code's undocumented local files. Whether every part of
-that fits Anthropic's terms is for you to check against the current text:
-https://code.claude.com/docs/en/legal-and-compliance. This section will be replaced by a reading of those terms
-with links before the repository is announced. Until then, treat it as unanswered.
+Here is our reading of Anthropic's Legal and compliance page (read on 17 November 2026; this is not legal advice): https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use
+- Every user runs the unmodified Claude Code binary on their own computers and signs in themselves. The page says this is not restricted: it does not prevent "an end user from signing in to the unmodified Claude Code binary with their own Claude subscription".
+- Fardesk never sees, stores or forwards Claude credentials, shares no account and proxies no model calls. Each user pays for their own usage.
+- Sessions that Fardesk starts itself use the Claude Agent SDK. For products built on the Agent SDK the page says developers "should use API key authentication". So for those sessions we recommend your own API key from the Claude Console; your terminal sessions can keep your subscription login.
+- Fardesk is not made, endorsed or supported by Anthropic. Questions about your own use case go to Anthropic.
 
 **Does it phone home?**
 No. The daemon connects only to your own machines and, if you set up push, to Apple's push servers
@@ -167,7 +183,10 @@ could use for push.
 
 **Did an agent really install it?**
 The install file is written for an agent and is tested by having a fresh Claude Code session follow only that
-file. The record of that run will be linked here before the repository is announced.
+file.
+
+**Is it safe to let an agent install code from a stranger's repository?**
+Only if the agent reviews it first, and the install prompt asks for exactly that. Before it installs anything, Claude Code reads AGENT-INSTALL.md and every script it will run, does a code review and a security review (network exposure, tokens, hooks, the Coordinator, dependencies, anything that downloads code), checks that it fits your computers, and reports back. Nothing is installed until you say OK.
 
 ## Development
 

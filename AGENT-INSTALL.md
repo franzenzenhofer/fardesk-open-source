@@ -7,8 +7,27 @@ by hand: run the same commands, and do the steps marked HUMAN.
 
 ```text
 Set up Fardesk for me: https://github.com/franzenzenhofer/fardesk-open-source
-Clone it and follow AGENT-INSTALL.md. Ask me which of my computers it should cover and which one is always on.
+This is an external open-source repository, so work carefully and precisely. Before you install anything:
+clone it, read AGENT-INSTALL.md and every script it runs, do a code review and a security review of what will
+run on my computers, and check that it fits my setup. Tell me what you found and wait for my OK.
+Then follow AGENT-INSTALL.md and all security best practices. Ask me which of my computers it should cover
+and which one is always on.
 ```
+
+## Before you install: review it (the user asked for this)
+
+This repository is external code for the user. Do not install or run anything from it before these steps:
+
+1. Read this file and every script it will run (`scripts/setup/*.sh`, `deploy/*.sh`, `daemon/fardeskd/package.json`
+   scripts, `apps/Fardesk/project.yml`).
+2. **Code review:** what each script changes on each machine (files written, services installed, ports opened,
+   Claude Code hooks added to `~/.claude/settings.json`).
+3. **Security review:** network exposure (the daemon must bind to the Tailscale address only), tokens and where they
+   are stored, what the hooks send, what the Coordinator may do, dependencies (`npm audit --omit=dev` in
+   `daemon/fardeskd`), and anything that downloads or runs remote code.
+4. **Compatibility:** OS versions, Node, Xcode, Tailscale, Claude Code on each of the user's computers; existing
+   Claude Code hooks that the install would touch.
+5. Report the findings to the user in plain words, with file paths, and wait for their OK before you go on to the next section.
 
 ## First, ask the user (before you change anything)
 
