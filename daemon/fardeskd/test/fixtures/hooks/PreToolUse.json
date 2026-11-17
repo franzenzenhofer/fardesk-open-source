@@ -1,0 +1,18 @@
+{
+  "session_id": "7d7456e7-072b-4806-8b62-9b9d858ba62a",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/7d7456e7-072b-4806-8b62-9b9d858ba62a.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "scratchpad_dir": "/tmp/claude-1000/-home-dev-fardesk-spike-c/7d7456e7-072b-4806-8b62-9b9d858ba62a/scratchpad",
+  "prompt_id": "ed7aa675-03af-47ad-b17b-0205b18cb8e0",
+  "permission_mode": "default",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "touch a1.txt",
+    "description": "Create empty file a1.txt"
+  },
+  "tool_use_id": "toolu_01NmodkAJCHXjEgZCJQcAuXb"
+}

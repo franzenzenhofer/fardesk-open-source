@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/OkResult.schema.json",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false
+}

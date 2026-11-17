@@ -1,0 +1,13 @@
+{
+  "id": "3b0c8e2a-5f4d-4c1e-9a7b-1d2e3f405162",
+  "at": "2026-11-15T09:30:12.000Z",
+  "message": "The request timed out",
+  "kind": "error",
+  "code": "URLError -1001",
+  "area": "feed",
+  "machine": "Studio Mac",
+  "sessionId": "sess_7f3a91",
+  "appVersion": "1.2.0",
+  "build": "8",
+  "platform": "iOS 26.1"
+}

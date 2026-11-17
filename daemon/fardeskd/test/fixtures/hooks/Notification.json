@@ -1,0 +1,10 @@
+{
+  "session_id": "7d7456e7-072b-4806-8b62-9b9d858ba62a",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/7d7456e7-072b-4806-8b62-9b9d858ba62a.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "scratchpad_dir": "/tmp/claude-1000/-home-dev-fardesk-spike-c/7d7456e7-072b-4806-8b62-9b9d858ba62a/scratchpad",
+  "prompt_id": "ed7aa675-03af-47ad-b17b-0205b18cb8e0",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission",
+  "notification_type": "permission_prompt"
+}

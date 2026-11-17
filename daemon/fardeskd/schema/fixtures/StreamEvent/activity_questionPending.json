@@ -1,0 +1,16 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0007",
+    "ts": "2026-11-14T09:04:00.000Z",
+    "kind": "question",
+    "requestId": "req_a1",
+    "text": "Which export format should I use?",
+    "options": [
+      "PNG",
+      "JPEG"
+    ],
+    "state": "pending"
+  }
+}

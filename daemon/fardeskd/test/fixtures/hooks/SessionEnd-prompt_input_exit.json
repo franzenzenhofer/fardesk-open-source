@@ -1,0 +1,9 @@
+{
+  "session_id": "6482f697-011c-4cc7-be1a-54239611d0ea",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/6482f697-011c-4cc7-be1a-54239611d0ea.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "scratchpad_dir": "/tmp/claude-1000/-home-dev-fardesk-spike-c/6482f697-011c-4cc7-be1a-54239611d0ea/scratchpad",
+  "prompt_id": "06d5b221-38ea-4db8-bc3e-52b4857201cf",
+  "hook_event_name": "SessionEnd",
+  "reason": "prompt_input_exit"
+}

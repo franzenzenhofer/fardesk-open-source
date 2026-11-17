@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "user",
+    "id": "00000000-0000-4000-8000-000000000003",
+    "ts": "2026-11-15T13:49:16.196Z",
+    "text": "Reply with the single word ACKTEST. Do not use tools."
+  },
+  {
+    "kind": "assistant",
+    "id": "00000000-0000-4000-8000-000000000006",
+    "ts": "2026-11-15T13:49:17.425Z",
+    "text": "ACKTEST"
+  },
+  {
+    "kind": "user",
+    "id": "00000000-0000-4000-8000-000000000010",
+    "ts": "2026-11-15T13:50:04.514Z",
+    "text": "Reply with the single word FROMTEST. Do not use tools."
+  },
+  {
+    "kind": "assistant",
+    "id": "00000000-0000-4000-8000-000000000012",
+    "ts": "2026-11-15T13:50:05.676Z",
+    "text": "FROMTEST"
+  }
+]

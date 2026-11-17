@@ -1,0 +1,10 @@
+{
+  "session_id": "3784c152-a433-4abe-84fb-e00ae4cc1616",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/3784c152-a433-4abe-84fb-e00ae4cc1616.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "scratchpad_dir": "/tmp/claude-1000/-home-dev-fardesk-spike-c/3784c152-a433-4abe-84fb-e00ae4cc1616/scratchpad",
+  "prompt_id": "626218ab-eaa1-4078-8296-6c43ced53487",
+  "hook_event_name": "PreCompact",
+  "trigger": "manual",
+  "custom_instructions": null
+}

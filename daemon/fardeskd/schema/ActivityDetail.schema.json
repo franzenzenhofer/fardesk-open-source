@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/ActivityDetail.schema.json",
+  "type": "object",
+  "properties": {
+    "activityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "diff",
+        "output"
+      ]
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "added": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "removed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sign": {
+                  "type": "string",
+                  "enum": [
+                    " ",
+                    "+",
+                    "-"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "number",
+                "sign",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "title",
+          "subtitle",
+          "added",
+          "removed",
+          "lines"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "activityId",
+    "kind",
+    "truncated",
+    "sections"
+  ],
+  "additionalProperties": false
+}

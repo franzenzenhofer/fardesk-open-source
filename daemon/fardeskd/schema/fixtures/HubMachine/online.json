@@ -1,0 +1,12 @@
+{
+  "name": "Studio",
+  "online": true,
+  "hub": false,
+  "lastSeen": "2026-11-16T09:30:00.000Z",
+  "latencyMs": 42,
+  "problem": null,
+  "sessions": 5,
+  "waiting": 1,
+  "working": 2,
+  "os": "macos"
+}

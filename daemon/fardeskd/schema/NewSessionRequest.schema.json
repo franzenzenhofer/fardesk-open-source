@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/NewSessionRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worktree": {
+      "type": "boolean"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "permissionMode": {
+      "type": "string",
+      "enum": [
+        "default",
+        "acceptEdits",
+        "plan",
+        "bypassPermissions",
+        "dontAsk",
+        "auto"
+      ]
+    }
+  },
+  "required": [
+    "cwd",
+    "prompt",
+    "worktree",
+    "model"
+  ],
+  "additionalProperties": false
+}

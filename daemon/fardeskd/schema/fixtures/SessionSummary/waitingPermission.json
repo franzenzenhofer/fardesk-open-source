@@ -1,0 +1,19 @@
+{
+  "id": "sess_2c84be",
+  "title": "Crawler retry logic",
+  "cwd": "/Users/dev/crawler",
+  "status": "waiting",
+  "waitingFor": "permission",
+  "owned": true,
+  "replyMode": "composer",
+  "canStop": true,
+  "summary": "Wants to run swift test",
+  "model": "claude-sonnet-5-5",
+  "pid": 50377,
+  "muted": false,
+  "permissionMode": "default",
+  "contextTokens": null,
+  "cacheExpiresAt": null,
+  "startedAt": "2026-11-14T08:30:00.000Z",
+  "updatedAt": "2026-11-14T09:10:41.000Z"
+}

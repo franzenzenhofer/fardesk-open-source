@@ -1,0 +1,16 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0013",
+    "ts": "2026-11-14T09:08:00.000Z",
+    "kind": "permission",
+    "requestId": "req_b4",
+    "tool": "Bash",
+    "title": "Run crawler tests",
+    "summary": "npm test",
+    "cwd": "/Users/dev/crawler",
+    "destructive": false,
+    "state": "expired"
+  }
+}

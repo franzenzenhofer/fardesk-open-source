@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "conflict",
+    "message": "Permission already decided"
+  }
+}

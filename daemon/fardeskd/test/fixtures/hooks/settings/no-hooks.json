@@ -1,0 +1,7 @@
+{
+  "model": "opus",
+  "theme": "dark",
+  "env": {
+    "EXAMPLE": "1"
+  }
+}

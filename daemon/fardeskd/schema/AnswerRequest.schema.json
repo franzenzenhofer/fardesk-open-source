@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/AnswerRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "option": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "option"
+  ],
+  "additionalProperties": false
+}

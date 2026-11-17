@@ -1,0 +1,11 @@
+{
+  "name": "Laptop",
+  "online": false,
+  "hub": false,
+  "lastSeen": null,
+  "latencyMs": null,
+  "problem": "not linked: no token for it in coordinator.peerTokens",
+  "sessions": 0,
+  "waiting": 0,
+  "working": 0
+}

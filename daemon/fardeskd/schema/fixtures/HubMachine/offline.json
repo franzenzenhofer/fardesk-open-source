@@ -1,0 +1,11 @@
+{
+  "name": "Laptop",
+  "online": false,
+  "hub": false,
+  "lastSeen": "2026-11-16T07:18:00.000Z",
+  "latencyMs": null,
+  "problem": "no answer within 5 s",
+  "sessions": 3,
+  "waiting": 0,
+  "working": 0
+}

@@ -1,0 +1,13 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0008",
+    "ts": "2026-11-14T09:04:30.000Z",
+    "kind": "question",
+    "requestId": "req_a2",
+    "text": "Describe the brush name.",
+    "options": [],
+    "state": "answered"
+  }
+}

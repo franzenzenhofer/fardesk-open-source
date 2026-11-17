@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/DeviceRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "apnsToken": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64,200}$"
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "sandbox",
+        "production"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "notifications": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "done",
+          "permission",
+          "question",
+          "ended"
+        ]
+      }
+    }
+  },
+  "required": [
+    "apnsToken",
+    "environment",
+    "name",
+    "notifications"
+  ],
+  "additionalProperties": false
+}

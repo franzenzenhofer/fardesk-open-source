@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/PermissionRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "deny",
+        "allow_always"
+      ]
+    }
+  },
+  "required": [
+    "decision"
+  ],
+  "additionalProperties": false
+}

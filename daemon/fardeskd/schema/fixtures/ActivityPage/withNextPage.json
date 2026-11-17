@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "id": "act_0002",
+      "ts": "2026-11-14T09:00:20.000Z",
+      "kind": "assistant",
+      "text": "Looking at the brush code."
+    },
+    {
+      "id": "act_0003",
+      "ts": "2026-11-14T09:00:30.000Z",
+      "kind": "system",
+      "text": "Session resumed"
+    }
+  ],
+  "nextBefore": "act_0002"
+}

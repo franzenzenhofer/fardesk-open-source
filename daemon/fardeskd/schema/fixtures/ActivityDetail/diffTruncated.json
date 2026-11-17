@@ -1,0 +1,20 @@
+{
+  "activityId": "act_0015",
+  "kind": "diff",
+  "truncated": true,
+  "sections": [
+    {
+      "title": "Tests/PaintEngineTests.swift",
+      "subtitle": "",
+      "added": 120,
+      "removed": 0,
+      "lines": [
+        {
+          "number": 1,
+          "sign": "+",
+          "text": "import Testing"
+        }
+      ]
+    }
+  ]
+}

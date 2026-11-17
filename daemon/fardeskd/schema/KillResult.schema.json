@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/KillResult.schema.json",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "closed": {
+      "type": "string",
+      "enum": [
+        "pane",
+        "tab",
+        "none"
+      ]
+    }
+  },
+  "required": [
+    "ok",
+    "closed"
+  ],
+  "additionalProperties": false
+}

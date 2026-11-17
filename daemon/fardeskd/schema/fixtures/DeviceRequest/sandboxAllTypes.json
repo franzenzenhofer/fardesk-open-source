@@ -1,0 +1,11 @@
+{
+  "apnsToken": "a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+  "environment": "sandbox",
+  "name": "Test iPhone",
+  "notifications": [
+    "done",
+    "permission",
+    "question",
+    "ended"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0005",
+    "ts": "2026-11-14T09:02:00.000Z",
+    "kind": "tool",
+    "tool": "Edit",
+    "title": "Failed to edit PaintEngine.swift",
+    "status": "error",
+    "hasDetail": false,
+    "durationMs": 0
+  }
+}

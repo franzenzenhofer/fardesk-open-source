@@ -1,0 +1,12 @@
+{
+  "name": "Linux",
+  "online": true,
+  "hub": true,
+  "lastSeen": "2026-11-16T09:30:05.000Z",
+  "latencyMs": 0,
+  "problem": null,
+  "sessions": 2,
+  "waiting": 0,
+  "working": 1,
+  "os": "linux"
+}

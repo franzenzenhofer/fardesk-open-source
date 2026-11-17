@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "token_revoked",
+    "message": "This device was revoked"
+  }
+}

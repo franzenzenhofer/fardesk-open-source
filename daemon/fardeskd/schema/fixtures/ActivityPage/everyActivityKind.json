@@ -1,0 +1,144 @@
+{
+  "items": [
+    {
+      "id": "act_0001",
+      "ts": "2026-11-14T09:00:05.000Z",
+      "kind": "user",
+      "text": "Make the brush smear softer."
+    },
+    {
+      "id": "act_0002",
+      "ts": "2026-11-14T09:00:20.000Z",
+      "kind": "assistant",
+      "text": "I will adjust the blend falloff in PaintEngine.swift."
+    },
+    {
+      "id": "act_0003",
+      "ts": "2026-11-14T09:00:30.000Z",
+      "kind": "tool",
+      "tool": "Bash",
+      "title": "Running swift test",
+      "status": "running",
+      "hasDetail": false,
+      "durationMs": null
+    },
+    {
+      "id": "act_0004",
+      "ts": "2026-11-14T09:01:10.000Z",
+      "kind": "tool",
+      "tool": "Bash",
+      "title": "Ran swift test - 31 passed",
+      "status": "ok",
+      "hasDetail": true,
+      "durationMs": 40250
+    },
+    {
+      "id": "act_0005",
+      "ts": "2026-11-14T09:02:00.000Z",
+      "kind": "tool",
+      "tool": "Edit",
+      "title": "Failed to edit PaintEngine.swift",
+      "status": "error",
+      "hasDetail": false,
+      "durationMs": 0
+    },
+    {
+      "id": "act_0006",
+      "ts": "2026-11-14T09:03:00.000Z",
+      "kind": "files",
+      "title": "Edited PaintEngine.swift",
+      "changed": [
+        "Sources/PaintEngine.swift",
+        "Tests/PaintEngineTests.swift"
+      ]
+    },
+    {
+      "id": "act_0007",
+      "ts": "2026-11-14T09:04:00.000Z",
+      "kind": "question",
+      "requestId": "req_a1",
+      "text": "Which export format should I use?",
+      "options": [
+        "PNG",
+        "JPEG"
+      ],
+      "state": "pending"
+    },
+    {
+      "id": "act_0008",
+      "ts": "2026-11-14T09:04:30.000Z",
+      "kind": "question",
+      "requestId": "req_a2",
+      "text": "Describe the brush name.",
+      "options": [],
+      "state": "answered"
+    },
+    {
+      "id": "act_0015",
+      "ts": "2026-11-14T09:05:30.000Z",
+      "kind": "question",
+      "requestId": "req_a4",
+      "text": "Pick a colour space.",
+      "options": [
+        "sRGB",
+        "Display P3"
+      ],
+      "state": "expired"
+    },
+    {
+      "id": "act_0010",
+      "ts": "2026-11-14T09:06:00.000Z",
+      "kind": "permission",
+      "requestId": "req_b1",
+      "tool": "Bash",
+      "title": "Run swift test",
+      "summary": "swift test --parallel",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "state": "pending"
+    },
+    {
+      "id": "act_0011",
+      "ts": "2026-11-14T09:06:30.000Z",
+      "kind": "permission",
+      "requestId": "req_b2",
+      "tool": "Edit",
+      "title": "Edit PaintEngine.swift",
+      "summary": "",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "state": "allowed"
+    },
+    {
+      "id": "act_0012",
+      "ts": "2026-11-14T09:07:00.000Z",
+      "kind": "permission",
+      "requestId": "req_b3",
+      "tool": "Bash",
+      "title": "Remove build folder",
+      "summary": "rm -rf .build",
+      "cwd": "/Users/dev/crawler",
+      "destructive": true,
+      "state": "denied"
+    },
+    {
+      "id": "act_0013",
+      "ts": "2026-11-14T09:08:00.000Z",
+      "kind": "permission",
+      "requestId": "req_b4",
+      "tool": "Bash",
+      "title": "Run crawler tests",
+      "summary": "npm test",
+      "cwd": "/Users/dev/crawler",
+      "destructive": false,
+      "state": "expired"
+    },
+    {
+      "id": "act_0014",
+      "ts": "2026-11-14T09:09:00.000Z",
+      "kind": "system",
+      "text": "Session resumed"
+    }
+  ],
+  "nextBefore": "act_0001"
+}

@@ -1,0 +1,48 @@
+[
+  {
+    "kind": "user",
+    "id": "04caddfc-4d09-32a6-d938-33b72650d5f5",
+    "ts": "2025-10-11T10:29:08.474Z",
+    "text": "slate pine indigo nectar cedar harbor umber amber clover reed drift jad"
+  },
+  {
+    "kind": "assistant",
+    "id": "41a1998f-dd0a-2343-cb5d-ceec59d0690f",
+    "ts": "2025-10-11T10:29:11.578Z",
+    "text": "# kernel opal elm fern lumen r\n\ndrift indigo ju"
+  },
+  {
+    "kind": "system",
+    "id": "050741e0-b713-1361-bffb-d236809f46bb",
+    "ts": "2025-10-11T10:29:11.580Z",
+    "text": "Interrupted"
+  },
+  {
+    "kind": "user",
+    "id": "f7e7bb86-738a-984f-f7bc-59a68384b0e9",
+    "ts": "2025-10-11T10:29:23.063Z",
+    "text": "juniper hazel lumen meadow dune xenon yarrow bravo zephyr gamma fern coral harbor"
+  },
+  {
+    "kind": "tool",
+    "id": "toolu_909tr0MfoVPj9FvA7BXRbSSZ",
+    "ts": "2025-10-11T10:29:24.724Z",
+    "tool": "Bash",
+    "title": "Denied: echo step-10",
+    "status": "error",
+    "hasDetail": false,
+    "durationMs": 10254
+  },
+  {
+    "kind": "system",
+    "id": "4ca97fa3-8324-6a39-1763-4c0d121e6d51",
+    "ts": "2025-10-11T10:29:34.979Z",
+    "text": "Interrupted"
+  },
+  {
+    "kind": "user",
+    "id": "35a3b47f-64a8-1009-67f4-0e25fc29509a",
+    "ts": "2025-10-11T10:29:46.712Z",
+    "text": "slate pine indigo nectar cedar harbor umber amber clover reed drift jad"
+  }
+]

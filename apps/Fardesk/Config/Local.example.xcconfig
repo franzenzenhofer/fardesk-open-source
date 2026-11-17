@@ -1,0 +1,13 @@
+// Copy to Local.xcconfig (gitignored). scripts/setup/30-app-config.sh writes the identity lines for you from
+// fardesk.env; the machine lines below are optional developer conveniences.
+//
+// Identity of your build: bundle ids are <prefix>.fardesk, the App Group is group.<prefix>.fardesk.
+FARDESK_BUNDLE_PREFIX = com.example
+// Your Apple developer team id; empty = choose the team in Xcode.
+FARDESK_TEAM_ID =
+// Names listed first in the session list, in this order, separated by ";". Empty = alphabetical.
+FARDESK_MACHINE_ORDER =
+// Format: Name|URL;Name|URL  (write // in URLs as /$()/ because xcconfig treats // as a comment)
+FARDESK_BOOTSTRAP_MACHINES = My Mac|http:/$()/100.64.0.1:4780
+// Optional hub: when set, the app logs in once to the hub and takes its machines from it.
+// FARDESK_HUB = http:/$()/100.64.0.10:4780

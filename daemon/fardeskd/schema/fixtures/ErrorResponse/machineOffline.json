@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "machine_offline",
+    "message": "Studio is offline: no answer within 5 s; last seen 2026-11-16T07:18:00.000Z"
+  }
+}

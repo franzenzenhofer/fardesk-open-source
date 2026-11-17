@@ -1,0 +1,13 @@
+{
+  "contractVersion": 1,
+  "name": "Build Box",
+  "hostname": "build-box",
+  "os": "linux",
+  "version": "0.1.0",
+  "claudeVersion": null,
+  "sessionsCount": 0,
+  "models": [],
+  "ghosttyAutomation": "unknown",
+  "allowBypass": false,
+  "coordinatorEnabled": false
+}

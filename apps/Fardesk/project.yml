@@ -1,0 +1,129 @@
+name: Fardesk
+options:
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+configFiles:
+  Debug: Config/Version.xcconfig
+  Release: Config/Version.xcconfig
+packages:
+  FardeskKit:
+    path: ../../packages/FardeskKit
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+targets:
+  Fardesk:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - Sources
+      - Shared
+      - path: Resources
+        excludes:
+          - "*.entitlements"
+    dependencies:
+      - package: FardeskKit
+        product: FardeskModels
+      - package: FardeskKit
+        product: FardeskStore
+      - package: FardeskKit
+        product: FardeskClient
+      - target: FardeskWidgets
+        platformFilter: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FARDESK_BUNDLE_PREFIX).fardesk
+        DEVELOPMENT_TEAM: $(FARDESK_TEAM_ID)
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Resources/Fardesk.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Resources/Fardesk-macOS.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Fardesk
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_NSCameraUsageDescription: "Scan the pairing code shown by fardeskd, and take photos to send with your replies."
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Dictate replies to your sessions."
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Turn your voice into reply text."
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "Confirm destructive actions."
+    info:
+      path: Config/Info.plist
+      properties:
+        UILaunchScreen: {}
+        FardeskBootstrapMachines: $(FARDESK_BOOTSTRAP_MACHINES)
+        FardeskHub: $(FARDESK_HUB)
+        FardeskMachineOrder: $(FARDESK_MACHINE_ORDER)
+        FardeskAppGroup: group.$(FARDESK_BUNDLE_PREFIX).fardesk
+        UIBackgroundModes:
+          - remote-notification
+        NSSupportsLiveActivities: true
+        LSApplicationQueriesSchemes:
+          - tailscale
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+  FardeskWidgets:
+    type: app-extension
+    supportedDestinations: [iOS]
+    sources:
+      - path: Widgets
+        excludes:
+          - "*.entitlements"
+      - Shared
+    info:
+      path: Config/WidgetsInfo.plist
+      properties:
+        CFBundleDisplayName: Fardesk Widgets
+        FardeskAppGroup: group.$(FARDESK_BUNDLE_PREFIX).fardesk
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - package: FardeskKit
+        product: FardeskModels
+      - package: FardeskKit
+        product: FardeskStore
+      - package: FardeskKit
+        product: FardeskClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FARDESK_BUNDLE_PREFIX).fardesk.widgets
+        DEVELOPMENT_TEAM: $(FARDESK_TEAM_ID)
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Widgets/FardeskWidgets.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+  FardeskUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS]
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Fardesk
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FARDESK_BUNDLE_PREFIX).fardesk.uitests
+        DEVELOPMENT_TEAM: $(FARDESK_TEAM_ID)
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Fardesk
+schemes:
+  Fardesk:
+    build:
+      targets:
+        Fardesk: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  FardeskUITests:
+    build:
+      targets:
+        Fardesk: all
+        FardeskUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - FardeskUITests

@@ -1,0 +1,6 @@
+{
+  "cwd": "/Users/dev/smear-studio",
+  "prompt": "Fix the flicker in the canvas view.",
+  "worktree": true,
+  "model": "claude-opus-5-5"
+}

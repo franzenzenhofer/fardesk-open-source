@@ -1,0 +1,22 @@
+{
+  "type": "session",
+  "session": {
+    "id": "sess_5d90aa",
+    "title": "Idle terminal session",
+    "cwd": "/Users/dev/crawler",
+    "status": "idle",
+    "waitingFor": null,
+    "owned": false,
+    "replyMode": "composer",
+    "canStop": false,
+    "summary": "Finished the retry rewrite",
+    "model": "claude-sonnet-5-5",
+    "pid": 52100,
+    "muted": false,
+    "permissionMode": "dontAsk",
+    "contextTokens": 187432,
+    "cacheExpiresAt": "2026-11-14T07:30:00.000Z",
+    "startedAt": "2026-11-14T06:00:00.000Z",
+    "updatedAt": "2026-11-14T06:30:00.000Z"
+  }
+}

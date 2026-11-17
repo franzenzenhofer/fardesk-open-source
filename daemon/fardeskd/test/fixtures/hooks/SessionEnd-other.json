@@ -1,0 +1,8 @@
+{
+  "session_id": "b0ad2014-b0c8-40ec-9f72-3840f88d1142",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/b0ad2014-b0c8-40ec-9f72-3840f88d1142.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "prompt_id": "b03b5c1a-a0c7-4264-b1d3-007c57819207",
+  "hook_event_name": "SessionEnd",
+  "reason": "other"
+}

@@ -1,0 +1,41 @@
+Fardesk
+Copyright 2026 The Fardesk authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Name and icon
+The name "Fardesk" and the app icon are not licensed under the Apache License. Section 6 of the licence
+gives no right to use them. You may say that your fork is based on Fardesk; do not publish a fork or an app
+under the name Fardesk or with this icon.
+
+Not affiliated with Anthropic
+Fardesk is an independent project. It is not made, endorsed or supported by Anthropic. "Claude" and "Claude
+Code" are names of Anthropic PBC.
+
+Anthropic software that Fardesk uses but does not contain
+- Claude Code, which you install and log in to yourself, is used under Anthropic's terms.
+- @anthropic-ai/claude-agent-sdk (https://github.com/anthropics/claude-agent-sdk-typescript) is installed
+  from the npm registry by `npm ci`. It is not part of this repository and is not under the Apache License.
+  Its LICENSE.md says: "© Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements
+  outlined here: https://code.claude.com/docs/en/legal-and-compliance". By running Fardesk you use it under
+  those terms.
+
+Transcript fixtures
+The files under daemon/fardeskd/test/fixtures/transcripts are structure captured from Claude Code session
+files with all free text replaced by filler (see the INDEX.md next to them). The file layout is Claude Code's
+own, undocumented format; it belongs to Anthropic and can change in any release. The fixtures name tools of
+some third-party connectors (tool names starting with mcp__); those names are used only to test the parser.
+
+Third-party dependencies (direct)
+Each one is installed from its registry; licence as stated in the package metadata or repository.
+- hono 4.x, MIT, https://github.com/honojs/hono
+- @hono/node-server 2.x, MIT, https://github.com/honojs/node-server
+- qrcode 1.x, MIT, https://github.com/soldair/node-qrcode
+- ws 8.x, MIT, https://github.com/websockets/ws
+- zod 4.x, MIT, https://github.com/colinhacks/zod
+- swift-argument-parser 1.x (Swift package, used by the command line tool), Apache License 2.0,
+  https://github.com/apple/swift-argument-parser (resolved to 1.8.2 in packages/FardeskKit/Package.resolved;
+  its LICENSE.txt is the Apache License 2.0 with an added Swift runtime library exception)
+
+Development-only npm packages (TypeScript, ESLint, Vitest, tsx, jscpd, ajv and their types) are not part of
+what Fardesk ships; their licences are in their own packages after `npm ci`.

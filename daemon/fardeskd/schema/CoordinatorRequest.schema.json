@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/CoordinatorRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "additionalProperties": false
+}

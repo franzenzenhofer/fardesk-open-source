@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/GhosttyProbeResult.schema.json",
+  "type": "object",
+  "properties": {
+    "ghosttyAutomation": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "denied",
+        "unknown"
+      ]
+    }
+  },
+  "required": [
+    "ghosttyAutomation"
+  ],
+  "additionalProperties": false
+}

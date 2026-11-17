@@ -1,0 +1,14 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0003",
+    "ts": "2026-11-14T09:00:30.000Z",
+    "kind": "tool",
+    "tool": "Bash",
+    "title": "Running swift test",
+    "status": "running",
+    "hasDetail": false,
+    "durationMs": null
+  }
+}

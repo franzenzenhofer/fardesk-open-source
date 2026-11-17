@@ -1,0 +1,16 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0015",
+    "ts": "2026-11-14T09:05:30.000Z",
+    "kind": "question",
+    "requestId": "req_a4",
+    "text": "Pick a colour space.",
+    "options": [
+      "sRGB",
+      "Display P3"
+    ],
+    "state": "expired"
+  }
+}

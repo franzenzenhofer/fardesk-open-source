@@ -1,0 +1,22 @@
+{
+  "type": "session",
+  "session": {
+    "id": "sess_91d0aa",
+    "title": "Export dialog",
+    "cwd": "/Users/dev/smear-studio",
+    "status": "waiting",
+    "waitingFor": "question",
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": true,
+    "summary": "Asked which file format to use",
+    "model": "claude-opus-5-5",
+    "pid": 51002,
+    "muted": false,
+    "permissionMode": null,
+    "contextTokens": null,
+    "cacheExpiresAt": null,
+    "startedAt": "2026-11-14T07:45:00.000Z",
+    "updatedAt": "2026-11-14T09:05:00.000Z"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "devices": [
+    {
+      "id": "dev_01",
+      "name": "iPhone",
+      "createdAt": "2026-11-14T08:00:00.000Z",
+      "lastSeenAt": "2026-11-15T09:30:00.000Z",
+      "lastIp": "100.64.0.9",
+      "revoked": false,
+      "current": true
+    },
+    {
+      "id": "dev_02",
+      "name": "Studio CLI",
+      "createdAt": "2026-11-13T08:00:00.000Z",
+      "lastSeenAt": null,
+      "lastIp": null,
+      "revoked": true,
+      "current": false
+    }
+  ]
+}

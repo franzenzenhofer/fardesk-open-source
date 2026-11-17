@@ -1,0 +1,20 @@
+{
+  "type": "hello",
+  "machine": {
+    "contractVersion": 1,
+    "name": "Studio Mac",
+    "hostname": "studio-mac.local",
+    "os": "macos",
+    "version": "0.1.0",
+    "claudeVersion": "2.4.1",
+    "sessionsCount": 3,
+    "models": [
+      "claude-opus-5-5",
+      "claude-sonnet-5-5"
+    ],
+    "ghosttyAutomation": "denied",
+    "allowBypass": true,
+    "coordinatorEnabled": true
+  },
+  "sessions": []
+}

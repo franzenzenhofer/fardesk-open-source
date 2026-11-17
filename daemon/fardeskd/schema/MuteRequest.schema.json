@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/MuteRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "muted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "muted"
+  ],
+  "additionalProperties": false
+}

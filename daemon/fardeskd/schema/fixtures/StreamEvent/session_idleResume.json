@@ -1,0 +1,22 @@
+{
+  "type": "session",
+  "session": {
+    "id": "sess_e5517c",
+    "title": "Docs cleanup",
+    "cwd": "/Users/dev/crawler",
+    "status": "idle",
+    "waitingFor": null,
+    "owned": false,
+    "replyMode": "resume",
+    "canStop": false,
+    "summary": "Looked through 6 files",
+    "model": null,
+    "pid": null,
+    "muted": true,
+    "permissionMode": "plan",
+    "contextTokens": null,
+    "cacheExpiresAt": null,
+    "startedAt": "2026-11-13T16:20:00.000Z",
+    "updatedAt": "2026-11-13T17:02:10.000Z"
+  }
+}

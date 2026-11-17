@@ -1,0 +1,41 @@
+{
+  "hub": "Linux",
+  "checkedAt": "2026-11-16T09:30:05.000Z",
+  "machines": [
+    {
+      "name": "Linux",
+      "online": true,
+      "hub": true,
+      "lastSeen": "2026-11-16T09:30:05.000Z",
+      "latencyMs": 0,
+      "problem": null,
+      "sessions": 2,
+      "waiting": 0,
+      "working": 1,
+      "os": "linux"
+    },
+    {
+      "name": "Studio",
+      "online": true,
+      "hub": false,
+      "lastSeen": "2026-11-16T09:30:00.000Z",
+      "latencyMs": 42,
+      "problem": null,
+      "sessions": 5,
+      "waiting": 1,
+      "working": 2,
+      "os": "macos"
+    },
+    {
+      "name": "Laptop",
+      "online": false,
+      "hub": false,
+      "lastSeen": "2026-11-16T07:18:00.000Z",
+      "latencyMs": null,
+      "problem": "no answer within 5 s",
+      "sessions": 3,
+      "waiting": 0,
+      "working": 0
+    }
+  ]
+}

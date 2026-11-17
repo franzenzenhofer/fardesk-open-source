@@ -1,0 +1,19 @@
+{
+  "id": "sess_0b6e12",
+  "title": "Release notes",
+  "cwd": "/Users/dev/smear-studio",
+  "status": "ended",
+  "waitingFor": null,
+  "owned": false,
+  "replyMode": "takeover",
+  "canStop": false,
+  "summary": "",
+  "model": "claude-haiku-5-5",
+  "pid": null,
+  "muted": false,
+  "permissionMode": "bypassPermissions",
+  "contextTokens": null,
+  "cacheExpiresAt": null,
+  "startedAt": "2026-11-12T10:00:00.000Z",
+  "updatedAt": "2026-11-12T10:45:30.000Z"
+}

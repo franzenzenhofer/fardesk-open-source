@@ -1,0 +1,9 @@
+{
+  "session_id": "6482f697-011c-4cc7-be1a-54239611d0ea",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/6482f697-011c-4cc7-be1a-54239611d0ea.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "scratchpad_dir": "/tmp/claude-1000/-home-dev-fardesk-spike-c/6482f697-011c-4cc7-be1a-54239611d0ea/scratchpad",
+  "hook_event_name": "SessionStart",
+  "source": "startup",
+  "model": "claude-sonnet-5-5"
+}

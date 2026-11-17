@@ -1,0 +1,12 @@
+  689     1 ??       /Applications/Ghostty.app/Contents/MacOS/ghostty
+43727   689 ttys000  /usr/bin/login
+43728 43727 ttys000  -/bin/zsh
+47748 43728 ttys000  /Users/dev/.local/bin/claude
+47790 47748 ttys000  npm exec chrome-devtools-mcp@1.5.0
+47825 47790 ttys000  chrome-devtools-mcp
+18788 25870 ttys001  caffeinate
+21867   689 ttys001  /usr/bin/login
+21868 21867 ttys001  -/bin/zsh
+25870 21868 ttys001  /Users/dev/.local/bin/claude
+25903 25870 ttys001  npm exec chrome-devtools-mcp@1.5.0
+25943 25903 ttys001  chrome-devtools-mcp

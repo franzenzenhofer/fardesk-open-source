@@ -1,0 +1,27 @@
+{
+  "session_id": "3784c152-a433-4abe-84fb-e00ae4cc1616",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/3784c152-a433-4abe-84fb-e00ae4cc1616.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "scratchpad_dir": "/tmp/claude-1000/-home-dev-fardesk-spike-c/3784c152-a433-4abe-84fb-e00ae4cc1616/scratchpad",
+  "prompt_id": "a3500263-5434-400d-a666-4bb34b72dd0a",
+  "permission_mode": "default",
+  "agent_id": "a17ac20f90edeedd6",
+  "agent_type": "general-purpose",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/3784c152-a433-4abe-84fb-e00ae4cc1616/subagents/agent-a17ac20f90edeedd6.jsonl",
+  "last_assistant_message": "hello",
+  "background_tasks": [
+    {
+      "id": "a17ac20f90edeedd6",
+      "type": "subagent",
+      "status": "running",
+      "description": "Reply hello",
+      "agent_type": "general-purpose"
+    }
+  ],
+  "session_crons": []
+}

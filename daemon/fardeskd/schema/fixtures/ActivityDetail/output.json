@@ -1,0 +1,25 @@
+{
+  "activityId": "act_0004",
+  "kind": "output",
+  "truncated": false,
+  "sections": [
+    {
+      "title": "swift test",
+      "subtitle": "exit 0",
+      "added": 0,
+      "removed": 0,
+      "lines": [
+        {
+          "number": null,
+          "sign": " ",
+          "text": "Test Suite 'All tests' started"
+        },
+        {
+          "number": null,
+          "sign": " ",
+          "text": "Executed 31 tests, with 0 failures"
+        }
+      ]
+    }
+  ]
+}

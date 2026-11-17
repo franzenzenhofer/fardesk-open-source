@@ -1,0 +1,17 @@
+{
+  "threshold": 0,
+  "minTokens": 50,
+  "minLines": 5,
+  "format": ["typescript", "swift"],
+  "path": [
+    "daemon/fardeskd/src",
+    "daemon/fardeskd/test/support",
+    "packages/FardeskKit/Sources",
+    "packages/FardeskKit/Tests",
+    "apps"
+  ],
+  "ignore": ["**/node_modules/**", "**/.build/**", "**/dist/**", "**/*.xcodeproj/**", "**/DerivedData/**"],
+  "gitignore": true,
+  "reporters": ["consoleFull"],
+  "exitCode": 1
+}

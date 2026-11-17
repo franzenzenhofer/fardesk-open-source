@@ -1,0 +1,34 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcarchive
+*.ipa
+*.p8
+*.pem
+*.key
+.env
+.env.*
+*.local.json
+.claude/worktrees/
+trash/
+xcuserdata/
+*.profraw
+*.profdata
+!daemon/fardeskd/test/fixtures/apns/*.pem
+
+# Attachments sent from the phone into sessions in this folder
+.fardesk/
+
+# UI test runs on a second Mac: screenshots, videos, logs (large; summaries live in docs/acceptance/*.md)
+docs/acceptance/sim-remote/
+
+# Your own settings and secrets: never committed
+fardesk.env
+private/
+# Raw screenshot runs (only the reviewed, copied images in docs/screenshots/ are tracked)
+docs/screenshots/raw/
