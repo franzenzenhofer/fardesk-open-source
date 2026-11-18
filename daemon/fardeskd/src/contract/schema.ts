@@ -21,6 +21,10 @@ export const permissionModeSchema = z.enum(["default", "acceptEdits", "plan", "b
 
 const isoTimestamp = z.iso.datetime();
 
+export const labelColorSchema = z.enum(["blue", "teal", "purple", "pink"]);
+/** The user's own name, colour and pin for a session; `name: null` means the app shows `title`. */
+export const sessionLabelSchema = z.strictObject({ name: z.string().min(1).max(80).nullable(), color: labelColorSchema.nullable(), pinned: z.boolean() });
+
 export const machineSchema = z.strictObject({
   contractVersion: z.literal(CONTRACT_VERSION),
   name: z.string().min(1),
@@ -50,6 +54,7 @@ export const sessionSummarySchema = z.strictObject({
   model: z.string().nullable(),
   pid: z.number().int().positive().nullable(),
   muted: z.boolean(),
+  label: sessionLabelSchema,
   /** The mode of the session's last turn (from the transcript); null when the transcript has none. */
   permissionMode: permissionModeSchema.nullable(),
   /** Context size of the last turn: input + cache read + cache creation tokens of the last main assistant message. */
@@ -189,6 +194,12 @@ export const telemetryListSchema =z.strictObject({ reports: z.array(telemetryRep
 export const permissionRequestSchema = z.strictObject({ decision: permissionDecisionSchema });
 export const answerRequestSchema = z.strictObject({ option: z.string().min(1) });
 export const muteRequestSchema = z.strictObject({ muted: z.boolean() });
+/** A patch: only the keys present change. An empty name (after trim) clears the custom name. */
+export const labelRequestSchema = z.strictObject({
+  name: z.string().trim().max(80).nullable().optional(),
+  color: labelColorSchema.nullable().optional(),
+  pinned: z.boolean().optional(),
+});
 export const newSessionRequestSchema = z.strictObject({
   cwd: z.string().min(1),
   prompt: z.string().min(1),
@@ -314,6 +325,7 @@ export const contractSchemas = {
   PermissionRequest: permissionRequestSchema,
   AnswerRequest: answerRequestSchema,
   MuteRequest: muteRequestSchema,
+  LabelRequest: labelRequestSchema,
   NewSessionRequest: newSessionRequestSchema,
   CoordinatorRequest: coordinatorRequestSchema,
   DeviceRequest: deviceRequestSchema,
@@ -345,7 +357,9 @@ export type ReplyMode = z.infer<typeof replyModeSchema>;
 export type PermissionState = z.infer<typeof permissionStateSchema>;
 export type PermissionDecision = z.infer<typeof permissionDecisionSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
-export type Machine = z.infer<typeof machineSchema>;
+export type SessionLabel = z.infer<typeof sessionLabelSchema>;
+export type LabelRequest = z.infer<typeof labelRequestSchema>;
+export type Machine =z.infer<typeof machineSchema>;
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 export type Activity = z.infer<typeof activitySchema>;
 export type ToolActivity = z.infer<typeof toolActivitySchema>;

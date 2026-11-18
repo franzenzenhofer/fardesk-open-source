@@ -11,6 +11,11 @@
   "model": "claude-sonnet-5-5",
   "pid": 50377,
   "muted": false,
+  "label": {
+    "name": "Crawler",
+    "color": "purple",
+    "pinned": false
+  },
   "permissionMode": "default",
   "contextTokens": null,
   "cacheExpiresAt": null,

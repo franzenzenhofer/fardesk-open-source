@@ -1,6 +1,6 @@
 // The one function that turns what we know about a session into the contract SessionSummary
 // (the "Session status mapping" table in docs/DAEMON.md).
-import type { ReplyMode, SessionStatus, SessionSummary, WaitingReason } from "../contract/schema.js";
+import type { ReplyMode, SessionLabel, SessionStatus, SessionSummary, WaitingReason } from "../contract/schema.js";
 import type { TranscriptSummary } from "../transcript/index.js";
 import type { LiveProcess } from "./claudeRegistry.js";
 import { BYPASS_PERMISSIONS, knownPermissionMode } from "./permissionMode.js";
@@ -22,6 +22,7 @@ export type StatusInput = {
   /** The terminal can be typed into, so replies work without an inbox. */
   typable?: boolean;
   muted: boolean;
+  label: SessionLabel;
 };
 
 export type SessionTimes = { startedAt: string; updatedAt: string };
@@ -99,6 +100,7 @@ export function buildSessionSummary(input: StatusInput, cwd: string, times: Sess
     model: input.summary.model,
     pid: input.process?.pid ?? null,
     muted: input.muted,
+    label: input.label,
     permissionMode: knownPermissionMode(input.summary.permissionMode),
     contextTokens: input.summary.contextTokens,
     cacheExpiresAt: input.summary.cacheExpiresAt,

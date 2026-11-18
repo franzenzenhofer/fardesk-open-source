@@ -1,5 +1,17 @@
 import Foundation
 
+private final class RejectRedirects: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 /// The two URLSessions of the app: one for the short HTTP calls, one for the long-lived WebSockets. Separate
 /// sessions so a slow stream never queues behind (or in front of) a tap's request, and each has the timeouts it needs.
 public enum FardeskSessions {
@@ -13,13 +25,13 @@ public enum FardeskSessions {
         configuration.urlCache = nil
         configuration.httpMaximumConnectionsPerHost = 6
         configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: configuration, delegate: RejectRedirects(), delegateQueue: nil)
     }()
 
     public static let stream: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = streamTimeout
         configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: configuration, delegate: RejectRedirects(), delegateQueue: nil)
     }()
 }

@@ -6,7 +6,7 @@ import { startTestDaemon } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
 import { makeTempDir, waitUntil } from "../../test/support/env.js";
 import { HOOK_SESSION_ID, fireHook, pendingRequestId, seedHookSession } from "../../test/support/hookSession.js";
-import { AUDIT_FILE, auditEntrySchema, createAuditLog, readAudit } from "../audit/store.js";
+import { AUDIT_FILE, UNAUTHENTICATED_AUDIT_FILE, auditEntrySchema, createAuditLog, readAudit } from "../audit/store.js";
 import type { AuditEntry } from "../audit/store.js";
 
 let daemon: TestDaemon;
@@ -74,5 +74,23 @@ describe("audit store", () => {
     for (const entry of all) auditEntrySchema.parse(entry);
     const recent = readAudit(stateDir, new Date("2026-11-17T10:09:00.000Z"));
     expect(recent.map((entry) => entry.time)).toEqual(["2026-11-17T10:09:00.000Z", "2026-11-17T10:10:00.000Z"]);
+  });
+
+  it("keeps the authenticated trail when a caller without a valid bearer floods the log", () => {
+    const stateDir = makeTempDir("fd-audit-");
+    let now = new Date("2026-11-17T10:00:00.000Z");
+    const log = createAuditLog({ stateDir, now: () => now, maxBytes: 600 });
+    log.record({ event: "request", deviceId: "dev_1", method: "POST", route: "/v1/sessions/:id/stop", sessionId: "s1", result: 200, ip: "100.64.0.9" });
+    for (let index = 0; index < 200; index += 1) {
+      now = new Date(now.getTime() + 1000);
+      log.record({ event: "login_failed", deviceId: null, method: "POST", route: "/v1/auth/login", sessionId: null, result: 401, ip: "100.64.0.66" });
+    }
+    now = new Date(now.getTime() + 1000);
+    log.record({ event: "request", deviceId: "dev_1", method: "POST", route: "/v1/sessions/:id/mute", sessionId: "s1", result: 200, ip: "100.64.0.9" });
+    const all = readAudit(stateDir, null);
+    expect(all.filter((entry) => entry.deviceId === "dev_1").map((entry) => entry.route)).toEqual(["/v1/sessions/:id/stop", "/v1/sessions/:id/mute"]);
+    expect(all.some((entry) => entry.event === "login_failed")).toBe(true);
+    expect(all.map((entry) => entry.time)).toEqual([...all.map((entry) => entry.time)].sort());
+    expect(statSync(join(stateDir, UNAUTHENTICATED_AUDIT_FILE)).mode & 0o777).toBe(0o600);
   });
 });

@@ -102,6 +102,10 @@ extension FardeskAPI {
         let _: OkResult = try await post(["v1", "sessions", sessionID, "mute"], MuteRequest(muted: muted))
     }
 
+    public func label(sessionID: String, _ request: LabelRequest) async throws {
+        let _: OkResult = try await post(["v1", "sessions", sessionID, "label"], request)
+    }
+
     public func decide(sessionID: String, requestID: String, decision: PermissionDecision) async throws {
         let body = PermissionDecisionRequest(decision: decision)
         let _: OkResult = try await post(["v1", "sessions", sessionID, "permission", requestID], body)

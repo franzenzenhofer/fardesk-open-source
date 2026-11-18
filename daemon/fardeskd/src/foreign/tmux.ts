@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { RunCommand, RunWithInput } from "../config/bind.js";
 import { FardeskError } from "../core/errors.js";
-import { assertSandboxTmux, sandboxAllowsSocket } from "../core/sandbox.js";
+import { assertSandboxTmux, sandboxAllowsDefaultServer, sandboxAllowsSocket } from "../core/sandbox.js";
 import { ancestry } from "./processTree.js";
 import type { ProcessTable } from "./processTree.js";
 import { listTmuxSockets, socketAccepts } from "./tmuxSockets.js";
@@ -65,7 +65,9 @@ export async function listAllPanes(options: { tmuxBinary: string; run: RunComman
   const uid = process.getuid?.() ?? 0;
   const candidates = listTmuxSockets(process.env, uid).filter(sandboxAllowsSocket);
   const alive = await Promise.all(candidates.map(async (path) => socketAccepts(path)));
-  const servers: (string | null)[] = [null, ...candidates.filter((_, index) => alive[index])];
+  const sockets = candidates.filter((_, index) => alive[index]);
+  // Under the test sandbox the real default server (where the test runner itself may live) is never looked at.
+  const servers: (string | null)[] = sandboxAllowsDefaultServer(options.tmuxBinary) ? [null, ...sockets] : sockets;
   const found = await Promise.all(servers.map(async (socket) => panesOfServer(options, socket)));
   return found.flat();
 }

@@ -1,6 +1,6 @@
 {
   "name": "fardeskd",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "private": true,
   "description": "Fardesk daemon: observes and controls Claude Code sessions on one machine",
   "type": "module",
@@ -39,7 +39,7 @@
     "jscpd": "^5.4.3",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.2",
+    "typescript-eslint": "^8.73.0",
     "vitest": "^5.1.0"
   }
 }

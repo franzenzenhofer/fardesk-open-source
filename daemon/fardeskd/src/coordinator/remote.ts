@@ -33,6 +33,7 @@ async function request<S extends z.ZodType>(peer: Peer, token: string, call: Cal
   try {
     response = await fetch(`${peer.url.replace(/\/+$/, "")}${call.path}`, {
       method: call.method,
+      redirect: "error",
       headers,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       ...(call.body === undefined ? {} : { body: JSON.stringify(call.body) }),

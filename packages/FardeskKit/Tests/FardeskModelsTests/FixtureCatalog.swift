@@ -33,6 +33,7 @@ enum FixtureCatalog {
         "PermissionRequest": roundTrip(PermissionDecisionRequest.self),
         "AnswerRequest": roundTrip(AnswerRequest.self),
         "MuteRequest": roundTrip(MuteRequest.self),
+        "LabelRequest": roundTrip(LabelRequest.self),
         "CoordinatorRequest": roundTrip(CoordinatorRequest.self),
         "FolderSearch": roundTrip(FolderSearch.self),
         "CoordinatorState": roundTrip(CoordinatorState.self),

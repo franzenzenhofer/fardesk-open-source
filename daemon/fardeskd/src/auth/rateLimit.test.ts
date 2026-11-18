@@ -45,3 +45,18 @@ describe("global cap", () => {
     expectLimited(() => { limiter.check("9.9.9.9"); });
   });
 });
+
+it("counts in-flight attempts against both the IP and concurrent-check limits", () => {
+  const { limiter } = setup(2);
+  const releaseFirst = limiter.reserve("first");
+  const releaseSecond = limiter.reserve("first");
+  expectLimited(() => { limiter.reserve("first"); });
+  const releaseThird = limiter.reserve("second");
+  const releaseFourth = limiter.reserve("third");
+  expectLimited(() => { limiter.reserve("fourth"); });
+  releaseFirst();
+  limiter.reserve("fourth")();
+  releaseSecond();
+  releaseThird();
+  releaseFourth();
+});

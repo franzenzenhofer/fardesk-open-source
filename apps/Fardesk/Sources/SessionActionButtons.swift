@@ -18,6 +18,7 @@ struct SessionActionButtons: View {
             }
             EndSessionButton(ref: ref, session: session)
         }
+        SessionLabelButtons(ref: ref, session: session)
         Section {
             if session.canStop {
                 Button("Stop", systemImage: FardeskSymbol.stop) { Task { await model.stop(ref) } }

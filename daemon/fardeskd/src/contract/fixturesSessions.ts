@@ -1,4 +1,4 @@
-import type { PermissionMode, SessionSummary } from "./schema.js";
+import type { PermissionMode, SessionLabel, SessionSummary } from "./schema.js";
 import type { FixtureCase, FixtureCases } from "./fixtureTypes.js";
 
 export const macosMachine: FixtureCase<"Machine"> = {
@@ -37,6 +37,8 @@ export const machineFixtures: FixtureCases<"Machine"> = {
   macosAutomationDenied: deniedMachine,
 };
 
+const NO_LABEL: SessionLabel = { name: null, color: null, pinned: false };
+
 const idleIn = (id: string, permissionMode: PermissionMode): SessionSummary => ({
   id,
   title: "Idle terminal session",
@@ -50,6 +52,7 @@ const idleIn = (id: string, permissionMode: PermissionMode): SessionSummary => (
   model: "claude-sonnet-5-5",
   pid: 52100,
   muted: false,
+  label: NO_LABEL,
   permissionMode,
   contextTokens: 187_432,
   cacheExpiresAt: "2026-11-14T07:30:00.000Z",
@@ -71,6 +74,7 @@ export const sessionSummaryFixtures: FixtureCases<"SessionSummary"> = {
     model: "claude-opus-5-5",
     pid: 48211,
     muted: false,
+    label: { name: null, color: "teal", pinned: false },
     permissionMode: "bypassPermissions",
     contextTokens: 426_323,
     cacheExpiresAt: "2026-11-14T10:12:03.000Z",
@@ -90,6 +94,7 @@ export const sessionSummaryFixtures: FixtureCases<"SessionSummary"> = {
     model: "claude-sonnet-5-5",
     pid: 50377,
     muted: false,
+    label: { name: "Crawler", color: "purple", pinned: false },
     permissionMode: "default",
     contextTokens: null,
     cacheExpiresAt: null,
@@ -109,6 +114,7 @@ export const sessionSummaryFixtures: FixtureCases<"SessionSummary"> = {
     model: "claude-opus-5-5",
     pid: 51002,
     muted: false,
+    label: { name: null, color: "pink", pinned: true },
     permissionMode: null,
     contextTokens: null,
     cacheExpiresAt: null,
@@ -128,6 +134,7 @@ export const sessionSummaryFixtures: FixtureCases<"SessionSummary"> = {
     model: null,
     pid: null,
     muted: true,
+    label: { name: "Release work", color: "blue", pinned: true },
     permissionMode: "plan",
     contextTokens: null,
     cacheExpiresAt: null,
@@ -147,6 +154,7 @@ export const sessionSummaryFixtures: FixtureCases<"SessionSummary"> = {
     model: "claude-haiku-5-5",
     pid: null,
     muted: false,
+    label: NO_LABEL,
     permissionMode: "bypassPermissions",
     contextTokens: null,
     cacheExpiresAt: null,

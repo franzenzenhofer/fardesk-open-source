@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fardesk.local/schema/LabelRequest.schema.json",
+  "type": "object",
+  "properties": {
+    "name": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 80
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "color": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "blue",
+            "teal",
+            "purple",
+            "pink"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pinned": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

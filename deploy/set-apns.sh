@@ -4,6 +4,7 @@
 # Missing arguments come from fardesk.env: FARDESK_APNS_KEY_PATH, FARDESK_APNS_KEY_ID, FARDESK_TEAM_ID, <prefix>.fardesk.
 # The key is copied to ~/.config/fardesk/ on the target (mode 600). It never enters the repo.
 set -euo pipefail
+umask 077
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/lib/fardesk-env.sh"
 fardesk_load_env
@@ -16,6 +17,7 @@ TEAM_ID="${4:-${FARDESK_TEAM_ID:?team id (argument 4 or FARDESK_TEAM_ID)}}"
 TOPIC="${5:-$FARDESK_BUNDLE_PREFIX.fardesk}"
 KEY_NAME="$(basename "$KEY_FILE")"
 REMOTE_SCRIPT='set -euo pipefail
+umask 077
 CONFIG="$HOME/.config/fardesk/config.json"
 chmod 600 "$HOME/.config/fardesk/'"$KEY_NAME"'"
 TMP="$CONFIG.apns.$$"

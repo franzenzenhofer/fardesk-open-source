@@ -13,6 +13,11 @@
     "model": "claude-haiku-5-5",
     "pid": null,
     "muted": false,
+    "label": {
+      "name": null,
+      "color": null,
+      "pinned": false
+    },
     "permissionMode": "bypassPermissions",
     "contextTokens": null,
     "cacheExpiresAt": null,

@@ -5,6 +5,7 @@
 # Resumable: after a successful upload the build number is stored in $FARDESK_BUILD_DIR/pending-build;
 # a re-run skips archive and upload and continues polling.
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -25,8 +26,8 @@ BUILD_DIR="${BUILD_DIR%/}"
 
 PLATFORM="${1:-ios}"
 case "$PLATFORM" in
-  ios) ARCHIVE_DESTINATION='generic/platform=iOS'; ASC_PLATFORM=IOS ;;
-  macos) ARCHIVE_DESTINATION='generic/platform=macOS'; ASC_PLATFORM=MAC_OS ;;
+  ios) ARCHIVE_DESTINATION='generic/platform=iOS'; ASC_PLATFORM=IOS; ALTOOL_PLATFORM=ios ;;
+  macos) ARCHIVE_DESTINATION='generic/platform=macOS'; ASC_PLATFORM=MAC_OS; ALTOOL_PLATFORM=macos ;;
   *) printf '[testflight] ERROR: platform must be ios or macos, got %s\n' "$PLATFORM" >&2; exit 1 ;;
 esac
 PENDING_FILE="$BUILD_DIR/pending-build-$PLATFORM"
@@ -62,7 +63,7 @@ write_export_options() {
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
     '<plist version="1.0"><dict>' \
     '<key>method</key><string>app-store-connect</string>' \
-    '<key>destination</key><string>upload</string>' \
+    '<key>destination</key><string>export</string>' \
     "<key>teamID</key><string>$TEAM_ID</string>" \
     '<key>signingStyle</key><string>automatic</string>' \
     '<key>manageAppVersionAndBuildNumber</key><false/>' \
@@ -81,15 +82,31 @@ archive_app() {
     || { tail -40 "$BUILD_DIR/archive.log" >&2; die "archive failed, see $BUILD_DIR/archive.log"; }
 }
 
+# Export to a local file, then upload it with altool. Xcode's own upload first asks App Store Connect for the
+# app's versions with a query that answered HTTP 500 for this app on 2026-11-17 (UNEXPECTED_ERROR), while
+# altool's upload does not depend on it.
 export_and_upload() {
-  local number="$1"
+  local number="$1" package
   log "exporting and uploading build $number"
   write_export_options
   # Xcode shells out to rsync -E; Homebrew's rsync earlier in PATH rejects that flag ("Copy failed").
   PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH" xcodebuild -exportArchive -archivePath "$BUILD_DIR/Fardesk-$number.xcarchive" \
     -exportPath "$BUILD_DIR/export-$number" -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist" \
     "${AUTH_FLAGS[@]}" > "$BUILD_DIR/export.log" 2>&1 \
-    || { tail -40 "$BUILD_DIR/export.log" >&2; die "export/upload failed, see $BUILD_DIR/export.log"; }
+    || { tail -40 "$BUILD_DIR/export.log" >&2; die "export failed, see $BUILD_DIR/export.log"; }
+  package="$(find "$BUILD_DIR/export-$number" -maxdepth 1 \( -name '*.ipa' -o -name '*.pkg' \) | head -1)"
+  [[ -n "$package" ]] || die "export wrote no .ipa or .pkg in $BUILD_DIR/export-$number"
+  upload_package "$package"
+}
+
+# altool reads the API key only from a private_keys folder, under the name AuthKey_<id>.p8.
+upload_package() {
+  local package="$1" keys="$HOME/.private_keys"
+  mkdir -p "$keys" && chmod 700 "$keys"
+  [[ -f "$keys/AuthKey_$ASC_KEY_ID.p8" ]] || install -m 600 "$ASC_KEY_PATH" "$keys/AuthKey_$ASC_KEY_ID.p8"
+  xcrun altool --upload-app -f "$package" -t "$ALTOOL_PLATFORM" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" \
+    > "$BUILD_DIR/upload.log" 2>&1 || { tail -20 "$BUILD_DIR/upload.log" >&2; die "upload failed, see $BUILD_DIR/upload.log"; }
+  grep -q "UPLOAD SUCCEEDED" "$BUILD_DIR/upload.log" || die "altool did not report UPLOAD SUCCEEDED, see $BUILD_DIR/upload.log"
 }
 
 build_json() {
@@ -210,7 +227,7 @@ main() {
   ensure_tester "$group"
   print_summary "$number" "$group"
   mv "$PENDING_FILE" "$BUILD_DIR/last-shipped-build-$PLATFORM"
-  bump_version_after_shipping
+  if [[ "${FARDESK_TESTFLIGHT_SKIP_VERSION_BUMP:-0}" != 1 ]]; then bump_version_after_shipping; fi
 }
 
 # Every TestFlight upload ships VERSION as it is (1.8.1), then the repo moves on to the next patch (1.8.2).

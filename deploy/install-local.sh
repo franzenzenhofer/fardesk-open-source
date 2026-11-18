@@ -4,6 +4,7 @@
 # Idempotent: installs dependencies, writes the config on first install, installs the service,
 # merges the Claude Code hooks (with a backup) and restarts the daemon.
 set -euo pipefail
+umask 077
 
 MACHINE_NAME="${1:?usage: install-local.sh <machine-name>}"
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -53,6 +54,11 @@ install_systemd() {
 }
 
 mkdir -p "$LOG_DIR"
+chmod 700 "$LOG_DIR"
+for log in "$LOG_DIR/fardeskd.out.log" "$LOG_DIR/fardeskd.err.log"; do
+  touch "$log"
+  chmod 600 "$log"
+done
 install_dependencies
 ensure_config
 case "$(uname -s)" in

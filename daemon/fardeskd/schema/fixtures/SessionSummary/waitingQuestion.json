@@ -11,6 +11,11 @@
   "model": "claude-opus-5-5",
   "pid": 51002,
   "muted": false,
+  "label": {
+    "name": null,
+    "color": "pink",
+    "pinned": true
+  },
   "permissionMode": null,
   "contextTokens": null,
   "cacheExpiresAt": null,

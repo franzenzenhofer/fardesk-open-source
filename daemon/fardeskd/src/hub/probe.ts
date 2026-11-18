@@ -8,13 +8,13 @@ import { describeFailure, REFUSED_TOKEN } from "./failure.js";
 export const PROBE_TIMEOUT_MS = 5000;
 
 export type PeerLink = { name: string; baseUrl: string; token: string };
-export type PeerCall = { method: string; path: string; headers?: Record<string, string>; body?: ArrayBuffer | undefined; timeoutMs: number };
+export type PeerCall = { method: string; path: string; headers?: Record<string, string>; body?: ArrayBuffer | Uint8Array<ArrayBuffer> | undefined; timeoutMs: number };
 /** `timedOut`: the peer did not answer in time (it may only be busy), unlike a refused connection. */
 export type ProbeResult = { online: boolean; timedOut: boolean; latencyMs: number | null; problem: string | null; machine: Machine | null };
 
 async function send(link: PeerLink, call: PeerCall): Promise<Response> {
   const headers = { ...call.headers, authorization: `Bearer ${link.token}` };
-  const init = { method: call.method, headers, signal: AbortSignal.timeout(call.timeoutMs), ...(call.body === undefined ? {} : { body: call.body }) };
+  const init: RequestInit = { redirect: "error", method: call.method, headers, signal: AbortSignal.timeout(call.timeoutMs), ...(call.body === undefined ? {} : { body: call.body }) };
   return fetch(`${link.baseUrl}${call.path}`, init);
 }
 

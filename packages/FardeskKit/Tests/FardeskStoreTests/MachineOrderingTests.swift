@@ -77,7 +77,23 @@ struct MachineOrderingTests {
         #expect(machine.listedSessions.count == 14 + MachineState.endedRowLimit)
     }
 
-    private func session(_ id: String, _ status: String, ago seconds: Double) throws -> SessionSummary {
-        try Fixtures.session("working", overriding: ["id": id, "status": status, "updatedAt": Date.ISO8601FormatStyle(includingFractionalSeconds: true).format(base.addingTimeInterval(-seconds))])
+    @Test("Pinned sessions come first, and a pinned ended one stays listed past the ended cap")
+    func pinnedFirst() throws {
+        var machine = MachineState(endpoint: Fixtures.endpoint("Studio"))
+        let pin: [String: any Sendable] = ["label": ["name": "Mine", "color": "blue", "pinned": true] as [String: any Sendable]]
+        let live = try (0..<3).map { try session("live\($0)", "working", ago: Double($0)) }
+        let pinnedLive = try session("live-pinned", "idle", ago: 50, extra: pin)
+        let ended = try (0..<15).map { try session("done\($0)", "ended", ago: Double(100 + $0)) }
+        let pinnedOld = try session("done-old-pinned", "ended", ago: 999, extra: pin)
+        machine.apply(.hello(machine: try Fixtures.machine(), sessions: ended + live + [pinnedOld, pinnedLive]))
+        #expect(Array(machine.listedSessions.prefix(2).map(\.id)) == ["live-pinned", "done-old-pinned"])
+        #expect(machine.listedSessions.filter { $0.id == "live-pinned" }.count == 1)
+        #expect(machine.listedSessions.count == 2 + 3 + MachineState.endedRowLimit)
+        #expect(machine.listedSessions.first?.displayTitle == "Mine")
+    }
+
+    private func session(_ id: String, _ status: String, ago seconds: Double, extra: [String: any Sendable] = [:]) throws -> SessionSummary {
+        let stamp = Date.ISO8601FormatStyle(includingFractionalSeconds: true).format(base.addingTimeInterval(-seconds))
+        return try Fixtures.session("working", overriding: ["id": id, "status": status, "updatedAt": stamp].merging(extra) { $1 })
     }
 }

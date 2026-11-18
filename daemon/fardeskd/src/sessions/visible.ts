@@ -35,5 +35,5 @@ export function visibleSessions(sessions: SessionSummary[], rules: ListRules): S
     if (kept.size >= rules.maxEnded) break;
     if (worthListing(session, rules)) kept.add(session.id);
   }
-  return sessions.filter((session) => session.status !== "ended" || kept.has(session.id));
+  return sessions.filter((session) => session.status !== "ended" || session.label.pinned || kept.has(session.id));
 }

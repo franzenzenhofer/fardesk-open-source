@@ -1,5 +1,10 @@
 // GET /v1/hub and /m/<machine>/...: the local app for this machine and for /v1/auth/*, cache or forward for a peer.
 import type { Context } from "hono";
+import { MAX_ATTACHMENT_BYTES } from "../attachments/store.js";
+import { MASTER_DEVICE_ID } from "../auth/deviceRegistry.js";
+import { FardeskError } from "../core/errors.js";
+import { PAIR_PATH } from "../server/context.js";
+import { MAX_JSON_BYTES, readBoundedBody } from "../server/boundedBody.js";
 import type { Config } from "../config/config.js";
 import type { App, AppEnv } from "../server/context.js";
 import { serveFromCache } from "./cached.js";
@@ -15,19 +20,23 @@ const LONG_ACTIONS = /\/(new|resume|takeover|fork|clear|attachments)$/;
 // Login and logout are about the caller's session with the hub itself (the peer token belongs to the hub, not to the
 // phone); the other /v1/auth/* routes (devices, revoke, password, reload) are about the machine that is addressed.
 const HUB_OWN_AUTH = new Set(["/v1/auth/login", "/v1/auth/logout"]);
+// Device callers may only forward peer auth operations available to ordinary devices.
+const DEVICE_PEER_AUTH = new Set([PAIR_PATH, "/v1/auth/devices", "/v1/auth/revoke", "/v1/auth/password", "/v1/auth/reload"]);
 const DEVICES_PATH = "/v1/devices";
 const DROPPED_HEADERS = new Set(["authorization", "host", "content-length", "connection", "transfer-encoding", "accept-encoding"]);
 
-type Target = { name: string; path: string; search: string; body: ArrayBuffer | undefined };
+type Target = { name: string; path: string; search: string; body: Uint8Array<ArrayBuffer> | undefined };
 type Ctx = Context<AppEnv>;
 
-function parseTarget(url: URL, body: ArrayBuffer | undefined): Target {
+function parseTarget(url: URL): Omit<Target, "body"> {
   const [, , raw = "", ...rest] = url.pathname.split("/");
-  return { name: decodeMachine(raw), path: `/${rest.join("/")}`, search: url.search, body };
+  return { name: decodeMachine(raw), path: `/${rest.join("/")}`, search: url.search };
 }
 
-async function bodyOf(c: Ctx): Promise<ArrayBuffer | undefined> {
-  return c.req.method === "GET" || c.req.method === "HEAD" ? undefined : c.req.arrayBuffer();
+async function bodyOf(c: Ctx, path: string): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  if (c.req.method === "GET" || c.req.method === "HEAD") return undefined;
+  const attachment = c.req.method === "POST" && /^\/v1\/sessions\/[^/]+\/attachments$/.test(path);
+  return readBoundedBody(c.req.raw, attachment ? MAX_ATTACHMENT_BYTES : MAX_JSON_BYTES, attachment);
 }
 
 async function local(app: App, c: Ctx, target: Target): Promise<Response> {
@@ -59,8 +68,24 @@ async function forward(peer: PeerMonitor, c: Ctx, target: Target): Promise<Respo
 
 type Handler = { app: App; hub: Hub; config: Config };
 
+/** The peer behind a public (bearer-less) pairing request: unknown and offline machines answer without naming any machine. */
+function anonymousPeer(hub: Hub, name: string): PeerMonitor {
+  try {
+    const peer = knownPeer(hub, name);
+    requireOnline(peer);
+    return peer;
+  } catch (error) {
+    if (error instanceof FardeskError) throw new FardeskError(error.code, "no such machine is available");
+    throw error;
+  }
+}
+
 async function viaPeer({ app, hub, config }: Handler, c: Ctx, target: Target): Promise<Response> {
-  const peer = knownPeer(hub, target.name);
+  const caller = c.get("deviceId") as string | undefined;
+  if (caller !== MASTER_DEVICE_ID && /^\/+v1\/+auth(?:\/|$)/i.test(decodeMachine(target.path)) && !DEVICE_PEER_AUTH.has(target.path)) {
+    throw new FardeskError("unauthorized", "the hub master token is required for this peer operation");
+  }
+  const peer = caller === undefined ? anonymousPeer(hub, target.name) : knownPeer(hub, target.name);
   if (c.req.method === "POST" && target.path === DEVICES_PATH) {
     const own = await local(app, c, target);
     if (!own.ok) return own;
@@ -75,7 +100,8 @@ async function viaPeer({ app, hub, config }: Handler, c: Ctx, target: Target): P
 }
 
 async function handle(handler: Handler, c: Ctx): Promise<Response> {
-  const target = parseTarget(new URL(c.req.url), await bodyOf(c));
+  const route = parseTarget(new URL(c.req.url));
+  const target = { ...route, body: await bodyOf(c, route.path) };
   if (target.name === handler.config.name || HUB_OWN_AUTH.has(target.path)) return local(handler.app, c, target);
   return viaPeer(handler, c, target);
 }

@@ -48,6 +48,7 @@ struct MachinesView: View {
         let _ = Breadcrumbs.mark("view MachinesView")
         container
         .confirmsKill()
+        .promptsRename()
         .sensoryFeedback(.impact(weight: .light), trigger: model.sendSignal)
         .sensoryFeedback(.error, trigger: model.failureSignal)
         .sheet(isPresented: $coordinator.showsSettings) { SettingsView() }

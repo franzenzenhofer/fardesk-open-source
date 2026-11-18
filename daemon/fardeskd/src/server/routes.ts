@@ -7,6 +7,7 @@ import {
   deviceRequestSchema,
   messageRequestSchema,
   killRequestSchema,
+  labelRequestSchema,
   muteRequestSchema,
   newSessionRequestSchema,
   permissionRequestSchema,
@@ -70,6 +71,10 @@ function commandRoutes(app: App, services: Services): void {
   });
   app.post("/v1/sessions/:id/mute", async (c) => {
     services.mute(c.req.param("id"), (await parseBody(c, muteRequestSchema)).muted);
+    return c.json(OK);
+  });
+  app.post("/v1/sessions/:id/label", async (c) => {
+    services.label(c.req.param("id"), await parseBody(c, labelRequestSchema));
     return c.json(OK);
   });
 }

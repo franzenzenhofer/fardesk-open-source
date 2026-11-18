@@ -57,7 +57,7 @@ type Retirement = {
   onRevoked: AuthService["onRevoked"];
 };
 
-type PasswordGate = { check: (password: string, ip: string) => Promise<void>; replaceHash: (hash: string | null) => void };
+type PasswordGate = { check: (password: string, ip: string) => Promise<number>; requireCurrent: (revision: number) => void; replaceHash: (hash: string | null) => void };
 
 async function wipePush({ apns, log }: AuthDeps, entry: DeviceEntry): Promise<void> {
   if (apns === null || entry.apnsToken === null || entry.apnsEnvironment === null) return;
@@ -95,21 +95,35 @@ function createRetirement(deps: AuthDeps): Retirement {
   };
 }
 
+const changedPassword = (): FardeskError => new FardeskError("unauthorized", "password changed during authentication");
+
 function createPasswordGate({ config, now }: AuthDeps): PasswordGate {
   const limiter = createLoginLimiter({ maxFailures: config.auth.maxFailures, windowMs: config.auth.windowSeconds * MS_PER_SECOND, now });
   let passwordHash = config.auth.passwordHash;
+  let revision = 0;
+  const requireCurrent = (checked: number): void => { if (checked !== revision) throw changedPassword(); };
   return {
+    requireCurrent,
     replaceHash(hash): void {
       passwordHash = hash;
+      revision += 1;
     },
-    async check(password, ip): Promise<void> {
+    async check(password, ip): Promise<number> {
       if (passwordHash === null) throw new FardeskError("unsupported", "no password set: run fardeskd set-password");
-      limiter.check(ip);
-      if (!(await verifyPassword(password, passwordHash))) {
-        limiter.recordFailure(ip);
-        throw new FardeskError("unauthorized", "wrong password");
+      const release = limiter.reserve(ip);
+      const checked = revision;
+      try {
+        const matches = await verifyPassword(password, passwordHash);
+        requireCurrent(checked);
+        if (!matches) {
+          limiter.recordFailure(ip);
+          throw new FardeskError("unauthorized", "wrong password");
+        }
+        limiter.recordSuccess(ip);
+        return checked;
+      } finally {
+        release();
       }
-      limiter.recordSuccess(ip);
     },
   };
 }
@@ -135,7 +149,7 @@ function createSessionOps({ deps, gate, retirement, master }: Parts): Pick<AuthS
       return result.state === "ok" ? { state: "ok", deviceId: result.device.id } : result;
     },
     async login(request, ip): Promise<LoginResult> {
-      await gate.check(request.password, ip);
+      gate.requireCurrent(await gate.check(request.password, ip));
       return issueLogin(request.deviceName, ip);
     },
     logout(deviceId, request): void {
@@ -161,8 +175,9 @@ function createRevocationOps({ deps, gate, retirement }: Parts): Pick<AuthServic
       return { revoked: revoked.length };
     },
     async changePassword(request, ip): Promise<void> {
-      await gate.check(request.current, ip);
+      const checked = await gate.check(request.current, ip);
       const hash = await hashPassword(request.next);
+      gate.requireCurrent(checked);
       writePasswordHash(deps.configPath, hash);
       gate.replaceHash(hash);
       await retirement.retireWithWipe(registry.revokeAll());

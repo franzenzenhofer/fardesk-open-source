@@ -2,6 +2,7 @@
 import type { Context } from "hono";
 import type { z } from "zod";
 import { FardeskError } from "../core/errors.js";
+import { MAX_JSON_BYTES, readBoundedBody } from "./boundedBody.js";
 
 function describe(error: z.ZodError): string {
   return error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`).join("; ");
@@ -24,11 +25,11 @@ function parseJsonText<S extends z.ZodType>(text: string, schema: S): z.infer<S>
 }
 
 export async function parseBody<S extends z.ZodType>(c: Context, schema: S): Promise<z.infer<S>> {
-  return parseJsonText(await c.req.text(), schema);
+  return parseJsonText((await readBoundedBody(c.req.raw, MAX_JSON_BYTES, false)).toString("utf8"), schema);
 }
 
 /** Like `parseBody`, but an empty body gives `fallback`. */
 export async function parseOptionalBody<S extends z.ZodType>(c: Context, schema: S, fallback: z.infer<S>): Promise<z.infer<S>> {
-  const text = await c.req.text();
+  const text = (await readBoundedBody(c.req.raw, MAX_JSON_BYTES, false)).toString("utf8");
   return text.trim().length === 0 ? fallback : parseJsonText(text, schema);
 }

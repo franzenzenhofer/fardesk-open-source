@@ -11,6 +11,11 @@
   "model": "claude-opus-5-5",
   "pid": 48211,
   "muted": false,
+  "label": {
+    "name": null,
+    "color": "teal",
+    "pinned": false
+  },
   "permissionMode": "bypassPermissions",
   "contextTokens": 426323,
   "cacheExpiresAt": "2026-11-14T10:12:03.000Z",

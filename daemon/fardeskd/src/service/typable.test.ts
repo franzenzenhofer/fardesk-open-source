@@ -1,3 +1,4 @@
+import { NO_LABEL } from "./labelStore.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
@@ -41,6 +42,7 @@ function rig(): Rig {
     isBusy: () => false,
     pendingKind: () => null,
     isMuted: () => false,
+    labelOf: () => NO_LABEL,
     onLeftWaiting: () => undefined,
   });
   const osascript = createFakeOsascript();

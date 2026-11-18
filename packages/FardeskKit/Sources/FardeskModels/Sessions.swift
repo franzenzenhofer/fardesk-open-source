@@ -74,12 +74,14 @@ public struct SessionSummary: Codable, Sendable, Hashable, Identifiable {
     public let cacheExpiresAt: Date?
     public let startedAt: Date
     public let updatedAt: Date
+    /// The user's name, colour and pin (older daemons: none).
+    public var label: SessionLabel = .none
 }
 
 extension SessionSummary {
     private enum CodingKeys: String, CodingKey {
         case id, title, cwd, status, waitingFor, owned, replyMode, canStop
-        case summary, model, pid, muted, permissionMode, contextTokens, cacheExpiresAt, startedAt, updatedAt
+        case summary, model, pid, muted, permissionMode, contextTokens, cacheExpiresAt, startedAt, updatedAt, label
     }
 
     public init(from decoder: any Decoder) throws {
@@ -101,6 +103,7 @@ extension SessionSummary {
         cacheExpiresAt = try c.decodeIfPresent(Date.self, forKey: .cacheExpiresAt)
         startedAt = try c.decode(Date.self, forKey: .startedAt)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        label = try c.decodeIfPresent(SessionLabel.self, forKey: .label) ?? .none
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -122,5 +125,6 @@ extension SessionSummary {
         try c.encode(cacheExpiresAt, forKey: .cacheExpiresAt)
         try c.encode(startedAt, forKey: .startedAt)
         try c.encode(updatedAt, forKey: .updatedAt)
+        try c.encode(label, forKey: .label)
     }
 }

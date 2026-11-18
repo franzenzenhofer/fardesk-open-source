@@ -13,6 +13,7 @@ import type {
   DeviceRequest,
   FolderSearch,
   GhosttyAutomation,
+  LabelRequest,
   Machine,
   PermissionDecision,
   RecentFolders,
@@ -99,6 +100,7 @@ export type Services = {
   decide(sessionId: string, requestId: string, decision: PermissionDecision): void;
   answer(sessionId: string, requestId: string, option: string): void;
   mute(sessionId: string, muted: boolean): void;
+  label(sessionId: string, request: LabelRequest): void;
   registerDevice(request: DeviceRequest): void;
   close(): Promise<void>;
 };

@@ -4,6 +4,8 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 
 export const AUDIT_FILE = "audit.jsonl";
+/** Rejected logins, pairings and bearers (no device id), rotated on their own. */
+export const UNAUTHENTICATED_AUDIT_FILE = "audit-unauthenticated.jsonl";
 export const AUDIT_MAX_BYTES = 1_000_000;
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
@@ -32,11 +34,12 @@ function rotateWhenFull(path: string, maxBytes: number): void {
 }
 
 export function createAuditLog(options: AuditOptions): AuditLog {
-  const path = join(options.stateDir, AUDIT_FILE);
   const now = options.now ?? ((): Date => new Date());
   const maxBytes = options.maxBytes ?? AUDIT_MAX_BYTES;
   return {
     record(input): void {
+      // Callers without a valid bearer get their own file: flooding it cannot rotate the authenticated trail away.
+      const path = join(options.stateDir, input.deviceId === null ? UNAUTHENTICATED_AUDIT_FILE : AUDIT_FILE);
       mkdirSync(dirname(path), { recursive: true, mode: DIR_MODE });
       rotateWhenFull(path, maxBytes);
       const entry: AuditEntry = { time: now().toISOString(), ...input };
@@ -50,10 +53,14 @@ function readLines(path: string): string[] {
   return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line !== "") : [];
 }
 
-/** The rotated file first, then the current one; entries older than `since` are skipped. */
+function readFile(stateDir: string, file: string): AuditEntry[] {
+  const path = join(stateDir, file);
+  return [...readLines(`${path}${ROTATED_SUFFIX}`), ...readLines(path)].map((line) => auditEntrySchema.parse(JSON.parse(line)));
+}
+
+/** Both logs merged in time order (each: the rotated file first, then the current one); entries older than `since` are skipped. */
 export function readAudit(stateDir: string, since: Date | null): AuditEntry[] {
-  const path = join(stateDir, AUDIT_FILE);
-  const lines = [...readLines(`${path}${ROTATED_SUFFIX}`), ...readLines(path)];
-  const entries = lines.map((line) => auditEntrySchema.parse(JSON.parse(line)));
+  const entries = [...readFile(stateDir, AUDIT_FILE), ...readFile(stateDir, UNAUTHENTICATED_AUDIT_FILE)]
+    .sort((left, right) => left.time.localeCompare(right.time));
   return since === null ? entries : entries.filter((entry) => new Date(entry.time) >= since);
 }

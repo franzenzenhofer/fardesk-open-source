@@ -50,7 +50,10 @@ public struct MachineState: Equatable, Sendable, Identifiable {
         let sorted = SessionOrdering.sorted(sessions)
         activeSessions = sorted.filter { $0.status != .ended }
         endedSessions = Array(sorted.filter { $0.status == .ended }.prefix(Self.endedRowLimit))
-        listedSessions = (activeSessions + endedSessions).filter { !$0.isCoordinatorSession }
+        // Pinned rows first (any status, never cut by the ended limit), then the usual order.
+        let pinned = sorted.filter(\.label.pinned)
+        let rest = activeSessions + endedSessions
+        listedSessions = (pinned + rest.filter { !$0.label.pinned }).filter { !$0.isCoordinatorSession }
     }
 
     /// Whether this event would change anything a screen shows. An unchanged poll, hello or ping must not wake

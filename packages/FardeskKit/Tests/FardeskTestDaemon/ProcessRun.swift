@@ -32,10 +32,14 @@ public final class RunningProcess: Sendable {
     private let process = Process()
     private let store = Store()
 
-    public init(executable: String, arguments: [String], stdin: String = "") throws {
+    /// `environment` is added to (and overrides) this process's own environment.
+    public init(executable: String, arguments: [String], stdin: String = "", environment: [String: String] = [:]) throws {
         let (outputPipe, errorPipe, inputPipe) = (Pipe(), Pipe(), Pipe())
         process.executableURL = URL(filePath: executable)
         process.arguments = arguments
+        if !environment.isEmpty {
+            process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, added in added }
+        }
         process.standardOutput = outputPipe
         process.standardError = errorPipe
         process.standardInput = inputPipe
@@ -85,7 +89,7 @@ public final class RunningProcess: Sendable {
     }
 
     /// Runs `/usr/bin/env <command> <arguments>` to completion.
-    public static func run(_ command: String, _ arguments: [String], stdin: String = "") async throws -> ProcessResult {
-        try await RunningProcess(executable: "/usr/bin/env", arguments: [command] + arguments, stdin: stdin).result()
+    public static func run(_ command: String, _ arguments: [String], stdin: String = "", environment: [String: String] = [:]) async throws -> ProcessResult {
+        try await RunningProcess(executable: "/usr/bin/env", arguments: [command] + arguments, stdin: stdin, environment: environment).result()
     }
 }

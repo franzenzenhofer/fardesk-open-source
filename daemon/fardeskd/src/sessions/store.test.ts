@@ -1,3 +1,4 @@
+import { NO_LABEL } from "../service/labelStore.js";
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -54,6 +55,7 @@ function setup(claudeHomes: ClaudeHome[], overrides: Partial<StoreDeps> = {}): H
     isBusy: (id) => overlay.busy.has(id),
     pendingKind: (id) => overlay.pending.get(id) ?? null,
     isMuted: (id) => overlay.muted.has(id),
+    labelOf: () => NO_LABEL,
     onLeftWaiting: (id) => overlay.left.push(id),
     ...overrides,
   });

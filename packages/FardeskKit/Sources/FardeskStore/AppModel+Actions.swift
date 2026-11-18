@@ -151,4 +151,19 @@ extension AppModel {
         } != nil
     }
 
+    /// Rename, colour or pin a session (docs/design/SESSION-LABELS.md). The daemon pushes the new list right after.
+    @discardableResult
+    public func label(_ request: LabelRequest, _ ref: SessionRef) async -> Bool {
+        let id = ref.sessionID
+        return await perform(on: ref.machineID, action: Self.labelAction(request), notice: .failure(ref)) {
+            try await $0.label(sessionID: id, request)
+        } != nil
+    }
+
+    static func labelAction(_ request: LabelRequest) -> String {
+        if let pinned = request.pinned { return pinned ? "pin the session" : "unpin the session" }
+        if request.color != nil { return "change the colour" }
+        return "rename the session"
+    }
+
 }

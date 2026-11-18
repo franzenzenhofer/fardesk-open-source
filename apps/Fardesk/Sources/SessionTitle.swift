@@ -5,6 +5,7 @@ import SwiftUI
 /// The navigation title: the project name over "machine, folder, status". A status dot, no spinner. Tapping it
 /// opens everything known about the session.
 struct SessionTitleView: View {
+    let ref: SessionRef
     let title: String
     let line: SessionHeaderLine
     let session: SessionSummary
@@ -28,7 +29,7 @@ struct SessionTitleView: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("session-title")
         .accessibilityHint("Shows everything about this session")
-        .sheet(isPresented: $showsInfo) { SessionInfoSheet(title: title, session: session, machineName: machineName) }
+        .sheet(isPresented: $showsInfo) { SessionInfoSheet(ref: ref, title: title, session: session, machineName: machineName) }
     }
 
     private var dotColor: Color { StateColor.color(line.tone) }
@@ -40,6 +41,7 @@ struct SessionTitleView: View {
 /// The full name and every fact about a session, in one sheet.
 struct SessionInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
+    let ref: SessionRef
     let title: String
     let session: SessionSummary
     let machineName: String
@@ -48,6 +50,7 @@ struct SessionInfoSheet: View {
         NavigationStack {
             List {
                 Section { Text(title).font(.title3.weight(.semibold)).textSelection(.enabled) }
+                SessionLabelEditor(ref: ref, session: session)
                 Section {
                     ForEach(SessionFacts(session: session, machineName: machineName).rows, id: \.label) { row in
                         LabeledContent(row.label) { Text(row.value).textSelection(.enabled).multilineTextAlignment(.trailing) }

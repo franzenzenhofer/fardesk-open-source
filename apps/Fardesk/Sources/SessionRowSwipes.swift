@@ -3,7 +3,7 @@ import FardeskStore
 import SwiftUI
 
 /// The swipes of a session row. Right swipe (WhatsApp style) unblocks: Allow on a permission, Answer on a question,
-/// Open otherwise. Left swipe on a permission row starts with Deny, then Stop / End Session.
+/// Open otherwise, then Pin / Unpin. Left swipe on a permission row starts with Deny, then Stop / End Session.
 struct SessionRowSwipes: ViewModifier {
     @Environment(AppModel.self) private var model
     @Environment(SessionCoordinator.self) private var coordinator
@@ -23,7 +23,10 @@ struct SessionRowSwipes: ViewModifier {
                 }
                 StopKillButtons(ref: ref, session: session)
             }
-            .swipeActions(edge: .leading, allowsFullSwipe: true) { leadingButton }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                leadingButton
+                PinButton(ref: ref, session: session).tint(.indigo)
+            }
     }
 
     @ViewBuilder

@@ -39,6 +39,11 @@ export function assertSandboxTmux(binary: string, socket: string | null | undefi
   if (!private_) refuse("tmux input to a server that is not a fardesk-test one", socket ?? binary);
 }
 
+/** Under the sandbox the server a bare `tmux <args>` reaches is looked at only when the binary wraps a private test server. */
+export function sandboxAllowsDefaultServer(binary: string): boolean {
+  return root() === null || wrapsPrivateServer(binary);
+}
+
 /** Under the sandbox only fardesk-test-* tmux sockets are looked at; elsewhere every socket is. */
 export function sandboxAllowsSocket(path: string): boolean {
   return root() === null || basename(path).startsWith(SANDBOX_TMUX_PREFIX);

@@ -149,6 +149,22 @@ struct HubModeTests {
         }
     }
 
+    /// stop() (the app goes to the background) must leave the open session's feed on disk when it returns: it used to
+    /// flush the cache writer first and only then queue the feeds, so their write came a second later or never.
+    @Test func stopLeavesTheOpenFeedOnDiskWhenItReturns() async throws {
+        try await HubRig.with { rig in
+            try await StoreSandbox.with { sandbox in
+                let model = try await hubModel(rig, sandbox)
+                let ref = SessionRef(machineID: peerID, sessionID: SeedSession.editsSessionID)
+                await model.openSession(ref)
+                #expect(!model.feeds.feed(for: ref).activities.isEmpty)
+                model.stop()
+                let cached = sandbox.cache.loadFeed(machineID: peerID, sessionID: ref.sessionID)
+                #expect(cached?.activities.isEmpty == false)
+            }
+        }
+    }
+
     @Test func aCachedSessionOpensEvenWhenTheHubIsGone() async throws {
         let ref = SessionRef(machineID: HubIdentity.machineID(name: HubRig.peerName), sessionID: SeedSession.editsSessionID)
         try await StoreSandbox.with { sandbox in

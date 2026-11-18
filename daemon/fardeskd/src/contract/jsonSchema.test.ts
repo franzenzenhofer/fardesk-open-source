@@ -27,11 +27,14 @@ function withFirstKeyWrongType(value: Record<string, unknown>): Record<string, u
   return { ...value, [firstKey as string]: { unexpected: true } };
 }
 
+/** Patch bodies: every key is optional, so leaving one out is valid by design. */
+const PATCH_CONTRACTS: readonly ContractName[] = ["LabelRequest"];
+
 function invalidValues(name: ContractName): readonly unknown[] {
   const base = firstFixture(name);
   return [
     { ...base, unknownKey: 1 },
-    withoutFirstKey(base),
+    ...(PATCH_CONTRACTS.includes(name) ? [] : [withoutFirstKey(base)]),
     withFirstKeyWrongType(base),
     "not an object",
     null,

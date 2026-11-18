@@ -18,7 +18,7 @@ public enum SessionOrdering {
     static func precedes(_ lhs: SessionSummary, _ rhs: SessionSummary) -> Bool {
         if lhs.status != rhs.status { return rank(lhs.status) < rank(rhs.status) }
         if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
-        let (leftTitle, rightTitle) = (lhs.title.lowercased(), rhs.title.lowercased())
+        let (leftTitle, rightTitle) = (lhs.displayTitle.lowercased(), rhs.displayTitle.lowercased())
         if leftTitle != rightTitle { return leftTitle < rightTitle }
         return lhs.id < rhs.id
     }

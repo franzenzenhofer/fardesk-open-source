@@ -30,6 +30,11 @@ public final class TestDaemon: @unchecked Sendable {
     private var server: RunningProcess?
 
     public var url: URL { URL(string: "http://127.0.0.1:\(port)")! }
+
+    /// The daemon runs inside the test sandbox (FARDESK_TEST_SANDBOX, as in the daemon's own tests): it never looks at
+    /// or types into a real tmux server, session inbox or terminal. Without it, a kill with --close-tab walked the
+    /// seeded process's ancestors up to the tmux pane the test runner itself ran in, and closed it.
+    public var daemonEnvironment: [String: String] { ["FARDESK_TEST_SANDBOX": root.path] }
     public var hookSocket: URL { stateDirectory.appending(path: "hook.sock") }
 
     init(port: Int, root: URL, home: TestClaudeHome, configURL: URL, stateDirectory: URL) {
@@ -102,7 +107,8 @@ public final class TestDaemon: @unchecked Sendable {
     public func launch() async throws {
         let server = try RunningProcess(
             executable: "/usr/bin/env",
-            arguments: ["node", RepoPaths.daemonMain.path, "serve", "--config", configURL.path]
+            arguments: ["node", RepoPaths.daemonMain.path, "serve", "--config", configURL.path],
+            environment: daemonEnvironment
         )
         self.server = server
         try await waitUntilAnswering(server)
@@ -115,7 +121,7 @@ public final class TestDaemon: @unchecked Sendable {
 
     /// Runs `fardeskd <arguments> --config <config>` to completion.
     public func runCommand(_ arguments: [String], stdin: String = "") async throws -> ProcessResult {
-        try await RunningProcess.run("node", [RepoPaths.daemonMain.path] + arguments + ["--config", configURL.path], stdin: stdin)
+        try await RunningProcess.run("node", [RepoPaths.daemonMain.path] + arguments + ["--config", configURL.path], stdin: stdin, environment: daemonEnvironment)
     }
 
     /// Sets the login password with the daemon's own `set-password` command (password on stdin).

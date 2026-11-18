@@ -161,6 +161,48 @@
               "muted": {
                 "type": "boolean"
               },
+              "label": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "blue",
+                          "teal",
+                          "purple",
+                          "pink"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "color",
+                  "pinned"
+                ],
+                "additionalProperties": false
+              },
               "permissionMode": {
                 "anyOf": [
                   {
@@ -227,6 +269,7 @@
               "model",
               "pid",
               "muted",
+              "label",
               "permissionMode",
               "contextTokens",
               "cacheExpiresAt",
@@ -327,6 +370,48 @@
             "muted": {
               "type": "boolean"
             },
+            "label": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "blue",
+                        "teal",
+                        "purple",
+                        "pink"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "pinned": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "color",
+                "pinned"
+              ],
+              "additionalProperties": false
+            },
             "permissionMode": {
               "anyOf": [
                 {
@@ -393,6 +478,7 @@
             "model",
             "pid",
             "muted",
+            "label",
             "permissionMode",
             "contextTokens",
             "cacheExpiresAt",

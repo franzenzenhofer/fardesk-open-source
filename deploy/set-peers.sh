@@ -3,6 +3,7 @@
 # Usage: FARDESK_LABEL=<bundle prefix>.fardeskd bash set-peers.sh '<json array of {name,url}>'
 # The peer list lets a client that knows one machine find the others after login.
 set -euo pipefail
+umask 077
 PEERS_JSON="${1:?usage: set-peers.sh '<json array of {name,url}>'}"
 CONFIG="${FARDESK_CONFIG:-$HOME/.config/fardesk/config.json}"
 TMP="$CONFIG.peers.$$"

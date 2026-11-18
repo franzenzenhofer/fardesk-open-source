@@ -37,13 +37,13 @@ struct SessionView: View {
         }
         .onAppear { TapClock.finish("session.open", model: model) }
         .readsAloud(box: box, status: session.status)
-        .navigationTitle(title ?? session.title)
+        .navigationTitle(title ?? session.displayTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
-                SessionTitleView(title: title ?? session.title, line: line, session: session, machineName: machine.endpoint.name)
+                SessionTitleView(ref: ref, title: title ?? session.displayTitle, line: line, session: session, machineName: machine.endpoint.name)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {

@@ -1,3 +1,4 @@
+import { NO_LABEL } from "../service/labelStore.js";
 import { describe, expect, it } from "vitest";
 import { sessionSummarySchema } from "../contract/schema.js";
 import type { SessionSummary } from "../contract/schema.js";
@@ -51,6 +52,7 @@ function input(overrides: Partial<StatusInput> = {}): StatusInput {
     ownedBusy: false,
     pendingKind: null,
     muted: false,
+    label: NO_LABEL,
     crossSessionAccepted: false,
     ...overrides,
   };

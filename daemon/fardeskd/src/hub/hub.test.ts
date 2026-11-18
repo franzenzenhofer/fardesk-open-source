@@ -198,12 +198,15 @@ describe("devices of a phone in hub mode", () => {
     peer = await startTestDaemon({ name: "Peer A", ...(await authOverrides()) });
     hub = await startHub(await authOverrides());
     await loginAs(peer, "Peer Phone");
-    await loginAs(hub, "Hub Phone");
+    const { token } = await loginAs(hub, "Hub Phone");
     await untilPeerLive();
     const names = async (path: string): Promise<string[]> => authDeviceListSchema.parse((await hub.call("GET", path)).json).devices.map((device) => device.name);
     expect(await names("/m/Peer%20A/v1/auth/devices")).toEqual(["Peer Phone"]);
     expect(await names("/m/hub-box/v1/auth/devices")).toEqual(["Hub Phone"]);
     expect(await names("/v1/auth/devices")).toEqual(["Hub Phone"]);
+    const pairCode = "/m/Peer%20A/v1/auth/pair-code";
+    expect((await hub.call("POST", pairCode, undefined, token)).status).toBe(401);
+    expect((await hub.call("POST", pairCode)).status).toBe(200);
   });
 });
 
@@ -221,6 +224,22 @@ describe("auth", () => {
       expect(login.status).toBe(501);
     }
     expect((await hub.call("GET", "/m/Peer%20A/v1/auth/devices")).status).toBe(200);
+  });
+
+  it("tells a caller without a bearer nothing about the machines behind the hub on the public pairing path", async () => {
+    await waitForProblem("dead");
+    const pair = { code: "x".repeat(43), deviceName: "probe" };
+    const unknown = await hub.call("POST", "/m/Nowhere/v1/auth/pair", pair, null);
+    expect(unknown.status).toBe(404);
+    const offline = await hub.call("POST", "/m/dead/v1/auth/pair", pair, null);
+    expect(offline.status).toBe(503);
+    for (const answer of [unknown, offline]) {
+      const { message } = errorResponseSchema.parse(answer.json).error;
+      expect(message).toBe("no such machine is available");
+      for (const name of ["hub-box", "Peer A", "dead", "unlinked"]) expect(message).not.toContain(name);
+    }
+    // An authenticated caller on a bearer route still gets the full explanation.
+    expect(errorResponseSchema.parse((await hub.call("GET", "/m/Nowhere/v1/sessions")).json).error.message).toContain("hub-box, Peer A, dead, unlinked");
   });
 });
 

@@ -226,8 +226,9 @@ public final class AppModel {
         hubPoll?.cancel()
         hubPoll = nil
         configuration.telemetry.flushToDisk()
-        cacheWriter.flush()
+        // Feeds first: flushFeeds only queues them on the cache writer, and flush() then writes the queue to disk.
         flushFeeds()
+        cacheWriter.flush()
         Task { await flushTelemetry() }
     }
 

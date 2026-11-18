@@ -326,7 +326,9 @@ Attachments: a `content-length` is required, the body is read as a stream and cu
 stored files are served only when they are still regular files (`lstat`), and each `.fardesk/` folder gets a `.gitignore` with `*`.
 
 Audit: `<stateDir>/audit.jsonl` (mode 600, rotated at 1 MB to `audit.jsonl.1`): one line per state-changing request and per rejected
-login or pairing, with time, device id, method, route pattern, session id, result and IP, never message text. `fardeskd audit [--since 2h]` prints it.
+login or pairing, with time, device id, method, route pattern, session id, result and IP, never message text. Requests without a valid
+bearer (rejected logins, pairings and tokens) go to `audit-unauthenticated.jsonl`, rotated the same way, so a flood of them cannot rotate the
+authenticated trail away. `fardeskd audit [--since 2h]` prints both, merged in time order.
 
 Hooks and passwords: `install-hooks --dry-run` prints the diff of each `settings.json` and writes nothing; `install-hooks` refuses a state
 directory that group or others can read. The minimum password length is 12.

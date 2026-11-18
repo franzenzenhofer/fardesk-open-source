@@ -47,6 +47,16 @@ export const muteRequestFixtures: FixtureCases<"MuteRequest"> = {
   unmuted: { muted: false },
 };
 
+export const labelRequestFixtures: FixtureCases<"LabelRequest"> = {
+  rename: { name: "Release work" },
+  recolour: { color: "teal" },
+  blue: { color: "blue" },
+  purple: { color: "purple" },
+  pink: { color: "pink" },
+  pin: { pinned: true },
+  clear: { name: null, color: null, pinned: false },
+};
+
 export const newSessionRequestFixtures: FixtureCases<"NewSessionRequest"> = {
   withWorktreeAndModel: {
     cwd: "/Users/dev/smear-studio",

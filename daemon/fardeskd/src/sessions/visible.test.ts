@@ -37,6 +37,19 @@ describe("visibleSessions", () => {
     expect(ids(visibleSessions(sessions, rules({ maxEnded: 2 })))).toEqual(["live-old", "newest", "middle"]);
   });
 
+  it("keeps a pinned ended session past the age window, the cap and a missing folder", () => {
+    const folder = makeTempDir();
+    const pinned = { name: null, color: null, pinned: true };
+    const sessions = [
+      { ...ended, id: "pinned-old", cwd: folder, updatedAt: daysAgo(90), label: pinned },
+      { ...ended, id: "pinned-gone", cwd: `${folder}/deleted-test-folder`, updatedAt: daysAgo(40), label: pinned },
+      { ...ended, id: "unpinned-old", cwd: folder, updatedAt: daysAgo(90) },
+      { ...ended, id: "newest", cwd: folder, updatedAt: daysAgo(1) },
+      { ...ended, id: "second", cwd: folder, updatedAt: daysAgo(2) },
+    ];
+    expect(ids(visibleSessions(sessions, rules({ maxEnded: 1 })))).toEqual(["pinned-old", "pinned-gone", "newest"]);
+  });
+
   it("checks folders newest first and stops after maxEnded kept sessions", () => {
     const folder = makeTempDir();
     const sessions = Array.from({ length: 200 }, (_, index) => ({

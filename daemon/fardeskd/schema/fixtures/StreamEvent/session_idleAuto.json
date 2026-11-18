@@ -13,6 +13,11 @@
     "model": "claude-sonnet-5-5",
     "pid": 52100,
     "muted": false,
+    "label": {
+      "name": null,
+      "color": null,
+      "pinned": false
+    },
     "permissionMode": "auto",
     "contextTokens": 187432,
     "cacheExpiresAt": "2026-11-14T07:30:00.000Z",

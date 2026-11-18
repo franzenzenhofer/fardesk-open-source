@@ -1,3 +1,4 @@
+import { NO_LABEL } from "../service/labelStore.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -38,6 +39,7 @@ function bypassStore(): { home: ClaudeHome; store: SessionStore } {
     isBusy: () => false,
     pendingKind: () => null,
     isMuted: () => false,
+    labelOf: () => NO_LABEL,
     onLeftWaiting: () => undefined,
   });
   disposers.push(() => { store.close(); });

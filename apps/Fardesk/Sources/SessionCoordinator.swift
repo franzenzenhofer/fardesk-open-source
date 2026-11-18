@@ -18,6 +18,8 @@ final class SessionCoordinator {
     var route: Route?
     /// A session waiting for the End Session confirmation.
     var killTarget: SessionRef?
+    /// A session waiting for the Rename prompt.
+    var renameTarget: SessionRef?
     var terminalTarget: SessionRef?
     var showsNewSession = false
     var showsSettings = false
@@ -39,6 +41,7 @@ final class SessionCoordinator {
     func reset() {
         route = nil
         killTarget = nil
+        renameTarget = nil
         terminalTarget = nil
         showsNewSession = false
         showsSettings = false

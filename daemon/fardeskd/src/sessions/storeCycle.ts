@@ -23,6 +23,7 @@ function buildFor(ctx: StoreContext, entry: StoreEntry): SessionSummary | null {
     pendingKind: deps.pendingKind(entry.id),
     crossSessionAccepted: entry.home !== null && ctx.acceptingHomes.has(entry.home),
     muted: deps.isMuted(entry.id),
+    label: deps.labelOf(entry.id),
     typable: entry.process !== null && (deps.isTypable?.(entry.process.pid) ?? false),
   };
   const cwd = resolveCwd(input);

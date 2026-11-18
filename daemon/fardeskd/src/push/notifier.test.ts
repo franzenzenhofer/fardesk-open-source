@@ -109,6 +109,7 @@ const session = (status: SessionSummary["status"], id = "s1", summary = "All fin
   model: null,
   pid: null,
   muted: false,
+  label: { name: null, color: null, pinned: false },
   permissionMode: null,
   contextTokens: null,
   cacheExpiresAt: null,

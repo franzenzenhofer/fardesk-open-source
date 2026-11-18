@@ -15,7 +15,7 @@ extension AppModel {
         return configuration.treatsEverySessionAsCold || ColdSession.isCold(session, now: Date())
     }
 
-    func session(_ ref: SessionRef) -> SessionSummary? {
+    public func session(_ ref: SessionRef) -> SessionSummary? {
         (try? state.machine(id: ref.machineID))?.sessions.first { $0.id == ref.sessionID }
     }
 

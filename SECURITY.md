@@ -26,7 +26,7 @@ other rules below exist to keep that token in the right hands.
 | Coordinator | Off by default. When on: default permission mode, a limited tool set unless `coordinator.fullTools: true`, and it may approve requests only with `coordinator.mayApprove: true`. Session output is treated as untrusted. |
 | Push | Generic text by default. `push.content: "full"` sends session text through Apple's push servers. Push is off unless you configure an APNs key. |
 | Attachments | Uploads have a hard size limit and a per-session quota; files are read back only if they are regular files the daemon stored itself. |
-| Audit log | `audit.jsonl` in the state folder: time, device, route, session id, no message text. `fardeskd audit` prints it. |
+| Audit log | `audit.jsonl` in the state folder: time, device, route, session id, no message text. Requests without a valid token go to `audit-unauthenticated.jsonl`, so they cannot push the trail out. `fardeskd audit` prints both. |
 | Diagnostics | Written to a local file only. Nothing is sent to the authors. `diagnostics.enabled: false` turns it off. |
 | Hooks | `install-hooks` shows the change to `~/.claude/settings.json`, writes a backup, edits atomically, and removes only its own entries. The hook socket is mode 0600 in a 0700 folder, and the hook command never blocks Claude Code. |
 | Files | The config and token files are mode 600 in a 700 folder. |

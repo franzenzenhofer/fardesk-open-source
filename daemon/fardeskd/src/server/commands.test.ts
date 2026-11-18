@@ -59,6 +59,26 @@ describe("mute and devices", () => {
     await expectApiError(daemon, "POST", "/v1/sessions/nope/mute", 404, "not_found", { muted: true });
   });
 
+  it("patches the label, persists it and shows it in the list", async () => {
+    const { id } = await seed();
+    const label = (): unknown => daemon.services.sessions().find((session) => session.id === id)?.label;
+    expect(label()).toEqual({ name: null, color: null, pinned: false });
+    await expectApiOk(daemon, `/v1/sessions/${id}/label`, { name: " Release work ", color: "blue" });
+    await expectApiOk(daemon, `/v1/sessions/${id}/label`, { pinned: true });
+    expect(label()).toEqual({ name: "Release work", color: "blue", pinned: true });
+    expect(JSON.parse(readFileSync(join(daemon.config.stateDir, "labels.json"), "utf8"))).toEqual({ labels: { [id]: { name: "Release work", color: "blue", pinned: true } } });
+    await expectApiOk(daemon, `/v1/sessions/${id}/label`, { name: "", color: null, pinned: false });
+    expect(label()).toEqual({ name: null, color: null, pinned: false });
+  });
+
+  it("validates the label request and the session", async () => {
+    const { id } = await seed();
+    await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { color: "red" });
+    await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { name: "x".repeat(81) });
+    await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { title: "nope" });
+    await expectApiError(daemon, "POST", "/v1/sessions/nope/label", 404, "not_found", { pinned: true });
+  });
+
   it("answers 500 with a generic body when a state file cannot be written", async () => {
     const { id } = await seed();
     mkdirSync(join(daemon.config.stateDir, "mutes.json"));

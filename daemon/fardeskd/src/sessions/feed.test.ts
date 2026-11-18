@@ -1,3 +1,4 @@
+import { NO_LABEL } from "../service/labelStore.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
@@ -37,6 +38,7 @@ function setup(fixture: string): { store: SessionStore; broker: ReturnType<typeo
     isBusy: () => false,
     pendingKind: (id) => broker.pendingKind(id),
     isMuted: () => false,
+    labelOf: () => NO_LABEL,
     onLeftWaiting: () => undefined,
   });
   stores.push(store);

@@ -11,6 +11,11 @@
   "model": null,
   "pid": null,
   "muted": true,
+  "label": {
+    "name": "Release work",
+    "color": "blue",
+    "pinned": true
+  },
   "permissionMode": "plan",
   "contextTokens": null,
   "cacheExpiresAt": null,

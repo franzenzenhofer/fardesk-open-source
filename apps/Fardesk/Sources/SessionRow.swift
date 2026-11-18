@@ -28,7 +28,12 @@ struct SessionRow: View {
                 .symbolEffect(.pulse, isActive: glyph.pulses)
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.title).font(.headline).lineLimit(2)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    if session.label.pinned {
+                        Image(systemName: "pin.fill").font(.caption).foregroundStyle(.secondary).accessibilityLabel("Pinned")
+                    }
+                    Text(session.displayTitle).font(.headline).lineLimit(2)
+                }
                 Text(presentation.subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -38,6 +43,7 @@ struct SessionRow: View {
             Text(presentation.relativeTime).font(.subheadline).foregroundStyle(.secondary)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
+        .overlay(alignment: .leading) { LabelColorBar(color: session.label.color) }
     }
 
     private var glyph: SessionRowGlyph { SessionRowGlyph(status: session.status) }

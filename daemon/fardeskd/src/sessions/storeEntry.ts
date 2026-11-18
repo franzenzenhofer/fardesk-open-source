@@ -1,5 +1,5 @@
 // One tracked session inside the store, the store's dependencies, and the pure helpers on entries.
-import type { Activity, SessionSummary } from "../contract/schema.js";
+import type { Activity, SessionLabel, SessionSummary } from "../contract/schema.js";
 import type { Bus } from "../core/bus.js";
 import type { Logger } from "../core/log.js";
 import type { Tailer, TranscriptSummary } from "../transcript/index.js";
@@ -20,6 +20,7 @@ export type StoreDeps = {
   isBusy(sessionId: string): boolean;
   pendingKind(sessionId: string): PendingKind | null;
   isMuted(sessionId: string): boolean;
+  labelOf(sessionId: string): SessionLabel;
   /** The terminal of this process can be typed into (tmux pane or Ghostty terminal): replies need no inbox. */
   isTypable?(pid: number): boolean;
   onLeftWaiting(sessionId: string): void;

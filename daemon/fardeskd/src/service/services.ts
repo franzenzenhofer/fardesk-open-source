@@ -36,7 +36,7 @@ type OwnedActions = Pick<Services, "resume" | "takeover" | "fork" | "newSession"
 const TEMP_ROOTS = ["/tmp", "/private/tmp", "/private/var/folders", "/var/tmp"];
 
 type Reads = Pick<Services, "machine" | "sessions" | "allSessions" | "activity" | "detail" | "recentFolders">;
-type Writes = Pick<Services, "decide" | "answer" | "mute" | "registerDevice">;
+type Writes = Pick<Services, "decide" | "answer" | "mute" | "label" | "registerDevice">;
 
 async function runClosers(closers: Closer[]): Promise<void> {
   for (const close of closers.toReversed()) await close();
@@ -128,7 +128,7 @@ function intake(config: Config, { store, pauseStore }: Core, attachments: Attach
   };
 }
 
-function writes({ broker, store, devices, muteStore }: Core): Writes {
+function writes({ broker, store, devices, muteStore, labelStore }: Core): Writes {
   return {
     decide: (sessionId, requestId, decision): void => {
       broker.decide(sessionId, requestId, decision);
@@ -139,6 +139,11 @@ function writes({ broker, store, devices, muteStore }: Core): Writes {
     mute(sessionId, muted): void {
       store.get(sessionId);
       muteStore.set(sessionId, muted);
+      store.recompute(sessionId);
+    },
+    label(sessionId, request): void {
+      store.get(sessionId);
+      labelStore.patch(sessionId, request);
       store.recompute(sessionId);
     },
     registerDevice: (request): void => {

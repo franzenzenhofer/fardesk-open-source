@@ -79,7 +79,7 @@ function upgradeTarget(request: IncomingMessage, services: Services, options: St
 }
 
 export function attachStream(server: Server, bus: Bus, services: Services, options: StreamOptions): Stream {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   const owners = new Map<WebSocket, string>();
   const serveLocal: StreamServe = (socket) => { serve(socket, bus, services, options); };
   const stopListening = services.auth.onRevoked((deviceIds) => {

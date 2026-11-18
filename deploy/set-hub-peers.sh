@@ -5,6 +5,7 @@
 # Without arguments the hub is FARDESK_HUB and the peers are the other machines of FARDESK_MACHINES (fardesk.env).
 # Example: bash deploy/set-hub-peers.sh build-server "Studio=local" "Laptop=laptop"
 set -euo pipefail
+umask 077
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/lib/fardesk-env.sh"
 fardesk_load_env
@@ -51,5 +52,5 @@ for peer in "${PEERS[@]}"; do
 done
 
 scp -q "$WORK/tokens.json" "$HUB:.config/fardesk/peer-tokens.json"
-ssh "$HUB" "cp $CFG $CFG.bak-$STAMP && jq --slurpfile t ~/.config/fardesk/peer-tokens.json '.coordinator = ((.coordinator // {}) + {peerTokens: \$t[0]})' $CFG > $CFG.new && mv $CFG.new $CFG && chmod 600 $CFG && mv ~/.config/fardesk/peer-tokens.json ~/.config/fardesk/peer-tokens.json.applied-$STAMP && jq -c '.coordinator.peerTokens|keys' $CFG"
+ssh "$HUB" "umask 077 && cp $CFG $CFG.bak-$STAMP && jq --slurpfile t ~/.config/fardesk/peer-tokens.json '.coordinator = ((.coordinator // {}) + {peerTokens: \$t[0]})' $CFG > $CFG.new && mv $CFG.new $CFG && chmod 600 $CFG && mv ~/.config/fardesk/peer-tokens.json ~/.config/fardesk/peer-tokens.json.applied-$STAMP && jq -c '.coordinator.peerTokens|keys' $CFG"
 mv "$WORK" "$HOME/.Trash/fardesk-hub-peers-$STAMP"

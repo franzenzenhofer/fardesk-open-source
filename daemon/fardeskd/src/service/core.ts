@@ -19,6 +19,8 @@ import { createSessionStore } from "../sessions/store.js";
 import type { SessionStore } from "../sessions/store.js";
 import { apnsFromConfig } from "./apnsSetup.js";
 import { createHookHandler } from "./hooks.js";
+import { createLabelStore } from "./labelStore.js";
+import type { LabelStore } from "./labelStore.js";
 import { createMuteStore } from "./muteStore.js";
 import type { MuteStore } from "./muteStore.js";
 import { createPauseStore } from "./pauseStore.js";
@@ -28,6 +30,7 @@ import type { ServiceOptions } from "./types.js";
 export const HOOK_SOCKET_FILE = "hook.sock";
 const DEVICES_FILE = "devices.json";
 const MUTES_FILE = "mutes.json";
+const LABELS_FILE = "labels.json";
 const PAUSE_FILE = "notification-pause.json";
 const MS_PER_SECOND = 1000;
 const FALLBACK_TITLE = "Claude Code";
@@ -41,6 +44,7 @@ export type Core = {
   store: SessionStore;
   devices: DeviceStore;
   muteStore: MuteStore;
+  labelStore: LabelStore;
   pauseStore: PauseStore;
   /** Pids of live sessions whose terminal can be typed into; filled by the typable watch. */
   typablePids: Set<number>;
@@ -51,8 +55,8 @@ export type Core = {
 type Notifier = ReturnType<typeof createNotifier>;
 type Parts = Omit<Core, "notifier">;
 
-function createStore(config: Config, log: Logger, parts: Pick<Core, "bus" | "broker" | "owned" | "muteStore" | "typablePids">): SessionStore {
-  const { bus, broker, owned, muteStore } = parts;
+function createStore(config: Config, log: Logger, parts: Pick<Core, "bus" | "broker" | "owned" | "muteStore" | "labelStore" | "typablePids">): SessionStore {
+  const { bus, broker, owned, muteStore, labelStore } = parts;
   return createSessionStore({
     claudeHomes: config.claudeHomes,
     bus,
@@ -65,6 +69,7 @@ function createStore(config: Config, log: Logger, parts: Pick<Core, "bus" | "bro
     isBusy: (id) => owned.isBusy(id),
     pendingKind: (id) => broker.pendingKind(id),
     isMuted: (id) => muteStore.isMuted(id),
+    labelOf: (id) => labelStore.get(id),
     isTypable: (pid) => parts.typablePids.has(pid),
     onLeftWaiting: (id) => {
       if (!owned.isOwned(id)) broker.cancelSession(id);
@@ -101,6 +106,7 @@ function createPushNotifier(setup: { config: Config; log: Logger; doneDelayMs?: 
 export async function createCore(config: Config, options: ServiceOptions, log: Logger, closers: Closer[]): Promise<Core> {
   const bus = createBus();
   const muteStore = createMuteStore(join(config.stateDir, MUTES_FILE));
+  const labelStore = createLabelStore(join(config.stateDir, LABELS_FILE));
   const broker = createBroker({ timeoutMs: config.permissionTimeoutSeconds * MS_PER_SECOND, bus, now: () => new Date(), newId: randomUUID });
   closers.push(() => { broker.close(); });
   const findCwd = (id: string): string => core.store.get(id).summary.cwd;
@@ -108,10 +114,10 @@ export async function createCore(config: Config, options: ServiceOptions, log: L
   const owned = options.createOwned({ config, broker, log, findCwd, findMode });
   closers.push(async () => owned.close());
   const typablePids = new Set<number>();
-  const store = createStore(config, log, { bus, broker, owned, muteStore, typablePids });
+  const store = createStore(config, log, { bus, broker, owned, muteStore, labelStore, typablePids });
   closers.push(() => { store.close(); });
   const devices = createDeviceStore(join(config.stateDir, DEVICES_FILE), () => new Date());
-  const parts: Parts = { bus, broker, owned, store, devices, muteStore, pauseStore: createPauseStore(join(config.stateDir, PAUSE_FILE), () => new Date()), typablePids, apns: resolveApns(config, options, closers) };
+  const parts: Parts = { bus, broker, owned, store, devices, muteStore, labelStore, pauseStore: createPauseStore(join(config.stateDir, PAUSE_FILE), () => new Date()), typablePids, apns: resolveApns(config, options, closers) };
   const notifier = createPushNotifier({ config, log, doneDelayMs: options.doneDelayMs }, parts);
   const core: Core = { ...parts, notifier };
   closers.push(() => { notifier.close(); });
