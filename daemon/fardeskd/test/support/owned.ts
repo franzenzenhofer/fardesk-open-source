@@ -1,4 +1,4 @@
-// Helpers for the owned-runner tests: real claude, real SDK, real ~/.claude, unique temp project dirs.
+// Helpers for the owned-runner tests: real claude, real SDK, the real Claude home, unique temp project dirs.
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, expect } from "vitest";
 import { mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
@@ -9,6 +9,7 @@ import type { Activity } from "../../src/contract/schema.js";
 import { createBus, type Bus } from "../../src/core/bus.js";
 import { FardeskError } from "../../src/core/errors.js";
 import { createLogger } from "../../src/core/log.js";
+import { CLAUDE_CONFIG_ENV } from "../../src/owned/claudeEnv.js";
 import { createOwnedRunner, type OwnedRunnerDeps } from "../../src/owned/runner.js";
 import type { OwnedRunner } from "../../src/owned/types.js";
 import { createBroker, type Broker } from "../../src/permissions/broker.js";
@@ -16,7 +17,8 @@ import { readClaudeRegistry } from "../../src/sessions/claudeRegistry.js";
 import { findTranscripts } from "../../src/sessions/transcriptFiles.js";
 import { makeTempDir, sleep, waitUntil } from "./env.js";
 
-export const CLAUDE_HOME = join(homedir(), ".claude");
+/** The home whose login the person running the tests uses: the one Claude Code itself picks (CLAUDE_CONFIG_DIR, else ~/.claude). */
+export const CLAUDE_HOME = process.env[CLAUDE_CONFIG_ENV] ?? join(homedir(), ".claude");
 export const TEST_MODEL = "haiku";
 export const TURN_TIMEOUT_MS = 90_000;
 const TRASH_DIR = fileURLToPath(new URL("../../../../trash/", import.meta.url));

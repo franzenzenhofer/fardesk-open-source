@@ -126,7 +126,14 @@ export async function startTestDaemon(
     await services.close();
     home.dispose();
   };
-  const call: TestDaemon["call"] = async (method, path, body, token = TEST_TOKEN) => callApi({ url, method, path, body, token });
+  // A test may start a call, wait for something else and only then await it. If that wait times out, the call is
+  // never awaited and fails later against the closed daemon as an unhandled rejection that breaks the whole run.
+  // The extra catch marks the promise as observed; whoever awaits it still gets the failure.
+  const call: TestDaemon["call"] = (method, path, body, token = TEST_TOKEN) => {
+    const pending = callApi({ url, method, path, body, token });
+    pending.catch(() => undefined);
+    return pending;
+  };
   return { home, config, services, server, url, call, openStream: async (token) => streams.open(token), close };
 }
 

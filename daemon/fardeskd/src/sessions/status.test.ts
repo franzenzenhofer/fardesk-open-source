@@ -95,9 +95,49 @@ const ROWS: Row[] = [
   { name: "registry shell is idle", overrides: { process: proc({ status: "shell" }) }, expected: { status: "idle" } },
   { name: "an unknown registry status is idle", overrides: { process: proc({ status: "mystery" }) }, expected: { status: "idle" } },
   {
-    name: "registry waiting is a waiting permission",
-    overrides: { process: proc({ status: "waiting" }) },
-    expected: { status: "waiting", waitingFor: "permission", summary: "Needs approval", canStop: false },
+    name: "registry waiting without a pending request is a question at the computer, never an approval",
+    overrides: { process: proc({ status: "waiting", waitingFor: "permission prompt" }) },
+    expected: { status: "waiting", waitingFor: "terminal", summary: "Needs you at the computer: permission prompt", canStop: false },
+  },
+  {
+    name: "registry waiting in a bypassPermissions session is also a terminal question",
+    overrides: { process: proc({ status: "waiting" }), summary: { ...TRANSCRIPT, permissionMode: "bypassPermissions" } },
+    expected: { status: "waiting", waitingFor: "terminal", summary: "Needs you at the computer" },
+  },
+  {
+    name: "a bypass-mode session whose registry says waiting is a terminal wait and its replies take the takeover route",
+    overrides: { process: proc({ status: "waiting", waitingFor: "permission prompt", messagingSocketPath: null }), summary: { ...TRANSCRIPT, permissionMode: "bypassPermissions" } },
+    expected: { status: "waiting", waitingFor: "terminal", replyMode: "takeover" },
+  },
+  {
+    name: "a dialog name of only spaces is no name",
+    overrides: { process: proc({ status: "waiting", waitingFor: "  " }) },
+    expected: { status: "waiting", waitingFor: "terminal", summary: "Needs you at the computer" },
+  },
+  {
+    name: "a pending permission in a bypass-mode session is an approval",
+    overrides: { process: proc({ status: "busy" }), pendingKind: "permission", summary: { ...TRANSCRIPT, permissionMode: "bypassPermissions" } },
+    expected: { status: "waiting", waitingFor: "permission", summary: "Needs approval" },
+  },
+  {
+    name: "a busy registry that names a dialog is not waiting",
+    overrides: { process: proc({ status: "busy", waitingFor: "permission prompt" }) },
+    expected: { status: "working", waitingFor: null, summary: "Ran the tests" },
+  },
+  {
+    name: "an ended session has no terminal wait",
+    overrides: { process: null },
+    expected: { status: "ended", waitingFor: null },
+  },
+  {
+    name: "a pending permission wins over registry waiting",
+    overrides: { process: proc({ status: "waiting" }), pendingKind: "permission" },
+    expected: { status: "waiting", waitingFor: "permission", summary: "Needs approval" },
+  },
+  {
+    name: "registry back to idle clears the waiting state",
+    overrides: { process: proc({ status: "idle" }) },
+    expected: { status: "idle", waitingFor: null },
   },
   {
     name: "a pending permission wins over registry busy",

@@ -1,11 +1,15 @@
 // runCli: parse the arguments, run one command, turn errors into exit codes.
 import { parseArgs } from "node:util";
+import { existsSync } from "node:fs";
+import { DEFAULT_TAILNET_TIMING } from "../config/addressWatch.js";
 import { runCommand } from "../config/bind.js";
+import { MAC_APP_CLI, tailscaleCommandsFor } from "../config/tailscale.js";
 import { defaultConfigPath } from "../config/config.js";
 import { runAudit } from "./auditCommand.js";
 import { runDevices, runRevoke, runRotateToken, runSetPassword } from "./authCommands.js";
 import { runCrossSession } from "./crossSession.js";
 import { runInit, runPair, runServe, runStatus } from "./commands.js";
+import { runHomes } from "./homesCommands.js";
 import { runHooksCommand } from "./hooks.js";
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from "./types.js";
 import type { CliDeps, CliIo, CommandContext } from "./types.js";
@@ -26,6 +30,7 @@ export const USAGE = [
   "  devices                list the logged-in devices",
   "  revoke <device|--all>  revoke one device (id or name) or all of them",
   "  cross-session <accept|unset>  set or remove crossSessionInbound in every Claude home settings.json",
+  "  homes [add <path>]     list the Claude homes (configured and found); add one: hooks installed, running daemon reloads",
   "  --help                 this text",
 ].join("\n");
 
@@ -42,11 +47,13 @@ const COMMANDS: Record<string, (context: CommandContext) => number | Promise<num
   devices: runDevices,
   revoke: runRevoke,
   "cross-session": runCrossSession,
+  homes: runHomes,
 };
 
 type Parsed = {
   command: string | undefined;
   target: string | undefined;
+  args: string[];
   config: string | undefined;
   name: string | undefined;
   since: string | undefined;
@@ -72,6 +79,7 @@ function parse(argv: string[]): Parsed {
   return {
     command: positionals[0],
     target: positionals[1],
+    args: positionals.slice(1),
     config: values.config,
     name: values.name,
     since: values.since,
@@ -92,6 +100,7 @@ function contextOf(parsed: Parsed, io: CliIo, deps: CliDeps): CommandContext {
     configPath: parsed.config ?? io.env["FARDESK_CONFIG"] ?? defaultConfigPath(),
     name: parsed.name ?? null,
     target: parsed.target ?? null,
+    args: parsed.args,
     all: parsed.all,
     dryRun: parsed.dryRun,
     since: parsed.since ?? null,
@@ -99,6 +108,8 @@ function contextOf(parsed: Parsed, io: CliIo, deps: CliDeps): CommandContext {
     deps,
     run: deps.run ?? runCommand,
     now: deps.now ?? ((): Date => new Date()),
+    tailscaleCommands: deps.tailscaleCommands ?? tailscaleCommandsFor(process.platform, existsSync(MAC_APP_CLI)),
+    tailnetTiming: deps.tailnetTiming ?? DEFAULT_TAILNET_TIMING,
   };
 }
 

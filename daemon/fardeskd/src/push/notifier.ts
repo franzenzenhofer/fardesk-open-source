@@ -44,13 +44,31 @@ export type NotifierDeps = {
 
 export const DEFAULT_DONE_DELAY_MS = 20_000;
 
-export type Notifier = { done(report: StopReport): void; ping(sessionId: string, title: string, body: string): Promise<number>; close(): void };
+export const HAND_OFF_BODY = "Still waiting: answer at the computer";
+
+export type Notifier = {
+  done(report: StopReport): void;
+  /** One more push, of the kind of the request that timed out (so a device that enabled only that kind gets it), and Claude Code fell back to its dialog at the computer. */
+  handOff(sessionId: string, kind: "permission" | "question"): void;
+  ping(sessionId: string, title: string, body: string): Promise<number>;
+  close(): void;
+};
 
 type Pending = Extract<Activity, { kind: "permission" | "question" }>;
-type Outgoing = { type: NotificationType; category: ApnsCategory; sessionId: string; body: string; requestId: string | null };
+type Outgoing = {
+  type: NotificationType;
+  category: ApnsCategory;
+  sessionId: string;
+  body: string;
+  requestId: string | null;
+  /** The category whose delivered notification this push replaces (same collapse id), when it is not its own. */
+  replaces?: ApnsCategory;
+};
 
 const isPendingRequest = (activity: Activity): activity is Pending =>
   (activity.kind === "permission" || activity.kind === "question") && activity.state === "pending";
+
+const requestCategory = (kind: Pending["kind"]): ApnsCategory => (kind === "question" ? "QUESTION" : "PERMISSION");
 
 function requestBody(activity: Pending): string {
   if (activity.kind === "question") return activity.text;
@@ -107,7 +125,7 @@ function push(deps: NotifierDeps, outgoing: Outgoing): void {
   // One notification per session and kind: a newer one replaces the older one on the device.
   const notification: ApnsNotification = {
     ...buildNotification(deps, outgoing, deps.describe(outgoing.sessionId).title),
-    collapseId: `${outgoing.sessionId}:${outgoing.category}`,
+    collapseId: `${outgoing.sessionId}:${outgoing.replaces ?? outgoing.category}`,
   };
   const targets = deps.devices.list().filter((entry) => entry.notifications.includes(outgoing.type));
   void Promise.all(targets.map(async (device) => deliver(deps, apns, device, notification))).then((results) => {
@@ -135,7 +153,7 @@ function onSession(deps: NotifierDeps, lastStatus: Map<string, SessionStatus>, s
 }
 
 function onRequest(deps: NotifierDeps, sessionId: string, activity: Pending): void {
-  const category = activity.kind === "question" ? "QUESTION" : "PERMISSION";
+  const category = requestCategory(activity.kind);
   push(deps, { type: activity.kind, category, sessionId, body: requestBody(activity), requestId: activity.requestId });
 }
 
@@ -179,6 +197,10 @@ export function createNotifier(deps: NotifierDeps): Notifier {
   return {
     done: (report): void => {
       quiet.schedule(report);
+    },
+    handOff: (sessionId, kind): void => {
+      // Same collapse id as the request push: the device swaps the stale Allow/Deny notification for this one.
+      push(deps, { type: kind, category: "TERMINAL", sessionId, body: HAND_OFF_BODY, requestId: null, replaces: requestCategory(kind) });
     },
     ping: async (sessionId, title, body) => ping(deps, sessionId, title, body),
     close: (): void => {

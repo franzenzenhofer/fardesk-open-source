@@ -5,7 +5,9 @@
 # Resumable: after a successful upload the build number is stored in $FARDESK_BUILD_DIR/pending-build;
 # a re-run skips archive and upload and continues polling.
 set -euo pipefail
-umask 077
+# Build output must stay world-readable: App Store Connect refuses a macOS installer package with files only the
+# owner can read ("only readable by the root user", 409). Secret files are written with explicit modes below.
+umask 022
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -200,6 +202,17 @@ print_summary() {
   log "tester count: $testers"
 }
 
+# Every release ships a higher version (scripts/version.sh): a marketing version that already has a build on this
+# platform was released before, so a new upload needs a higher VERSION first. Resuming our own upload is exempt.
+require_unreleased_version() {
+  local version count
+  version="$(tr -d '[:space:]' < "$REPO_ROOT/VERSION")"
+  count="$(asc GET "/v1/preReleaseVersions?filter%5Bapp%5D=$APP_ID&filter%5Bversion%5D=$version&filter%5Bplatform%5D=$ASC_PLATFORM&include=builds&limit=1" \
+    | jq '[.data[]?.relationships.builds.data[]?] | length')"
+  [[ "$count" == 0 ]] || die "version $version already has a $PLATFORM build in TestFlight: raise VERSION first (bash scripts/version.sh bump, or a new minor/major)"
+  log "version $version has no $PLATFORM build yet"
+}
+
 choose_build_number() {
   if [[ -f "$PENDING_FILE" ]]; then
     cat "$PENDING_FILE"
@@ -210,13 +223,14 @@ choose_build_number() {
 
 main() {
   [[ -f "$ASC_KEY_PATH" ]] || die "missing API key file $ASC_KEY_PATH"
-  mkdir -p "$BUILD_DIR"
+  mkdir -p "$BUILD_DIR" && chmod 700 "$BUILD_DIR"   # holds the account holder file and API answers: owner only
   auth_flags
   local number group
   number="$(choose_build_number)"
   if [[ -f "$PENDING_FILE" ]]; then
     log "build $number already uploaded, resuming at processing"
   else
+    require_unreleased_version
     archive_app "$number"
     export_and_upload "$number"
     echo "$number" > "$PENDING_FILE"
@@ -227,19 +241,10 @@ main() {
   ensure_tester "$group"
   print_summary "$number" "$group"
   mv "$PENDING_FILE" "$BUILD_DIR/last-shipped-build-$PLATFORM"
-  if [[ "${FARDESK_TESTFLIGHT_SKIP_VERSION_BUMP:-0}" != 1 ]]; then bump_version_after_shipping; fi
+  log "version: $(bash "$SCRIPT_DIR/version.sh" show)"
 }
-
-# Every TestFlight upload ships VERSION as it is (1.8.1), then the repo moves on to the next patch (1.8.2).
-bump_version_after_shipping() {
-  local shipped
-  shipped="$(bash "$SCRIPT_DIR/version.sh" show)"
-  log "version: $shipped"
-  bash "$SCRIPT_DIR/version.sh" bump > /dev/null
-  (cd "$REPO_ROOT" && git add VERSION apps/Fardesk/Config/Version.xcconfig daemon/fardeskd/package.json \
-    packages/FardeskKit/Sources/FardeskCLICore/FardeskCLI.swift \
-    && git commit -q -m "Shipped $shipped to TestFlight (build $(cat "$BUILD_DIR/last-shipped-build-$PLATFORM")); next version $(bash "$SCRIPT_DIR/version.sh" show)")
-  log "next version: $(bash "$SCRIPT_DIR/version.sh" show)"
-}
+# The version is set on purpose at the start of a release (scripts/version.sh set <x.y.z>, major for a breaking
+# change, minor for features, patch for fixes) and the same version ships on every platform of that release. This
+# script only checks it (require_unreleased_version); it never bumps.
 
 main "$@"

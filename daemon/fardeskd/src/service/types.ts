@@ -102,5 +102,7 @@ export type Services = {
   mute(sessionId: string, muted: boolean): void;
   label(sessionId: string, request: LabelRequest): void;
   registerDevice(request: DeviceRequest): void;
+  /** Re-reads claudeHomes from the config file: sessions of an added home show up without a restart. */
+  reloadHomes(): { homes: string[] };
   close(): Promise<void>;
 };

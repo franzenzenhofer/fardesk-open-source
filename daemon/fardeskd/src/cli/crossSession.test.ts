@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
-import { captureIo, writeCliConfig } from "../../test/support/cliConfig.js";
+import { captureIo, runWithoutProcesses, writeCliConfig } from "../../test/support/cliConfig.js";
 import { freePort } from "../../test/support/env.js";
 import { createRealOwned } from "../service/ownedFactory.js";
 import { runCli } from "./index.js";
@@ -25,7 +25,7 @@ async function setup(settings: string | null): Promise<{ home: ClaudeHome; confi
 
 async function run(argv: string[]): Promise<{ code: number; out: string[]; err: string[] }> {
   const io = captureIo();
-  const code = await runCli(argv, io, { createOwned: createRealOwned });
+  const code = await runCli(argv, io, { createOwned: createRealOwned, run: runWithoutProcesses });
   return { code, out: io.out, err: io.err };
 }
 

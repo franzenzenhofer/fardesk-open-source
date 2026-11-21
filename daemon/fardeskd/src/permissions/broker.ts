@@ -1,4 +1,6 @@
+import { isDeepStrictEqual } from "node:util";
 import type { Activity, PermissionDecision, PermissionState } from "../contract/schema.js";
+import type { FinishedToolCall } from "../transcript/index.js";
 import type { Bus } from "../core/bus.js";
 import { FardeskError } from "../core/errors.js";
 import { describeRequest } from "./describe.js";
@@ -10,10 +12,10 @@ export type BrokerAnswer =
   | { state: "allowed"; always: boolean }
   | { state: "denied" }
   | { state: "answered"; option: string }
-  | { state: "expired" };
+  | { state: "expired"; timedOut?: true };
 
 export type AskInput = { sessionId: string; toolName: string; toolInput: unknown; cwd: string };
-export type AskHandle = { requestId: string; answer: Promise<BrokerAnswer> };
+export type AskHandle = { requestId: string; kind: PendingKind; answer: Promise<BrokerAnswer> };
 export type PendingKind = "permission" | "question";
 
 export type BrokerOptions = {
@@ -28,6 +30,10 @@ export type Broker = {
   decide(sessionId: string, requestId: string, decision: PermissionDecision): void;
   answer(sessionId: string, requestId: string, option: string): void;
   cancelSession(sessionId: string): void;
+  /** The request is moot (the hook connection closed because the dialog was answered in the terminal): no-op when already resolved. */
+  cancelRequest(sessionId: string, requestId: string): void;
+  /** The transcript holds this tool call's result: its pending permission request cannot be answered any more. */
+  toolFinished(sessionId: string, call: FinishedToolCall): void;
   activities(sessionId: string): Activity[];
   pendingKind(sessionId: string): PendingKind | null;
   close(): void;
@@ -39,6 +45,8 @@ type Entry = {
   sessionId: string;
   requestId: string;
   activity: BrokerActivity;
+  /** What the hook asked about: a finished tool call only ends the request for exactly this input. */
+  toolInput: unknown;
   settle: (answer: BrokerAnswer) => void;
   timer: NodeJS.Timeout;
 };
@@ -59,6 +67,10 @@ const DECISION_ANSWERS: Record<PermissionDecision, BrokerAnswer> = {
 };
 
 const EXPIRED: BrokerAnswer = { state: "expired" };
+const TIMED_OUT: BrokerAnswer = { state: "expired", timedOut: true };
+
+/** The transcript timestamp of a tool call is its tool_use line, written a moment before the hook fires. */
+const TOOL_START_SLACK_MS = 5_000;
 
 function permissionState(answer: BrokerAnswer): PermissionState {
   if (answer.state === "allowed") return "allowed";
@@ -149,12 +161,23 @@ function startRequest(ledger: Ledger, options: BrokerOptions, input: AskInput): 
     settle = resolve;
   });
   const timer = setTimeout(() => {
-    ledger.finish(entry, EXPIRED);
+    ledger.finish(entry, TIMED_OUT);
   }, options.timeoutMs);
   timer.unref();
-  const entry: Entry = { sessionId: input.sessionId, requestId, activity, settle, timer };
+  const entry: Entry = { sessionId: input.sessionId, requestId, activity, toolInput: input.toolInput, settle, timer };
   ledger.add(entry);
-  return { requestId, answer };
+  return { requestId, kind: activity.kind, answer };
+}
+
+function expireWhere(ledger: Ledger, sessionId: string, matches: (entry: Entry) => boolean): void {
+  for (const entry of ledger.entriesOf(sessionId).filter((e) => isPending(e) && matches(e))) ledger.finish(entry, EXPIRED);
+}
+
+/** A permission request is for this tool call when it names the tool, carries the same input and was asked right then. */
+function isCallOf(entry: Entry, call: FinishedToolCall): boolean {
+  const { activity } = entry;
+  if (activity.kind !== "permission" || activity.tool !== call.tool) return false;
+  return Math.abs(Date.parse(activity.ts) - Date.parse(call.startedAt)) <= TOOL_START_SLACK_MS && isDeepStrictEqual(entry.toolInput, call.input);
 }
 
 export function createBroker(options: BrokerOptions): Broker {
@@ -173,6 +196,12 @@ export function createBroker(options: BrokerOptions): Broker {
     },
     cancelSession: (sessionId): void => {
       ledger.expire(ledger.entriesOf(sessionId));
+    },
+    cancelRequest: (sessionId, requestId): void => {
+      expireWhere(ledger, sessionId, (entry) => entry.requestId === requestId);
+    },
+    toolFinished: (sessionId, call): void => {
+      expireWhere(ledger, sessionId, (entry) => isCallOf(entry, call));
     },
     activities: (sessionId): Activity[] => ledger.entriesOf(sessionId).map((entry) => entry.activity),
     pendingKind: (sessionId): PendingKind | null => ledger.entriesOf(sessionId).find(isPending)?.activity.kind ?? null,

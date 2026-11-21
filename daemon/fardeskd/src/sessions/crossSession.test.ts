@@ -1,12 +1,10 @@
-import { NO_LABEL } from "../service/labelStore.js";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
 import { waitUntil } from "../../test/support/env.js";
-import { createBus } from "../core/bus.js";
-import { createLogger } from "../core/log.js";
+import { quietStoreDeps } from "../../test/support/storeDeps.js";
 import { acceptsCrossSession, readCrossSessionInbound } from "./crossSession.js";
 import { createSessionStore } from "./store.js";
 import type { SessionStore } from "./store.js";
@@ -27,21 +25,7 @@ function bypassStore(): { home: ClaudeHome; store: SessionStore } {
   disposers.push(() => { home.dispose(); });
   home.addTranscript({ fixture: "01-simple-session", sessionId: SESSION });
   home.addRegistry({ fixture: "idle", sessionId: SESSION });
-  const store = createSessionStore({
-    claudeHomes: [home.dir],
-    bus: createBus(),
-    log: createLogger(() => undefined, () => new Date()),
-    registryPollMs: 50,
-    transcriptPollMs: 20,
-    summaryMaxChars: 80,
-    limits: { maxEnded: 10, maxEndedReadsPerRefresh: 10, maxFolders: 5 },
-    isOwned: () => false,
-    isBusy: () => false,
-    pendingKind: () => null,
-    isMuted: () => false,
-    labelOf: () => NO_LABEL,
-    onLeftWaiting: () => undefined,
-  });
+  const store = createSessionStore(quietStoreDeps(home.dir, { registryPollMs: 50, limits: { maxEnded: 10, maxEndedReadsPerRefresh: 10, maxFolders: 5 } }));
   disposers.push(() => { store.close(); });
   return { home, store };
 }

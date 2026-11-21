@@ -4,6 +4,7 @@ import type { PermissionMode } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import { BYPASS_PERMISSIONS } from "../sessions/permissionMode.js";
 import { toSdkResult } from "../permissions/hookReply.js";
+import { claudeHomeEnv } from "./claudeEnv.js";
 import type { OwnedSet } from "./ownedSet.js";
 import { createSession, type RunningSession } from "./session.js";
 import type { OwnedRunnerDeps } from "./runner.js";
@@ -39,7 +40,7 @@ function sessionOptions(deps: OwnedRunnerDeps, { cwd, model, permissionMode, ext
     settingSources: SETTING_SOURCES,
     ...permissionOptions(permissionMode),
     includePartialMessages: false,
-    env: { ...process.env, [SESSION_STATE_ENV]: "1" },
+    env: { ...claudeHomeEnv(deps.claudeHome, process.env), [SESSION_STATE_ENV]: "1" },
     ...modelOption(model),
     ...extra,
   };

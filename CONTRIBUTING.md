@@ -11,6 +11,14 @@ Thanks for looking. Fardesk is small on purpose; please open an issue before a l
 - No real tokens, addresses, host names, account names or screenshots of real sessions in code, tests, issues or
   pull requests. Use `100.64.0.x` addresses, `example.com`, and names like "Studio" and "Laptop".
 
+## How pull requests are handled
+
+This repository is a generated copy of the maintainer's source repository; nothing is merged here. When you
+open a pull request, the maintainer applies your change in the source repository with you as co-author, and it
+appears here with the next release. The pull request is then closed with a link to that commit, not merged.
+Issues and pull requests use templates that repeat the rule above: no real addresses, host names, account
+names, logs, config or session content.
+
 ## Code standards
 
 - TypeScript strict in the daemon, Swift 6 with strict concurrency in the app and package.

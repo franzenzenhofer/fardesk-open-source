@@ -40,8 +40,9 @@ public struct SessionPresentation: Equatable, Sendable {
 
     private static func statusLabel(for session: SessionSummary) -> String {
         switch (session.status, session.waitingFor) {
-        case (.waiting, .permission): "Needs approval"
-        case (.waiting, .question): "Needs answer"
+        case (.waiting, .terminal?): "Needs you at the computer"
+        case (.waiting, .permission?): "Needs approval"
+        case (.waiting, .question?): "Needs answer"
         case (.waiting, nil): "Waiting"
         case (.working, _): "Working"
         case (.idle, _): "Idle"
@@ -50,7 +51,9 @@ public struct SessionPresentation: Equatable, Sendable {
     }
 
     private static func subtitleParts(for session: SessionSummary, statusLabel: String) -> [String] {
-        let lead = session.status == .waiting || session.summary.isEmpty ? statusLabel : session.summary
+        // A terminal wait: the daemon summary names the dialog ("Needs you at the computer: permission prompt").
+        let namesDialog = session.waitingFor == .terminal && !session.summary.isEmpty
+        let lead = namesDialog || (session.status != .waiting && !session.summary.isEmpty) ? session.summary : statusLabel
         return session.status == .ended ? [lead, "Can resume"] : [lead]
     }
 

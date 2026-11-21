@@ -24,6 +24,7 @@ import { createTypableWatch } from "./typable.js";
 import type { TerminalDeps } from "./terminal.js";
 import { createCore } from "./core.js";
 import type { Closer, Core } from "./core.js";
+import { reloadHomes } from "./homes.js";
 import { collectMachineFacts } from "./machine.js";
 import type { MachineFacts } from "./machine.js";
 import type { ActionResult, ServiceOptions, Services } from "./types.js";
@@ -175,7 +176,7 @@ export async function createServices(config: Config, options: ServiceOptions): P
       log,
       now: () => Date.now(),
     });
-    const base = { ...read, ...actions, ghosttyProbe: async (): Promise<GhosttyAutomation> => ghostty.probe(), ...intake(config, core, attachments), ...ownedActions(core), ...reach(config, core), ...writes(core) };
+    const base = { ...read, ...actions, ghosttyProbe: async (): Promise<GhosttyAutomation> => ghostty.probe(), ...intake(config, core, attachments), ...ownedActions(core), ...reach(config, core), ...writes(core), reloadHomes: (): { homes: string[] } => reloadHomes(config, options.configPath, core.store) };
     return { bus: core.bus, auth, audit: createAuditLog({ stateDir: config.stateDir }), ...base, ...coordinate(config, core, base), close };
   } catch (error) {
     await runClosers(closers);

@@ -6,6 +6,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+if [ -f "$ROOT/internal/gates.sh" ]; then
+  echo "== Private gates (internal/gates.sh), first: a private value fails in about a minute =="
+  bash "$ROOT/internal/gates.sh"
+fi
+
 echo "== DRY gate (jscpd, zero clones) =="
 bash "$ROOT/scripts/dry-gate.sh"
 

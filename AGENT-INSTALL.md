@@ -109,6 +109,10 @@ Checks, per machine:
 - The listening address is the Tailscale address, not `0.0.0.0`: `lsof -iTCP:4780 -sTCP:LISTEN` (macOS) or
   `ss -ltn 'sport = :4780'` (Linux).
 - `~/.config/fardesk/config.json` has mode 600.
+- `fardeskd homes` lists no `found, not configured` line. Someone who runs Claude Code under `CLAUDE_CONFIG_DIR`
+  has more than one Claude home, and the sessions of a home outside `claudeHomes` are invisible. The setup script
+  lists the homes it finds; adding one edits its `settings.json`, so ask the user and then run
+  `fardeskd homes add <path>` (or `10-daemon.sh` with `--add-homes`). Never add a home on your own.
 
 ## Step 3: hub (skip if there is none)
 

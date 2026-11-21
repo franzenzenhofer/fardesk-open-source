@@ -1,5 +1,5 @@
 // Version: written by scripts/version.sh from the VERSION file (never edit by hand).
-MARKETING_VERSION = 1.8.5
+MARKETING_VERSION = 2.0.0
 // Build number; scripts/testflight.sh overrides it on the command line.
 CURRENT_PROJECT_VERSION = 1
 // Identity of the build. These are the example values; Config/Local.xcconfig (gitignored, written by

@@ -57,7 +57,7 @@ describe("reply into a tmux pane", () => {
     const { panePid } = rig.sandbox.start(collector(join(rig.daemon.config.stateDir, "never.txt")));
     const { id } = await seed(panePid, { status: "waiting", waitingFor: "tool approval" });
     const message = await expectApiError(rig.daemon, "POST", `/v1/sessions/${id}/message`, 409, "conflict", { text: "1" });
-    expect(message).toContain("waiting for a permission answer");
+    expect(message).toContain("has a question open at the computer");
   });
 });
 

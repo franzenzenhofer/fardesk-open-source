@@ -51,21 +51,28 @@ extension AppModel {
         for pending in outbox.queued(on: machineID) { await deliver(pending.id) }
     }
 
-    /// Shown under a message held while its session waits on a permission or question: typed into the open dialog it
-    /// would answer it and lose its attachment lines.
+    /// Shown under a message held while its session waits on a permission or question the phone can answer: typed
+    /// into the open dialog it would answer it and lose its attachment lines.
     static let waitingForAnswer = "your answer"
 
-    /// Sends every held message whose session no longer waits on the user (called after each state change).
+    /// True while the session waits on a request the phone can answer. A question open only at the computer is not
+    /// one: nothing on the phone ends that wait, so a message is never held for it (the daemon refuses it with the reason).
+    func awaitsPhoneAnswer(_ ref: SessionRef) -> Bool {
+        guard let session = session(ref), session.status == .waiting else { return false }
+        return session.waitingFor?.phoneCanAnswer ?? false
+    }
+
+    /// Sends every held message whose session no longer waits on an answer from the phone (called after each state change).
     func releaseAnswerHolds() {
         for pending in outbox.messages where pending.state == .queued(waitingFor: Self.waitingForAnswer) {
-            guard session(pending.ref)?.status != .waiting else { continue }
+            guard !awaitsPhoneAnswer(pending.ref) else { continue }
             Task { await deliver(pending.id) }
         }
     }
 
     func deliver(_ id: UUID) async {
         guard let pending = outbox.message(id), !pending.isInFlight else { return }
-        if pending.kind == .reply, session(pending.ref)?.status == .waiting {
+        if pending.kind == .reply, awaitsPhoneAnswer(pending.ref) {
             return outbox.set(id, .queued(waitingFor: Self.waitingForAnswer))
         }
         let started = Date()

@@ -48,6 +48,17 @@ describe("runCommand", () => {
   });
 });
 
+const RUNNING = JSON.stringify({ BackendState: "Running" });
+
+// A scripted tailscale: answers `status --json` with `status` and `ip -4` with `ip`; an Error is thrown instead.
+function scripted(status: string | Error, ip: string): (command: string, args: string[]) => Promise<string> {
+  return async (_command, args) => {
+    const answer = args[0] === "status" ? status : ip;
+    if (answer instanceof Error) throw answer;
+    return runNodePrinting(answer);
+  };
+}
+
 describe("resolveBindAddress", () => {
   it("returns a configured literal address without running anything", async () => {
     const run = (): Promise<string> => {
@@ -57,19 +68,35 @@ describe("resolveBindAddress", () => {
   });
 
   it("takes the first line of a valid tailscale address", async () => {
-    const address = await resolveBindAddress(configWith("tailscale"), async () => runNodePrinting("100.64.0.1\nfd7a::1\n"));
-    expect(address).toBe("100.64.0.1");
+    expect(await resolveBindAddress(configWith("tailscale"), scripted(RUNNING, "100.64.0.1\nfd7a::1\n"))).toBe("100.64.0.1");
   });
 
   it("accepts the top of the 100.64.0.0/10 range", async () => {
-    expect(await resolveBindAddress(configWith("tailscale"), async () => runNodePrinting("100.127.255.254"))).toBe("100.127.255.254");
+    expect(await resolveBindAddress(configWith("tailscale"), scripted(RUNNING, "100.127.255.254"))).toBe("100.127.255.254");
   });
 
   it.each(["garbage", "", "10.0.0.1", "100.63.0.1", "100.128.0.1", "100.64.0.999"])("rejects %j as not a tailscale IPv4", async (output) => {
-    const error = await rejection(resolveBindAddress(configWith("tailscale"), async () => runNodePrinting(output)));
+    const error = await rejection(resolveBindAddress(configWith("tailscale"), scripted(RUNNING, output)));
     expect(error).toBeInstanceOf(FardeskError);
-    expect((error as FardeskError).code).toBe("internal");
-    expect((error as FardeskError).message).toContain("100.64.0.0/10");
+    expect((error as FardeskError).message).toContain("no tailnet address yet");
+  });
+
+  it.each([
+    [new Error("spawn tailscale ENOENT"), "Tailscale: not installed"],
+    [new Error("failed to connect to local tailscaled"), "Tailscale is stopped on this computer"],
+    [JSON.stringify({ BackendState: "Stopped" }), "Tailscale is stopped on this computer"],
+    [JSON.stringify({ BackendState: "NeedsLogin" }), "Tailscale: logged out, run tailscale up"],
+  ])("says in plain words why there is no address (%#)", async (status, sentence) => {
+    const error = await rejection(resolveBindAddress(configWith("tailscale"), scripted(status, "")));
+    expect((error as FardeskError).message).toBe(sentence);
+  });
+
+  it("tries the next command when the first one cannot reach a daemon", async () => {
+    const run = async (command: string, args: string[]): Promise<string> => {
+      if (command === "first") throw new Error("failed to connect to local tailscaled");
+      return scripted(RUNNING, "100.64.0.7")(command, args);
+    };
+    expect(await resolveBindAddress(configWith("tailscale"), run, ["first", "second"])).toBe("100.64.0.7");
   });
 
   it.runIf(tailscaleWorks())("resolves with the real tailscale binary", async () => {

@@ -12,7 +12,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 async function baseUrl(context: CommandContext): Promise<string | null> {
   const config = loadConfig(context.configPath);
   try {
-    return daemonUrl(config, await resolveBindAddress(config, context.run));
+    return daemonUrl(config, await resolveBindAddress(config, context.run, context.tailscaleCommands));
   } catch {
     return null;
   }

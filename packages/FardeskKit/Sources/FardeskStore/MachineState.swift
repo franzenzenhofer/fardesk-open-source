@@ -134,9 +134,12 @@ public struct MachineState: Equatable, Sendable, Identifiable {
     }
 
     /// A call answered `machine_offline`: offline, quietly, with the hub's sentence as the problem.
+    /// The time shown is the hub's last contact with the machine, never this device's own clock.
     public mutating func markOffline(problem: String, now: Date) {
+        let hubSeen = hubInfo?.lastSeen
         markOffline(now: now)
-        hubInfo = HubMachine(name: endpoint.name, online: false, lastSeen: lastSeen, problem: problem)
+        if let hubSeen, case .offline = connection { connection = .offline(lastSeen: hubSeen) }
+        hubInfo = HubMachine(name: endpoint.name, online: false, lastSeen: hubSeen ?? lastSeen, problem: problem)
     }
 
     public mutating func setPause(_ until: Date?) {

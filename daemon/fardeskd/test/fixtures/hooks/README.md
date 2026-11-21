@@ -1,6 +1,6 @@
 # Hook fixtures
 
-Real hook stdin payloads captured in Spike C (see `SPIKES.md`), Claude Code 2.1.325.
+Real hook stdin payloads captured during a hook spike, Claude Code 2.1.325.
 Every key and value type is kept. Only the home directory (`/home/dev`), the user name and the
 scratchpad uid are neutralised.
 

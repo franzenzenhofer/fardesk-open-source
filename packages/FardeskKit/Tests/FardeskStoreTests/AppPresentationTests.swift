@@ -25,6 +25,28 @@ struct AppPresentationTests {
         #expect(presentation.lastSeenLabel == "Last seen 5m ago")
     }
 
+    @Test func anOfflinePeerRowShowsTheHubsLastSeenNotThisDevicesClock() throws {
+        let hubSeen = now.addingTimeInterval(-3_600)
+        var machine = MachineState(endpoint: endpoint)
+        machine.apply(hub: HubMachine(name: "Mac", online: true, lastSeen: hubSeen))
+        machine.apply(.hello(machine: try Fixtures.machine(), sessions: []))
+        machine.apply(.ping(ts: now.addingTimeInterval(-60)))
+        machine.markOffline(problem: "Tailscale is stopped on it", now: now)
+        let presentation = MachinePresentation(machine: machine, now: now)
+        #expect(machine.connection == .offline(lastSeen: hubSeen))
+        #expect(presentation.offlineSinceLabel == "since 1h ago")
+        #expect(presentation.problem == "Tailscale is stopped on it")
+        #expect(machine.hubInfo?.lastSeen == hubSeen)
+    }
+
+    @Test func aPeerTheHubNeverSawHasNoOfflineSince() {
+        var machine = MachineState(endpoint: endpoint)
+        machine.apply(hub: HubMachine(name: "Mac", online: false, lastSeen: nil, problem: "not linked"))
+        let presentation = MachinePresentation(machine: machine, now: now)
+        #expect(presentation.statusLabel == "Offline")
+        #expect(presentation.offlineSinceLabel == nil)
+    }
+
     @Test func offlineWithoutAnyContactHasNoLastSeen() {
         var machine = MachineState(endpoint: endpoint)
         machine.restore(MachineSnapshot(machineID: endpoint.id, machine: nil, sessions: [], lastSeen: nil))

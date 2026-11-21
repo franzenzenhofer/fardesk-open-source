@@ -1,12 +1,13 @@
 // The poll cycle of the session store: sync entries with the registry and the transcripts, then publish.
 import type { SessionSummary } from "../contract/schema.js";
-import { createTailer, mapActivities, summarise } from "../transcript/index.js";
+import { createTailer, finishedToolCalls, mapActivities, summarise } from "../transcript/index.js";
 import type { TranscriptLine } from "../transcript/index.js";
 import { buildSessionSummary, resolveCwd, resolveTimes } from "./status.js";
 import { EMPTY_SUMMARY, cacheKeyOf, diffActivities, newEntry } from "./storeEntry.js";
 import type { StoreContext, StoreEntry } from "./storeEntry.js";
 import { readSummaryLines } from "./storeIo.js";
 import { acceptsCrossSession } from "./crossSession.js";
+import { isProcessAlive } from "./processes.js";
 import { collectProcesses, collectTranscripts } from "./storeSources.js";
 import type { HomedProcess } from "./storeSources.js";
 import type { TranscriptRef } from "./transcriptFiles.js";
@@ -44,6 +45,15 @@ function applyLines(ctx: StoreContext, entry: StoreEntry, lines: TranscriptLine[
   entry.summary = summarise(lines, ctx.deps.summaryMaxChars, { cwd, activities: entry.activities });
 }
 
+/** Reports each tool call the first time its tool_result shows up (calls already finished at start are only remembered). */
+function reportFinishedCalls(ctx: StoreContext, entry: StoreEntry, lines: TranscriptLine[], silent = false): void {
+  for (const call of finishedToolCalls(lines)) {
+    if (entry.finishedCallIds.has(call.id)) continue;
+    entry.finishedCallIds.add(call.id);
+    if (!silent) ctx.deps.onToolFinished?.(entry.id, call);
+  }
+}
+
 function startTailer(ctx: StoreContext, entry: StoreEntry, path: string, cwd: string): void {
   entry.tailer?.close();
   entry.tailerPath = path;
@@ -56,11 +66,14 @@ function startTailer(ctx: StoreContext, entry: StoreEntry, path: string, cwd: st
       for (const activity of diffActivities(previous, entry.activities)) {
         ctx.deps.bus.publish({ type: "activity", sessionId: entry.id, activity });
       }
+      reportFinishedCalls(ctx, entry, tailer.lines());
       publishEntry(ctx, entry);
     },
   });
   entry.tailer = tailer;
+  entry.finishedCallIds = new Set();
   applyLines(ctx, entry, tailer.lines(), cwd);
+  reportFinishedCalls(ctx, entry, tailer.lines(), true);
 }
 
 export function stopTailer(entry: StoreEntry): void {
@@ -91,10 +104,31 @@ function syncEnded(ctx: StoreContext, entry: StoreEntry, ref: TranscriptRef, bud
   entry.summary = summarise(readSummaryLines(ref), ctx.deps.summaryMaxChars);
 }
 
+const MISSED_POLLS_BEFORE_GONE = 2;
+
+/**
+ * A live process missing from one poll may only be a registry file that could not be parsed (a partial write), so
+ * it counts as gone when its pid is really dead or it stayed missing for two polls in a row.
+ */
+function goneConfirmed(entry: StoreEntry): boolean {
+  entry.missedPolls += 1;
+  const confirmed = entry.missedPolls >= MISSED_POLLS_BEFORE_GONE || entry.lastPid === null || !isProcessAlive(entry.lastPid);
+  if (confirmed) entry.missedPolls = 0;
+  return confirmed;
+}
+
 function leftWaiting(entry: StoreEntry): boolean {
   const waiting = entry.process?.status === "waiting";
-  const left = entry.wasWaiting && !waiting;
+  const live = entry.process !== null;
+  if (entry.process !== null) {
+    entry.missedPolls = 0;
+    entry.lastPid = entry.process.pid;
+  } else if (entry.wasLive && !goneConfirmed(entry)) {
+    return false;
+  }
+  const left = (entry.wasWaiting && !waiting) || (entry.wasLive && !live);
   entry.wasWaiting = waiting;
+  entry.wasLive = live;
   return left;
 }
 
@@ -118,7 +152,7 @@ export function refreshStore(ctx: StoreContext): void {
     stopTailer(entry);
   }
   const left = [...entries.values()].filter(leftWaiting).map((entry) => entry.id);
-  for (const entry of gone) entries.delete(entry.id);
+  for (const entry of gone) if (entry.missedPolls === 0) entries.delete(entry.id);
   for (const entry of entries.values()) publishEntry(ctx, entry);
   for (const id of left) deps.onLeftWaiting(id);
 }

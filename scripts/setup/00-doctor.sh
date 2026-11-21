@@ -69,11 +69,22 @@ check_machines() {
   fi
 }
 
+# Claude homes on this computer that the installed daemon does not read yet (their sessions would be invisible).
+check_claude_homes() {
+  local main="$HOME/.local/share/fardeskd/dist/main.js" found
+  [[ -f "$main" ]] || { say "skipped  Claude homes (the daemon is not installed on this computer yet)"; return; }
+  local listing
+  listing="$(node "$main" homes 2>&1)" || { say "skipped  Claude homes (the check could not run: ${listing})"; return; }
+  found="$(grep '^found, not configured' <<< "$listing")" || { ok "no Claude home outside claudeHomes"; return; }
+  while IFS= read -r line; do say "note     ${line}"; done <<< "$found"
+}
+
 check_node
 need_tool jq "brew install jq / apt install jq"
 need_tool ssh "needed to reach the other machines"
 optional_tool tmux "needed for the Stop command on sessions started in a terminal"
 check_claude_and_tailscale
 check_apple_tools
+check_claude_homes
 check_env_file
 setup_finish

@@ -3,14 +3,16 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
-import { captureIo, writeCliConfig } from "../../test/support/cliConfig.js";
+import { captureIo, runWithoutProcesses, writeCliConfig } from "../../test/support/cliConfig.js";
 import { startTestDaemon, writeConfigFile } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
 import { fixturePath, freePort, makeTempDir, portAccepts, waitUntil } from "../../test/support/env.js";
+import { createFakeTailscale, putOnPath } from "../../test/support/fakeTailscale.js";
+import { networkInterfaces } from "node:os";
 import { createRealOwned } from "../service/ownedFactory.js";
 import { runCli } from "./index.js";
 
-const deps = { createOwned: createRealOwned };
+const deps = { createOwned: createRealOwned, run: runWithoutProcesses };
 type JsonFile = { name: string; hooks: Record<string, unknown[]> };
 const readJson = (path: string): JsonFile => JSON.parse(readFileSync(path, "utf8")) as JsonFile;
 const NOW = new Date("2026-11-15T10:00:00.000Z");
@@ -169,7 +171,8 @@ describe("status", () => {
     const io = captureIo();
     const code = await runCli(["status", "--config", tailscale.path], io, { ...deps, run: async () => Promise.reject(new Error("tailscale is not running")) });
     expect(code).toBe(0);
-    expect(io.out.join("\n")).toContain("bind address: not resolved (tailscale is not running)");
+    expect(io.out).toContain("Tailscale is stopped on this computer");
+    expect(io.out.join("\n")).not.toContain("bind address");
   });
 });
 
@@ -196,5 +199,51 @@ describe("serve", () => {
     expect(await runCli(["serve", "--config", configPath], io, deps)).toBe(1);
     expect(io.err[0]).toContain("EADDRINUSE");
     expect(existsSync(join(stateDir, "hook.sock"))).toBe(false);
+  });
+});
+
+describe("status with Tailscale off", () => {
+  it("prints one plain line for the stopped state and no stack trace, using a real tailscale executable on PATH", async () => {
+    const fake = createFakeTailscale(null);
+    putOnPath(fake);
+    const { configPath } = await setup({ bind: { address: "tailscale", port: 1 } });
+    const io = captureIo();
+    expect(await runCli(["status", "--config", configPath], io, { ...deps, tailscaleCommands: ["tailscale"] })).toBe(0);
+    expect(io.out).toContain("Tailscale is stopped on this computer");
+    expect(io.out.join("\n")).not.toMatch(/\n\s+at /);
+    expect(io.err).toEqual([]);
+  });
+
+  it("names the address when Tailscale runs", async () => {
+    const fake = createFakeTailscale("100.64.0.5");
+    putOnPath(fake);
+    const { configPath } = await setup({ bind: { address: "tailscale", port: 1 } });
+    const io = captureIo();
+    await runCli(["status", "--config", configPath], io, { ...deps, tailscaleCommands: ["tailscale"] });
+    expect(io.out).toContain("Tailscale: running, address 100.64.0.5");
+    expect(io.out).toContain("bind address: http://100.64.0.5:1");
+  });
+});
+
+const localTailnetAddress = Object.values(networkInterfaces())
+  .flat()
+  .map((entry) => entry?.address ?? "")
+  .find((address) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(address));
+
+describe.runIf(localTailnetAddress !== undefined)("serve with Tailscale (needs a real tailnet address on this computer)", () => {
+  it("waits through failing tailscale calls in one process, then listens on the tailnet address", async () => {
+    const fake = createFakeTailscale(localTailnetAddress ?? null);
+    fake.failNext(3);
+    putOnPath(fake);
+    const port = await freePort();
+    const { configPath } = await setup({ bind: { address: "tailscale", port } });
+    const io = captureIo();
+    const exit = runCli(["serve", "--config", configPath], io, { ...deps, tailscaleCommands: ["tailscale"], tailnetTiming: { initialMs: 1, capMs: 5, recheckMs: 50 } });
+    await waitUntil(() => io.out.some((line) => line.startsWith("fardeskd listening")));
+    expect(io.out.findIndex((line) => line.startsWith("fardeskd listening"))).toBeLessThanOrEqual(3);
+    expect(io.out.at(-1)).toBe(`fardeskd listening on http://${localTailnetAddress}:${port}`);
+    io.stop();
+    expect(await exit).toBe(0);
+    expect(await portAccepts(port)).toBe(false);
   });
 });

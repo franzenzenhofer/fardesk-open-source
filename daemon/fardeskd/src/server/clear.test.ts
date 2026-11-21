@@ -97,7 +97,7 @@ describe.each(COMMANDS)("POST /v1/sessions/:id/$command, shared refusals", ({ co
     const never = join(rig.daemon.config.stateDir, "never.txt");
     const { id } = await rig.seed(rig.sandbox.start(collector(never)).panePid, { waitingFor: "tool approval", status: "waiting" });
     const refusal = await expectApiError(rig.daemon, "POST", `/v1/sessions/${id}/${command}`, 409, "conflict");
-    expect(refusal).toContain("waiting for a permission answer");
+    expect(refusal).toContain("has a question open at the computer");
     expect(typedInto(never)).toBe("");
   });
 

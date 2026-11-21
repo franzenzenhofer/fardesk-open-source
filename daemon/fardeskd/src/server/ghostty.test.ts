@@ -69,7 +69,7 @@ describe("reply into a Ghostty terminal", () => {
     const tab = await ghosttyTab();
     const { id } = await seed(tab.claudePid, { ...NO_INBOX, status: "waiting", waitingFor: "tool approval" });
     await waitUntil(() => replyModeOf(id) === "composer");
-    expect(await expectApiError(rig.daemon, "POST", `/v1/sessions/${id}/message`, 409, "conflict", { text: "1" })).toContain("waiting for a permission answer");
+    expect(await expectApiError(rig.daemon, "POST", `/v1/sessions/${id}/message`, 409, "conflict", { text: "1" })).toContain("has a question open at the computer");
     expect(rig.osascript.typed()).toEqual([]);
   });
 
@@ -89,7 +89,7 @@ describe("reply into a Ghostty terminal", () => {
     const { id } = await seed(pid, { status: "waiting", waitingFor: "tool approval" });
     await waitUntil(() => replyModeOf(id) === "composer");
     const text = "but not here\nAttached image: /work/.fardesk/attachments/a.png";
-    expect(await expectApiError(rig.daemon, "POST", `/v1/sessions/${id}/message`, 409, "conflict", { text })).toContain("waiting for a permission answer");
+    expect(await expectApiError(rig.daemon, "POST", `/v1/sessions/${id}/message`, 409, "conflict", { text })).toContain("has a question open at the computer");
     expect(rig.inbox.received).toEqual([]);
   });
 

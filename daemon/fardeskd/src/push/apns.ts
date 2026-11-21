@@ -14,11 +14,11 @@ const BACKGROUND_PRIORITY = "5";
 const HTTP_GONE = 410;
 const UNPARSEABLE_REASON = "UnparseableResponse";
 const DEAD_TOKEN_REASONS: readonly string[] = ["BadDeviceToken", "Unregistered"];
-const TIME_SENSITIVE_CATEGORIES: readonly string[] = ["PERMISSION", "QUESTION"];
+const TIME_SENSITIVE_CATEGORIES: readonly string[] = ["PERMISSION", "QUESTION", "TERMINAL"];
 
 export type ApnsEnvironment = keyof typeof APNS_HOSTS;
 export type ApnsHosts = Record<ApnsEnvironment, string>;
-export type ApnsCategory = "PERMISSION" | "QUESTION" | "DONE" | "ENDED";
+export type ApnsCategory = "PERMISSION" | "QUESTION" | "TERMINAL" | "DONE" | "ENDED";
 
 export type ApnsNotification = {
   title: string;

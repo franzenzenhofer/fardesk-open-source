@@ -1,0 +1,24 @@
+{
+  "id": "sess_7a31f2",
+  "title": "Round coordinator",
+  "cwd": "/Users/dev/smear-studio",
+  "status": "waiting",
+  "waitingFor": "terminal",
+  "owned": false,
+  "replyMode": "composer",
+  "canStop": false,
+  "summary": "Needs you at the computer: permission prompt",
+  "model": "claude-opus-5-5",
+  "pid": 51840,
+  "muted": false,
+  "label": {
+    "name": null,
+    "color": null,
+    "pinned": false
+  },
+  "permissionMode": "bypassPermissions",
+  "contextTokens": null,
+  "cacheExpiresAt": null,
+  "startedAt": "2026-11-14T08:00:00.000Z",
+  "updatedAt": "2026-11-14T09:20:00.000Z"
+}

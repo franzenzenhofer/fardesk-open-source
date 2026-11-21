@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createBus } from "../core/bus.js";
 import { FardeskError } from "../core/errors.js";
 import type { StreamEvent } from "../contract/schema.js";
+import type { FinishedToolCall } from "../transcript/index.js";
 import { sleep } from "../../test/support/env.js";
 import { HISTORY_LIMIT, createBroker, type AskInput, type Broker } from "./broker.js";
 
@@ -24,6 +25,13 @@ function setup(timeoutMs = LONG_TIMEOUT_MS): { broker: Broker; events: StreamEve
 
 const bash = (command: string): AskInput => ({ sessionId: "s1", toolName: "Bash", toolInput: { command }, cwd: "/work" });
 const ask = (input: unknown, sessionId = "s1"): AskInput => ({ sessionId, toolName: "AskUserQuestion", toolInput: input, cwd: "/work" });
+
+const finishedBash = (command: string, startOffsetMs: number): FinishedToolCall => ({
+  id: "toolu_bash",
+  tool: "Bash",
+  input: { command },
+  startedAt: new Date(NOW.getTime() + startOffsetMs).toISOString(),
+});
 
 function expectCode(action: () => unknown, code: string): void {
   try {
@@ -102,7 +110,7 @@ describe("broker permissions", () => {
   it("expires after the timeout", async () => {
     const { broker, events } = setup(SHORT_TIMEOUT_MS);
     const { answer } = broker.ask(bash("ls"));
-    expect(await answer).toEqual({ state: "expired" });
+    expect(await answer).toEqual({ state: "expired", timedOut: true });
     expect(events[1]).toMatchObject({ activity: { state: "expired" } });
     expect(broker.pendingKind("s1")).toBeNull();
   });
@@ -114,6 +122,41 @@ describe("broker permissions", () => {
     await answer;
     await sleep(SHORT_TIMEOUT_MS * 2);
     expect(events).toHaveLength(2);
+  });
+
+  it("a timeout is marked as timed out, every other expiry is not (only a timeout hands off to the terminal)", async () => {
+    const { broker } = setup();
+    const closed = broker.ask(bash("ls"));
+    broker.cancelRequest("s1", closed.requestId);
+    expect(await closed.answer).toEqual({ state: "expired" });
+    broker.cancelRequest("s1", closed.requestId);
+    broker.cancelRequest("unknown", "nope");
+  });
+
+  it("toolFinished expires the pending request of that tool call only", async () => {
+    const { broker } = setup();
+    const mine = broker.ask(bash("ls"));
+    const otherTool = broker.ask({ ...bash("ls"), toolName: "Edit", toolInput: { file_path: "/work/a.txt", old_string: "a", new_string: "b" } });
+    const otherSession = broker.ask({ ...bash("ls"), sessionId: "s2" });
+    broker.toolFinished("s1", finishedBash("ls", -200));
+    expect(await mine.answer).toEqual({ state: "expired" });
+    expect(broker.pendingKind("s2")).toBe("permission");
+    expect(broker.pendingKind("s1")).toBe("permission");
+    broker.toolFinished("s1", finishedBash("ls", -3_600_000));
+    expect(broker.pendingKind("s1")).toBe("permission");
+    broker.close();
+    await Promise.all([otherTool.answer, otherSession.answer]);
+  });
+
+  it("a parallel call that finished does not end the request of another call (same tool, other input; other tool)", async () => {
+    const { broker } = setup();
+    const pending = broker.ask(bash("rm x"));
+    broker.toolFinished("s1", finishedBash("ls", -100));
+    broker.toolFinished("s1", { id: "toolu_read", tool: "Read", input: { file_path: "/work/a.txt" }, startedAt: new Date(NOW.getTime() - 100).toISOString() });
+    expect(broker.pendingKind("s1")).toBe("permission");
+    broker.toolFinished("s1", finishedBash("rm x", -100));
+    expect(await pending.answer).toEqual({ state: "expired" });
+    broker.close();
   });
 
   it("cancelSession expires only that session's pending entries", async () => {
@@ -168,7 +211,7 @@ describe("broker questions", () => {
 
   it("expires a question on timeout", async () => {
     const { broker, events } = setup(SHORT_TIMEOUT_MS);
-    expect(await broker.ask(ask(FREE_TEXT_INPUT)).answer).toEqual({ state: "expired" });
+    expect(await broker.ask(ask(FREE_TEXT_INPUT)).answer).toEqual({ state: "expired", timedOut: true });
     expect(events[1]).toMatchObject({ activity: { kind: "question", state: "expired" } });
   });
 

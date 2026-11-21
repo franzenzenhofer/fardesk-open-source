@@ -174,6 +174,12 @@ treats session output as untrusted data. Leave it off if you read untrusted cont
 `install-hooks` adds its own hook entries. It makes a timestamped backup, shows the difference, writes
 atomically, and `uninstall-hooks` removes only its own entries.
 
+**I run Claude Code under `CLAUDE_CONFIG_DIR`. Does Fardesk see those sessions?**
+Only for homes listed in `claudeHomes` (default: `~/.claude`). `fardeskd homes` lists the homes it finds, in
+folders of your home directory and in running `claude` processes, and `fardeskd status` names every one that is
+not configured. `fardeskd homes add <path>` installs the hooks there (backup and diff as above), writes the
+config and makes the running daemon reload it. Nothing is added without that command.
+
 **Will it break with the next Claude Code release?**
 It can. See "What it does not do".
 

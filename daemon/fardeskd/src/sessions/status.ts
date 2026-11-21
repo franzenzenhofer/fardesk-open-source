@@ -5,9 +5,14 @@ import type { TranscriptSummary } from "../transcript/index.js";
 import type { LiveProcess } from "./claudeRegistry.js";
 import { BYPASS_PERMISSIONS, knownPermissionMode } from "./permissionMode.js";
 
-const WAITING_SUMMARIES: Record<WaitingReason, string> = { permission: "Needs approval", question: "Needs answer" };
+const WAITING_SUMMARIES: Record<WaitingReason, string> = {
+  permission: "Needs approval",
+  question: "Needs answer",
+  terminal: "Needs you at the computer",
+};
 
-export type PendingKind = WaitingReason;
+/** What the broker holds open for the phone to answer. */
+export type PendingKind = Exclude<WaitingReason, "terminal">;
 
 export type StatusInput = {
   id: string;
@@ -69,10 +74,18 @@ function statusOf(input: StatusInput, waitingFor: WaitingReason | null): Session
   return registryStatus(input.process, input.owned && input.ownedBusy);
 }
 
+// A bare registry "waiting" with no request held for the phone is a dialog open at the computer, never an approval.
 function waitingOf(input: StatusInput): WaitingReason | null {
   if (input.process === null && !input.owned) return null;
   if (input.pendingKind !== null) return input.pendingKind;
-  return input.process?.status === "waiting" ? "permission" : null;
+  return input.process?.status === "waiting" ? "terminal" : null;
+}
+
+function summaryOf(input: StatusInput, waitingFor: WaitingReason | null): string {
+  if (waitingFor === null) return input.summary.summary;
+  const base = WAITING_SUMMARIES[waitingFor];
+  const dialog = input.process?.waitingFor?.trim() ?? "";
+  return waitingFor !== "terminal" || dialog === "" ? base : `${base}: ${dialog}`;
 }
 
 function replyModeOf(input: StatusInput, status: SessionStatus): ReplyMode {
@@ -84,19 +97,19 @@ function replyModeOf(input: StatusInput, status: SessionStatus): ReplyMode {
 }
 
 export function buildSessionSummary(input: StatusInput, cwd: string, times: SessionTimes): SessionSummary {
-  const waitingFor = waitingOf(input);
-  const status = statusOf(input, waitingFor);
+  const waiting = waitingOf(input);
+  const status = statusOf(input, waiting);
   const hasTmux = input.process?.tmux != null;
   return {
     id: input.id,
     title: titleOf(input, cwd),
     cwd,
     status,
-    waitingFor,
+    waitingFor: waiting,
     owned: input.owned,
     replyMode: replyModeOf(input, status),
     canStop: status === "working" && (input.owned || hasTmux),
-    summary: waitingFor === null ? input.summary.summary : WAITING_SUMMARIES[waitingFor],
+    summary: summaryOf(input, waiting),
     model: input.summary.model,
     pid: input.process?.pid ?? null,
     muted: input.muted,

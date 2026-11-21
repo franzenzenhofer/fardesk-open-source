@@ -5,7 +5,11 @@ import { z } from "zod";
 export const CONTRACT_VERSION = 1;
 
 export const sessionStatusSchema = z.enum(["working", "waiting", "idle", "ended"]);
-export const waitingReasonSchema = z.enum(["permission", "question"]);
+/**
+ * What a waiting session needs. "permission" and "question": the daemon holds a request the phone can answer.
+ * "terminal": a dialog is open at the computer and the daemon holds no request for it, so only the terminal can answer.
+ */
+export const waitingReasonSchema = z.enum(["permission", "question", "terminal"]);
 export const replyModeSchema = z.enum(["composer", "takeover", "resume"]);
 export const toolStatusSchema = z.enum(["running", "ok", "error"]);
 export const permissionStateSchema = z.enum(["pending", "allowed", "denied", "expired"]);

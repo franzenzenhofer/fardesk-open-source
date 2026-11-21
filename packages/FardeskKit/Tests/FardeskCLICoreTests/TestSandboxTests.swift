@@ -4,7 +4,7 @@ import Testing
 
 /// The Swift test daemon must run inside the daemon's test sandbox. Without it, `kill --close-tab` on a seeded session
 /// walked the seeded process's ancestors (test runner, shell, agent) up to the tmux pane the test runner itself ran in
-/// and closed that pane, which ended the person's tmux server (2026-11-18, during scripts/open-source/export.sh).
+/// and closed that pane, which ended the person's tmux server (2026-11-18, during an export run).
 struct TestSandboxTests {
     @Test func theTestDaemonRunsInsideItsOwnSandbox() async throws {
         try await TestDaemon.with(sessions: []) { daemon in

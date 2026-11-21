@@ -125,43 +125,53 @@ struct HubModeTests {
         }
     }
 
-    @Test func openingASessionCachesItsFeedAndTheNextOpenShowsItAtOnce() async throws {
+    private struct OpenSession {
+        let model: AppModel
+        let ref: SessionRef
+        let sandbox: StoreSandbox
+        let rig: HubRig
+    }
+
+    /// Runs `body` with a hub model that has the live peer's seeded edits session open. The body stops the model.
+    private func withOpenEditsSession(_ body: @MainActor (OpenSession) async throws -> Void) async throws {
         try await HubRig.with { rig in
             try await StoreSandbox.with { sandbox in
                 let model = try await hubModel(rig, sandbox)
                 let ref = SessionRef(machineID: peerID, sessionID: SeedSession.editsSessionID)
                 await model.openSession(ref)
-                let shown = model.feeds.feed(for: SessionRef(machineID: peerID, sessionID: ref.sessionID))
-                #expect(!shown.activities.isEmpty)
-                model.flushFeeds()
-                model.cacheWriter.flush()
-                let cached = try #require(sandbox.cache.loadFeed(machineID: peerID, sessionID: ref.sessionID))
-                #expect(cached.activities.map(\.id) == shown.snapshot().activities.map(\.id))
-                model.stop()
-
-                let second = AppModel(configuration: configuration(sandbox, hub: rig.hub.url))
-                await second.start()
-                await second.restoreCachedFeed(ref)
-                let instant = second.feeds.feed(for: SessionRef(machineID: peerID, sessionID: ref.sessionID))
-                #expect(instant.activities.map(\.id) == cached.activities.map(\.id), "shown before any call answered")
-                second.stop()
+                try await body(OpenSession(model: model, ref: ref, sandbox: sandbox, rig: rig))
             }
+        }
+    }
+
+    @Test func openingASessionCachesItsFeedAndTheNextOpenShowsItAtOnce() async throws {
+        try await withOpenEditsSession { open in
+            let (model, ref, sandbox) = (open.model, open.ref, open.sandbox)
+            let shown = model.feeds.feed(for: ref)
+            #expect(!shown.activities.isEmpty)
+            model.flushFeeds()
+            model.cacheWriter.flush()
+            let cached = try #require(sandbox.cache.loadFeed(machineID: peerID, sessionID: ref.sessionID))
+            #expect(cached.activities.map(\.id) == shown.snapshot().activities.map(\.id))
+            model.stop()
+
+            let second = AppModel(configuration: configuration(sandbox, hub: open.rig.hub.url))
+            await second.start()
+            await second.restoreCachedFeed(ref)
+            let instant = second.feeds.feed(for: ref)
+            #expect(instant.activities.map(\.id) == cached.activities.map(\.id), "shown before any call answered")
+            second.stop()
         }
     }
 
     /// stop() (the app goes to the background) must leave the open session's feed on disk when it returns: it used to
     /// flush the cache writer first and only then queue the feeds, so their write came a second later or never.
     @Test func stopLeavesTheOpenFeedOnDiskWhenItReturns() async throws {
-        try await HubRig.with { rig in
-            try await StoreSandbox.with { sandbox in
-                let model = try await hubModel(rig, sandbox)
-                let ref = SessionRef(machineID: peerID, sessionID: SeedSession.editsSessionID)
-                await model.openSession(ref)
-                #expect(!model.feeds.feed(for: ref).activities.isEmpty)
-                model.stop()
-                let cached = sandbox.cache.loadFeed(machineID: peerID, sessionID: ref.sessionID)
-                #expect(cached?.activities.isEmpty == false)
-            }
+        try await withOpenEditsSession { open in
+            #expect(!open.model.feeds.feed(for: open.ref).activities.isEmpty)
+            open.model.stop()
+            let cached = open.sandbox.cache.loadFeed(machineID: peerID, sessionID: open.ref.sessionID)
+            #expect(cached?.activities.isEmpty == false)
         }
     }
 

@@ -69,8 +69,12 @@ function requireComposer(record: SessionRecord): void {
 
 // Typed input would answer an open permission or question dialog, so a waiting session must not get it.
 export function requireNotWaiting(record: SessionRecord): void {
-  if (record.summary.waitingFor !== null) {
-    throw new FardeskError("conflict", `session ${record.summary.id} is waiting for a ${record.summary.waitingFor} answer: answer it before sending text`);
+  const { id, waitingFor } = record.summary;
+  if (waitingFor === "terminal") {
+    throw new FardeskError("conflict", `session ${id} has a question open at the computer: typed text would answer it, so answer it there or take the session over`);
+  }
+  if (waitingFor !== null) {
+    throw new FardeskError("conflict", `session ${id} is waiting for a ${waitingFor} answer: answer it before sending text`);
   }
 }
 
@@ -87,6 +91,8 @@ async function typeIntoGhostty(deps: ActionDeps, terminalId: string, text: strin
 
 // tmux send-keys > Ghostty AppleScript > inbox socket.
 async function deliver(deps: ActionDeps, record: SessionRecord, text: string): Promise<void> {
+  // A dialog only the terminal can answer is the reason, whatever route the text would have taken.
+  if (record.summary.waitingFor === "terminal") requireNotWaiting(record);
   const pid = record.process?.pid ?? null;
   const placement: Placement = pid === null ? { kind: "none" } : await locate(terminalDeps(deps), pid);
   if (placement.kind === "pane") {

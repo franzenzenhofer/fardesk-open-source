@@ -90,8 +90,14 @@ type Broker = {
   decide(sessionId: string, requestId: string, decision: PermissionDecision): void   // throws not_found
   answer(sessionId: string, requestId: string, option: string): void
   pending(sessionId: string): Activity[]           // merged into the activity feed
-  cancelSession(sessionId: string): void
+  cancelSession(sessionId: string): void           // process ended, SessionEnd, registry left waiting
+  cancelRequest(sessionId: string, requestId: string): void   // the hook connection closed (dialog answered in the terminal)
+  toolFinished(sessionId: string, call: FinishedToolCall): void  // the transcript holds that call's result; matches tool name + exact input
 }
+// A request that ends by the timeout answers { state: "expired", timedOut: true }: the hook handler then sends ONE
+// "Still waiting: answer at the computer" push (category TERMINAL; generic text in generic-push mode; same collapse id as the
+// request push of that kind and sent as that kind, so the device swaps the stale Allow/Deny notification), and the
+// session stays in the terminal waiting state (`waitingFor: terminal`) until the registry leaves `waiting` or the process ends. A Stop of the main thread does NOT clear it on purpose: a subagent can still sit at the dialog while the main thread finishes turns.
 
 // src/owned/*
 function createOwnedRunner(deps): OwnedRunner
@@ -137,7 +143,8 @@ function createServices(config: Config): Services             // wires everythin
 |---|---|
 | no live process | `status: ended`, `replyMode: resume` |
 | registry `busy` | `working` |
-| registry `waiting` or a pending broker request | `waiting`, `waitingFor` from the broker or `permission` |
+| a pending broker request (the phone can answer it) | `waiting`, `waitingFor: permission` or `question` |
+| registry `waiting` and no pending broker request (a dialog only at the computer: an expired request, a nested CLI, a bypass-mode subagent) | `waiting`, `waitingFor: terminal` (summary "Needs you at the computer", plus the dialog kind the CLI reports when it names one): never an approval, no permission push, typed text is refused with the reason. |
 | registry `idle` or `shell` | `idle` |
 | owned (runner has it) | `owned: true`, `replyMode: composer`, `canStop` while working |
 | terminal, permission mode prompts, inbox socket present | `replyMode: composer` |
@@ -180,6 +187,7 @@ GET  /v1/auth/devices                                  -> AuthDeviceList (`curre
 POST /v1/auth/revoke           RevokeRequest           -> RevokeResult  (id or name, null = all; silent wipe push + stream sockets closed)
 POST /v1/auth/password         PasswordChangeRequest   -> OkResult      (verifies `current`, revokes ALL device tokens)
 POST /v1/auth/reload                                   -> OkResult      (CLI hook: re-read the hash from the config file, revoke all)
+POST /v1/homes/reload                                  -> { homes: string[] } (CLI hook of `homes add`: re-read claudeHomes from the config file, no restart)
 ```
 
 Errors: `ErrorResponse` with status 401 (`unauthorized`, `token_revoked`), 404, 400, 409, 429 (`rate_limited`), 501, 500.

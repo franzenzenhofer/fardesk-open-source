@@ -13,10 +13,11 @@ import { EXIT_OK } from "./types.js";
 import type { CommandContext } from "./types.js";
 
 const SETTINGS_FILE = "settings.json";
+export const settingsPathOf = (home: string): string => join(home, SETTINGS_FILE);
 
-export const settingsPathsOf = (config: Config): string[] => config.claudeHomes.map((home) => join(home, SETTINGS_FILE));
+export const settingsPathsOf = (config: Config): string[] => config.claudeHomes.map(settingsPathOf);
 
-function describeResult(path: string, result: InstallResult): string {
+export function describeResult(path: string, result: InstallResult): string {
   if (!result.changed) return `${path}: unchanged`;
   const backup = result.backupPath === null ? "no backup (new file)" : `backup ${result.backupPath}`;
   return `${path}: changed ${result.events.join(", ")}; ${backup}`;
@@ -32,6 +33,9 @@ export function requirePrivateStateDir(stateDir: string): void {
   throw new FardeskError("invalid_request", `state dir ${stateDir} has mode ${mode}, readable by group or others: run chmod 700 ${stateDir} first`);
 }
 
+export const hookEntriesOf = (config: Config): ReturnType<typeof buildHookEntries> =>
+  buildHookEntries({ socketPath: join(config.stateDir, HOOK_SOCKET_FILE), permissionTimeoutSeconds: config.permissionTimeoutSeconds });
+
 function printDryRun(context: CommandContext, config: Config, entries: ReturnType<typeof buildHookEntries>): number {
   for (const path of settingsPathsOf(config)) {
     const diff = previewInstall(path, entries);
@@ -46,10 +50,7 @@ export function runHooksCommand(context: CommandContext, action: "install" | "un
   const config = loadConfig(context.configPath);
   if (action === "install") requirePrivateStateDir(config.stateDir);
   const now = context.now();
-  const entries = buildHookEntries({
-    socketPath: join(config.stateDir, HOOK_SOCKET_FILE),
-    permissionTimeoutSeconds: config.permissionTimeoutSeconds,
-  });
+  const entries = hookEntriesOf(config);
   if (context.dryRun) return printDryRun(context, config, entries);
   for (const path of settingsPathsOf(config)) {
     const result = action === "install" ? installHooks(path, entries, now) : uninstallHooks(path, now);

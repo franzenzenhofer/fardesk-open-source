@@ -47,8 +47,8 @@ private struct MachineHeader: View {
             Text(presentation.name).font(.headline).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             MachineStatusBadge(presentation: presentation)
-            if let lastSeen = presentation.lastSeenLabel {
-                Text(lastSeen).font(.subheadline).foregroundStyle(.secondary)
+            if let offlineSince = presentation.offlineSinceLabel {
+                Text(offlineSince).font(.subheadline).foregroundStyle(.secondary)
             }
             if let latency = presentation.latencyLabel {
                 Text(latency).font(.subheadline).foregroundStyle(.secondary)

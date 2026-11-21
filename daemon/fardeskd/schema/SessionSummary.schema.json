@@ -30,7 +30,8 @@
           "type": "string",
           "enum": [
             "permission",
-            "question"
+            "question",
+            "terminal"
           ]
         },
         {

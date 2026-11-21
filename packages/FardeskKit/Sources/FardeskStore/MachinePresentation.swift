@@ -10,6 +10,8 @@ public struct MachinePresentation: Equatable, Sendable {
     /// The colour of the status dot: green online, orange logged out, grey otherwise.
     public let state: StateTone
     public let lastSeenLabel: String?
+    /// "since 5m ago" for an offline machine whose last contact is known: read after the status "Offline".
+    public let offlineSinceLabel: String?
     public let isDimmed: Bool
     /// Why an offline machine is offline, in the hub's words (hub mode only).
     public let problem: String?
@@ -25,6 +27,7 @@ public struct MachinePresentation: Equatable, Sendable {
         isOnline = status.isOnline
         state = StateTone(connection: machine.connection)
         lastSeenLabel = status.lastSeen
+        offlineSinceLabel = status.offlineSince
         isDimmed = status.isDimmed
         let info = machine.hubInfo
         problem = status.isOnline ? nil : info?.problem
@@ -43,6 +46,7 @@ public struct MachinePresentation: Equatable, Sendable {
         isOnline = info.online
         state = StateTone(connection: connection)
         lastSeenLabel = status.lastSeen
+        offlineSinceLabel = status.offlineSince
         isDimmed = status.isDimmed
         problem = info.online ? nil : info.problem
         latencyLabel = info.online ? info.latencyMs.map(Self.latency) : nil
@@ -55,18 +59,20 @@ public struct MachinePresentation: Equatable, Sendable {
         let label: String
         let isOnline: Bool
         let lastSeen: String?
+        let offlineSince: String?
         let isDimmed: Bool
     }
 
     private static func status(of connection: ConnectionState, now: Date) -> Status {
         switch connection {
-        case .online: Status(label: "Online", isOnline: true, lastSeen: nil, isDimmed: false)
-        case .connecting: Status(label: "Connecting", isOnline: false, lastSeen: nil, isDimmed: false)
-        case .loggedOut: Status(label: "Logged out", isOnline: false, lastSeen: nil, isDimmed: true)
+        case .online: Status(label: "Online", isOnline: true, lastSeen: nil, offlineSince: nil, isDimmed: false)
+        case .connecting: Status(label: "Connecting", isOnline: false, lastSeen: nil, offlineSince: nil, isDimmed: false)
+        case .loggedOut: Status(label: "Logged out", isOnline: false, lastSeen: nil, offlineSince: nil, isDimmed: true)
         case .offline(let lastSeen):
             Status(
                 label: "Offline", isOnline: false,
-                lastSeen: lastSeen.map { "Last seen \(RelativeTimeFormat.short(from: $0, to: now)) ago" }, isDimmed: true
+                lastSeen: lastSeen.map { "Last seen \(RelativeTimeFormat.short(from: $0, to: now)) ago" },
+                offlineSince: lastSeen.map { "since \(RelativeTimeFormat.short(from: $0, to: now)) ago" }, isDimmed: true
             )
         }
     }

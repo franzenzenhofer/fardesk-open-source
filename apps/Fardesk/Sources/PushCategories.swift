@@ -18,6 +18,7 @@ enum PushCategories {
                 UNNotificationAction(identifier: PushAction.openIdentifier, title: "Open", options: [.foreground]),
             ]),
             category("ENDED", []),
+            category("TERMINAL", []),
         ]
     }
 

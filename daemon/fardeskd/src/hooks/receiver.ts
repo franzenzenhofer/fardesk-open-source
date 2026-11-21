@@ -15,7 +15,8 @@ export type HookReply = { output: Record<string, unknown> | null };
 
 export type HookReceiverDeps = {
   socketPath: string;
-  onEvent(event: HookEvent): Promise<HookReply>;
+  /** `signal` aborts when the hook's connection closes before the reply (its curl was killed: the dialog was answered elsewhere). */
+  onEvent(event: HookEvent, signal: AbortSignal): Promise<HookReply>;
   log: Logger;
 };
 
@@ -58,8 +59,12 @@ async function handleHook(req: IncomingMessage, res: ServerResponse, deps: HookR
     respond(res, 400, "");
     return;
   }
+  const closed = new AbortController();
+  res.once("close", () => {
+    if (!res.writableEnded) closed.abort();
+  });
   try {
-    const reply = await deps.onEvent(parsed.event);
+    const reply = await deps.onEvent(parsed.event, closed.signal);
     respond(res, 200, reply.output === null ? "" : JSON.stringify(reply.output));
   } catch (error) {
     deps.log.error("hook_handler_failed", { event: parsed.event.hookEventName, error: String(error) });

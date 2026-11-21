@@ -14,7 +14,7 @@ export const streamEventFixtures: FixtureCases<"StreamEvent"> = {
   helloWithSessions: {
     type: "hello",
     machine: macosMachine,
-    sessions: Object.values(sessionSummaryFixtures),
+    sessions: Object.entries(sessionSummaryFixtures).filter(([name]) => name !== "waitingTerminal").map(([, session]) => session),
   },
   helloEmpty: { type: "hello", machine: linuxMachine, sessions: [] },
   helloAutomationDenied: { type: "hello", machine: deniedMachine, sessions: [] },

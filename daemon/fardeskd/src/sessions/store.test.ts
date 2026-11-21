@@ -9,6 +9,7 @@ import type { SessionSummary, StreamEvent } from "../contract/schema.js";
 import { createBus } from "../core/bus.js";
 import { FardeskError } from "../core/errors.js";
 import { createLogger } from "../core/log.js";
+import type { FinishedToolCall } from "../transcript/index.js";
 import type { PendingKind } from "./status.js";
 import { createSessionStore } from "./store.js";
 import type { SessionStore, StoreDeps } from "./store.js";
@@ -164,6 +165,20 @@ describe("sources", () => {
     expect(store.list()[0]?.status).toBe("working");
     const swapped = setup([second, first]);
     expect(swapped.store.list()[0]?.status).toBe("working");
+  });
+
+  it("polls a home that is added to the shared list at runtime", async () => {
+    const first = newHome();
+    const added = newHome();
+    const sessionId = "77777777-7777-4777-8777-777777777777";
+    added.addTranscript({ fixture: "01-simple-session", sessionId });
+    added.addRegistry({ fixture: "idle", sessionId });
+    const claudeHomes = [first.dir];
+    const { store } = setup([first], { claudeHomes });
+    expect(store.list()).toEqual([]);
+    claudeHomes.push(added.dir);
+    await waitUntil(() => store.list().length === 1);
+    expect(ids(store.list())).toEqual([sessionId]);
   });
 });
 
@@ -327,14 +342,65 @@ describe("live updates", () => {
     expect(sessionEvents(events).some((session) => session.id === sessionId && session.status === "ended")).toBe(true);
   });
 
-  it("removes a session whose registry file is deleted and whose transcript is gone", () => {
+  it("removes a session whose registry file is deleted, whose process is dead and whose transcript is gone", async () => {
     const home = newHome();
     const { pid } = home.addRegistry({ fixture: "idle", sessionId: "22222222-2222-4222-8222-222222222222" });
     const { store } = setup([home]);
     expect(store.list()).toHaveLength(1);
+    await home.killLive(pid);
     home.removeRegistry(pid);
     store.refresh();
     expect(store.list()).toEqual([]);
+  });
+});
+
+function liveSessionWithFinishedLog(describeCall: (sessionId: string, call: FinishedToolCall) => string): {
+  sessionId: string;
+  path: string;
+  store: SessionStore;
+  finished: string[];
+} {
+  const home = newHome();
+  const { sessionId, path } = home.addTranscript({ fixture: "01b-minimal-session" });
+  home.addRegistry({ fixture: "busy", sessionId });
+  const finished: string[] = [];
+  const { store } = setup([home], { onToolFinished: (id, call) => finished.push(describeCall(id, call)) });
+  return { sessionId, path, store, finished };
+}
+
+describe("moot requests (#87)", () => {
+  it("reports a finished tool call with its name, input and start time once its result is in the transcript", async () => {
+    const { sessionId, path, finished } = liveSessionWithFinishedLog(
+      (id, call) => `${id} ${call.tool} ${JSON.stringify(call.input)} ${call.startedAt}`,
+    );
+    appendFileSync(path, `${askToolUse(900, "toolu_live2")}\n`);
+    await sleep(150);
+    expect(finished).toEqual([]);
+    appendFileSync(path, `${toolOk(901, "toolu_live2")}\n`);
+    await waitUntil(() => finished.length > 0);
+    expect(finished).toEqual([`${sessionId} Bash {"command":"npm test"} 2026-11-15T12:15:00.000Z`]);
+  });
+
+  it("does not report a call without a result when a parallel call's result arrives (it only looks overtaken)", async () => {
+    const { sessionId, path, store, finished } = liveSessionWithFinishedLog((_id, call) => call.id);
+    appendFileSync(path, `${askToolUse(900, "toolu_ls")}\n${askToolUse(901, "toolu_rm")}\n${toolOk(902, "toolu_ls")}\n`);
+    await waitUntil(() => finished.length > 0);
+    await waitUntil(() => store.activities(sessionId).some((activity) => activity.kind === "tool" && activity.status === "error"));
+    expect(finished).toEqual(["toolu_ls"]);
+  });
+
+  it("calls onLeftWaiting when a live process that was not waiting ends (its pending requests are moot)", async () => {
+    const home = newHome();
+    const sessionId = "12121212-1212-4212-8212-121212121212";
+    const { pid } = home.addRegistry({ fixture: "busy", sessionId, overrides: { status: "busy" } });
+    const { store, overlay } = setup([home]);
+    expect(overlay.left).toEqual([]);
+    await home.killLive(pid);
+    home.removeRegistry(pid);
+    store.refresh();
+    expect(overlay.left).toEqual([sessionId]);
+    store.refresh();
+    expect(overlay.left).toEqual([sessionId]);
   });
 });
 
@@ -349,16 +415,6 @@ describe("leaving the waiting state", () => {
     home.addRegistry({ fixture: "busy", sessionId, pid, overrides: { status: "busy" } });
     await waitUntil(() => overlay.left.length > 0);
     await sleep(200);
-    expect(overlay.left).toEqual([sessionId]);
-  });
-
-  it("calls onLeftWaiting when a waiting process vanishes", () => {
-    const home = newHome();
-    const sessionId = "10101010-1010-4010-8010-101010101010";
-    const { pid } = home.addRegistry({ fixture: "busy", sessionId, overrides: { status: "waiting" } });
-    const { store, overlay } = setup([home]);
-    home.removeRegistry(pid);
-    store.refresh();
     expect(overlay.left).toEqual([sessionId]);
   });
 });

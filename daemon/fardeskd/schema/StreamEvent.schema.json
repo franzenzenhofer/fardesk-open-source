@@ -115,7 +115,8 @@
                     "type": "string",
                     "enum": [
                       "permission",
-                      "question"
+                      "question",
+                      "terminal"
                     ]
                   },
                   {
@@ -324,7 +325,8 @@
                   "type": "string",
                   "enum": [
                     "permission",
-                    "question"
+                    "question",
+                    "terminal"
                   ]
                 },
                 {

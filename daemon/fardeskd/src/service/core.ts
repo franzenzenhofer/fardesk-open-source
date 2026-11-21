@@ -74,6 +74,9 @@ function createStore(config: Config, log: Logger, parts: Pick<Core, "bus" | "bro
     onLeftWaiting: (id) => {
       if (!owned.isOwned(id)) broker.cancelSession(id);
     },
+    onToolFinished: (id, call) => {
+      if (!owned.isOwned(id)) broker.toolFinished(id, call);
+    },
   });
 }
 

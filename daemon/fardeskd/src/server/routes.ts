@@ -12,6 +12,8 @@ import {
   newSessionRequestSchema,
   permissionRequestSchema,
 } from "../contract/schema.js";
+import { MASTER_DEVICE_ID } from "../auth/deviceRegistry.js";
+import { FardeskError } from "../core/errors.js";
 import { DEFAULT_FOLDER_LIMIT, MAX_FOLDER_LIMIT } from "../folders/search.js";
 import type { Services } from "../service/types.js";
 import type { App } from "./context.js";
@@ -114,4 +116,8 @@ export function registerRoutes(app: App, services: Services, hooks: RouteHooks =
   sessionActionRoutes(app, services);
   registerIntakeRoutes(app, services);
   registerAuthRoutes(app, services);
+  app.post("/v1/homes/reload", (c) => {
+    if (c.get("deviceId") !== MASTER_DEVICE_ID) throw new FardeskError("unauthorized", "only the master token can reload the Claude homes");
+    return c.json(services.reloadHomes());
+  });
 }

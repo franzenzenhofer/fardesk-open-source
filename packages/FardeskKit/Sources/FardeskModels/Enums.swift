@@ -2,11 +2,16 @@ public enum SessionStatus: String, Codable, Sendable, Hashable {
     case working, waiting, idle, ended
 }
 
+/// What a waiting session needs. A permission or question is a request the phone can answer; a terminal wait is a
+/// dialog open at the computer that only the terminal can answer.
 public enum WaitingReason: String, Codable, Sendable, Hashable {
-    case permission, question
+    case permission, question, terminal
+
+    /// The phone can answer it, so a message typed meanwhile waits for that answer.
+    public var phoneCanAnswer: Bool { self != .terminal }
 }
 
-public enum ReplyMode: String, Codable, Sendable, Hashable {
+public enum ReplyMode:String, Codable, Sendable, Hashable {
     case composer, takeover, resume
 }
 

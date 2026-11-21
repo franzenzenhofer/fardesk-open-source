@@ -225,6 +225,55 @@ describe("push content generic", () => {
   });
 });
 
+describe("hand-off to the terminal (#87)", () => {
+  it("pushes one TERMINAL notification per hand-off, without an approval request", async () => {
+    const { sandbox, devices, notifier } = await setup();
+    register(devices, TOKEN_A, ALL);
+    notifier.handOff("s1", "permission");
+    await waitUntil(() => sandbox.requests.length === 1);
+    expect(payload(sandbox).aps).toMatchObject({
+      alert: { title: "Title of s1", body: "Still waiting: answer at the computer" },
+      category: "TERMINAL",
+      "interruption-level": "time-sensitive",
+    });
+    expect(payload(sandbox)["requestId"]).toBeUndefined();
+    await sleep(100);
+    expect(sandbox.requests).toHaveLength(1);
+  });
+
+  it("replaces the delivered request notification on the device (same collapse id), so no stale Allow/Deny stays", async () => {
+    const { bus, sandbox, devices, notifier } = await setup();
+    register(devices, TOKEN_A, ALL);
+    bus.publish({ type: "activity", sessionId: "s1", activity: permission() });
+    await waitUntil(() => sandbox.requests.length === 1);
+    notifier.handOff("s1", "permission");
+    await waitUntil(() => sandbox.requests.length === 2);
+    const [request, handOff] = sandbox.requests.map((recorded) => recorded.headers["apns-collapse-id"]);
+    expect(request).toBe("s1:PERMISSION");
+    expect(handOff).toBe(request);
+    bus.publish({ type: "activity", sessionId: "s1", activity: question });
+    notifier.handOff("s1", "question");
+    await waitUntil(() => sandbox.requests.length === 4);
+    expect(sandbox.requests.slice(2).map((recorded) => recorded.headers["apns-collapse-id"])).toEqual(["s1:QUESTION", "s1:QUESTION"]);
+  });
+
+  it("says only that a session needs you in generic mode, and respects mute and pause", async () => {
+    const generic = await setup({ content: "generic" });
+    register(generic.devices, TOKEN_A, ALL);
+    generic.notifier.handOff("s1", "permission");
+    await waitUntil(() => generic.sandbox.requests.length === 1);
+    expect(payload(generic.sandbox).aps["alert"]).toEqual({ title: "Fardesk", body: "A session on mac-mini needs you" });
+    const quiet = await setup();
+    register(quiet.devices, TOKEN_A, ALL);
+    quiet.muted.add("s1");
+    quiet.notifier.handOff("s1", "permission");
+    quiet.state.paused = true;
+    quiet.notifier.handOff("s2", "permission");
+    await sleep(150);
+    expect(quiet.sandbox.requests).toHaveLength(0);
+  });
+});
+
 describe("done", () => {
   it("pushes the trimmed last assistant message", async () => {
     const { sandbox, devices, notifier } = await setup();

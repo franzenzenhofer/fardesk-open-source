@@ -1,6 +1,8 @@
 // Public surface of the transcript module: the ONE place that understands transcript lines.
 export { buildDetail } from "./detail.js";
 export type { DetailOptions } from "./detail.js";
+export { finishedToolCalls } from "./finished.js";
+export type { FinishedToolCall } from "./finished.js";
 export { createParseStats, parseLine } from "./lineSchema.js";
 export type { ParseStats, TranscriptLine } from "./lineTypes.js";
 export { mapActivities } from "./mapper.js";
