@@ -12,8 +12,9 @@ export const sessionStatusSchema = z.enum(["working", "waiting", "idle", "ended"
 export const waitingReasonSchema = z.enum(["permission", "question", "terminal"]);
 export const replyModeSchema = z.enum(["composer", "takeover", "resume"]);
 export const toolStatusSchema = z.enum(["running", "ok", "error"]);
-export const permissionStateSchema = z.enum(["pending", "allowed", "denied", "expired"]);
-export const questionStateSchema = z.enum(["pending", "answered", "expired"]);
+/** "terminal": the phone was not asked in time and the dialog now waits at the computer (see `typable`). */
+export const permissionStateSchema = z.enum(["pending", "allowed", "denied", "expired", "terminal"]);
+export const questionStateSchema = z.enum(["pending", "answered", "expired", "terminal"]);
 export const permissionDecisionSchema = z.enum(["allow", "deny", "allow_always"]);
 export const machineOsSchema = z.enum(["macos", "linux"]);
 /** Whether the daemon may drive Ghostty through AppleScript (macOS Automation consent): "unknown" until it tried. */
@@ -99,6 +100,8 @@ export const questionActivitySchema = z.strictObject({
   text: z.string().min(1),
   options: z.array(z.string().min(1)),
   state: questionStateSchema,
+  /** Only with state "terminal": answering an option from the phone types the matching keys into the terminal dialog. */
+  typable: z.boolean().optional(),
 });
 export const permissionActivitySchema = z.strictObject({
   ...activityBase,
@@ -110,6 +113,8 @@ export const permissionActivitySchema = z.strictObject({
   cwd: z.string().min(1),
   destructive: z.boolean(),
   state: permissionStateSchema,
+  /** Only with state "terminal": Allow or Deny from the phone types the matching key into the terminal dialog. */
+  typable: z.boolean().optional(),
 });
 export const systemActivitySchema = z.strictObject({ ...activityBase, kind: z.literal("system"), text: z.string() });
 
@@ -251,6 +256,8 @@ export const errorCodeSchema = z.enum([
   "internal",
   "token_revoked",
   "rate_limited",
+  /** The caller is known but not allowed here: a device of another tailnet user tried to pair (HTTP 403). */
+  "forbidden",
   /** The hub knows the target machine is not reachable right now (HTTP 503). */
   "machine_offline",
 ]);
@@ -265,7 +272,7 @@ export const streamEventSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("ping"), ts: isoTimestamp }),
 ]);
 
-/** What the QR code and the fardesk://pair link carry: a one-time code (valid 10 minutes), never the master token. */
+/** What the QR code and the fardesk://pair link carry: a one-time code (valid 2 minutes), never the master token. */
 export const pairingPayloadSchema = z.strictObject({
   v: z.literal(CONTRACT_VERSION),
   name: z.string().min(1),
@@ -278,7 +285,7 @@ export const pairingPayloadSchema = z.strictObject({
 export const MIN_PASSWORD_LENGTH = 12;
 /** `POST /v1/auth/pair` (no bearer): the code from the pairing link in exchange for a device token. */
 export const pairRequestSchema = z.strictObject({ code: z.string().min(32), deviceName: z.string().min(1) });
-/** `POST /v1/auth/pair-code` (bearer): a fresh single-use code for a pairing link. */
+/** `POST /v1/auth/pair-code` (bearer): opens the pairing window: a fresh single-use code for a pairing link. */
 export const pairCodeResultSchema = z.strictObject({ code: z.string().min(32), expiresAt: isoTimestamp });
 export const peerSchema = z.strictObject({ name: z.string().min(1), url: z.url({ protocol: /^https?$/ }) });
 export const loginRequestSchema = z.strictObject({ password: z.string().min(1), deviceName: z.string().min(1) });

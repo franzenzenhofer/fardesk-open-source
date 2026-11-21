@@ -15,6 +15,8 @@ public struct SessionFeed: Equatable, Sendable {
     public private(set) var rows: [Activity] = []
     /// Pending permissions and questions, oldest first: the sticky card shows these.
     public private(set) var pendingRequests: [Activity] = []
+    /// Requests handed off to the terminal ("waiting at the computer"), oldest first: shown as a card without Allow/Deny unless typable.
+    public private(set) var terminalRequests: [Activity] = []
     /// The feed as the screen draws it (pending requests left out, tool rows grouped), computed when the rows change, not in a view body.
     public private(set) var blocks: [FeedBlock] = []
     /// Cursor for the next older page (`nextBefore` of the last loaded page); nil when everything is loaded.
@@ -101,12 +103,14 @@ public struct SessionFeed: Equatable, Sendable {
     private mutating func rebuildDerived() {
         var shown: [Activity] = []
         var pending: [Activity] = []
+        var atComputer: [Activity] = []
         shown.reserveCapacity(activities.count)
         for activity in activities {
-            if activity.isPendingRequest { pending.append(activity) } else { shown.append(activity) }
+            if activity.isPendingRequest { pending.append(activity) } else if activity.isTerminalRequest { atComputer.append(activity) } else { shown.append(activity) }
         }
         rows = shown
         pendingRequests = pending
+        terminalRequests = atComputer
         blocks = FeedBlock.group(shown)
     }
 }

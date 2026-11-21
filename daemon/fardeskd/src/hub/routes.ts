@@ -2,8 +2,10 @@
 import type { Context } from "hono";
 import { MAX_ATTACHMENT_BYTES } from "../attachments/store.js";
 import { MASTER_DEVICE_ID } from "../auth/deviceRegistry.js";
+import type { AuthService } from "../auth/service.js";
 import { FardeskError } from "../core/errors.js";
-import { PAIR_PATH } from "../server/context.js";
+import { rememberPeer } from "../server/authRoutes.js";
+import { PAIR_PATH, clientIp } from "../server/context.js";
 import { MAX_JSON_BYTES, readBoundedBody } from "../server/boundedBody.js";
 import type { Config } from "../config/config.js";
 import type { App, AppEnv } from "../server/context.js";
@@ -66,7 +68,7 @@ async function forward(peer: PeerMonitor, c: Ctx, target: Target): Promise<Respo
   return new Response(await response.arrayBuffer(), { status: response.status, headers: contentType === null ? {} : { "content-type": contentType } });
 }
 
-type Handler = { app: App; hub: Hub; config: Config };
+type Handler = { app: App; hub: Hub; config: Config; auth: AuthService };
 
 /** The peer behind a public (bearer-less) pairing request: unknown and offline machines answer without naming any machine. */
 function anonymousPeer(hub: Hub, name: string): PeerMonitor {
@@ -80,11 +82,12 @@ function anonymousPeer(hub: Hub, name: string): PeerMonitor {
   }
 }
 
-async function viaPeer({ app, hub, config }: Handler, c: Ctx, target: Target): Promise<Response> {
+async function viaPeer({ app, hub, config, auth }: Handler, c: Ctx, target: Target): Promise<Response> {
   const caller = c.get("deviceId") as string | undefined;
   if (caller !== MASTER_DEVICE_ID && /^\/+v1\/+auth(?:\/|$)/i.test(decodeMachine(target.path)) && !DEVICE_PEER_AUTH.has(target.path)) {
     throw new FardeskError("unauthorized", "the hub master token is required for this peer operation");
   }
+  if (caller === undefined && target.path === PAIR_PATH) await auth.verifyPairingCaller(clientIp(c)).catch(rememberPeer(c));
   const peer = caller === undefined ? anonymousPeer(hub, target.name) : knownPeer(hub, target.name);
   if (c.req.method === "POST" && target.path === DEVICES_PATH) {
     const own = await local(app, c, target);
@@ -106,7 +109,7 @@ async function handle(handler: Handler, c: Ctx): Promise<Response> {
   return viaPeer(handler, c, target);
 }
 
-export function registerHubRoutes(app: App, hub: Hub, config: Config): void {
+export function registerHubRoutes(app: App, hub: Hub, config: Config, auth: AuthService): void {
   app.get("/v1/hub", (c) => c.json(hub.state()));
-  app.all("/m/:machine/*", async (c) => handle({ app, hub, config }, c));
+  app.all("/m/:machine/*", async (c) => handle({ app, hub, config, auth }, c));
 }

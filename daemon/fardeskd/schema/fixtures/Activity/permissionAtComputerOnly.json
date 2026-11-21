@@ -1,0 +1,13 @@
+{
+  "id": "act_0019",
+  "ts": "2026-11-14T09:11:30.000Z",
+  "kind": "permission",
+  "requestId": "req_b6",
+  "tool": "Bash",
+  "title": "Run swift test",
+  "summary": "swift test --parallel",
+  "cwd": "/Users/dev/smear-studio",
+  "destructive": false,
+  "state": "terminal",
+  "typable": false
+}

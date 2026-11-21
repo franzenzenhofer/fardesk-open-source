@@ -17,6 +17,7 @@ export function auditMiddleware(audit: AuditLog): MiddlewareHandler<AppEnv> {
     const failedAuth = isPublicAuthPath(c.req.path) && c.res.status >= FAILED;
     if (READ_METHODS.has(method) && !failedAuth) return;
     const caller = c.get("deviceId") as string | undefined;
+    const peer = c.get("peer") as string | undefined;
     audit.record({
       event: failedAuth ? "login_failed" : "request",
       deviceId: caller ?? null,
@@ -25,6 +26,7 @@ export function auditMiddleware(audit: AuditLog): MiddlewareHandler<AppEnv> {
       sessionId: SESSION_PATH.exec(c.req.path)?.[1] ?? null,
       result: c.res.status,
       ip: clientIp(c),
+      ...(peer === undefined ? {} : { peer }),
     });
   };
 }

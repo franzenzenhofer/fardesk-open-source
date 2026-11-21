@@ -1,0 +1,13 @@
+{
+  "id": "act_0017",
+  "ts": "2026-11-14T09:10:30.000Z",
+  "kind": "question",
+  "requestId": "req_a6",
+  "text": "Which export format should I use?",
+  "options": [
+    "PNG",
+    "JPEG"
+  ],
+  "state": "terminal",
+  "typable": false
+}

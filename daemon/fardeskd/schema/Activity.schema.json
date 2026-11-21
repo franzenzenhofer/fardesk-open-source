@@ -192,8 +192,12 @@
           "enum": [
             "pending",
             "answered",
-            "expired"
+            "expired",
+            "terminal"
           ]
+        },
+        "typable": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -251,8 +255,12 @@
             "pending",
             "allowed",
             "denied",
-            "expired"
+            "expired",
+            "terminal"
           ]
+        },
+        "typable": {
+          "type": "boolean"
         }
       },
       "required": [

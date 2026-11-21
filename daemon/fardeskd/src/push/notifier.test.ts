@@ -11,7 +11,7 @@ import { createApnsClient } from "./apns.js";
 import type { ApnsClient } from "./apns.js";
 import { createDeviceStore } from "./deviceStore.js";
 import type { DeviceStore } from "./deviceStore.js";
-import { DONE_BODY_MAX_CHARS, createNotifier } from "./notifier.js";
+import { DONE_BODY_MAX_CHARS, REQUEST_BODY_MAX_CHARS, createNotifier } from "./notifier.js";
 import type { Notifier } from "./notifier.js";
 
 const TOKEN_A = "aa".repeat(32);
@@ -94,7 +94,7 @@ const permission = (state: "pending" | "allowed" = "pending"): Extract<Activity,
   state,
 });
 
-const question: Activity = { id: "req-q1", ts: NOW, kind: "question", requestId: "q1", text: "Tea or coffee?", options: ["Tea", "Coffee"], state: "pending" };
+const question: Extract<Activity, { kind: "question" }> = { id: "req-q1", ts: NOW, kind: "question", requestId: "q1", text: "Tea or coffee?", options: ["Tea", "Coffee"], state: "pending" };
 
 const session = (status: SessionSummary["status"], id = "s1", summary = "All fine"): SessionSummary => ({
   id,
@@ -130,7 +130,7 @@ describe("requests that need an answer", () => {
     const body = payload(sandbox);
     expect(sandbox.requests[0]?.path).toBe(`/3/device/${TOKEN_A}`);
     expect(body.aps).toMatchObject({
-      alert: { title: "Title of s1", body: "Run npm test: in /work" },
+      alert: { title: "Title of s1", body: "Bash: in /work" },
       category: "PERMISSION",
       "thread-id": "s1",
       "interruption-level": "time-sensitive",
@@ -229,10 +229,10 @@ describe("hand-off to the terminal (#87)", () => {
   it("pushes one TERMINAL notification per hand-off, without an approval request", async () => {
     const { sandbox, devices, notifier } = await setup();
     register(devices, TOKEN_A, ALL);
-    notifier.handOff("s1", "permission");
+    notifier.handOff("s1", permission());
     await waitUntil(() => sandbox.requests.length === 1);
     expect(payload(sandbox).aps).toMatchObject({
-      alert: { title: "Title of s1", body: "Still waiting: answer at the computer" },
+      alert: { title: "Title of s1", body: "Still waiting at the computer: Bash: in /work" },
       category: "TERMINAL",
       "interruption-level": "time-sensitive",
     });
@@ -241,18 +241,37 @@ describe("hand-off to the terminal (#87)", () => {
     expect(sandbox.requests).toHaveLength(1);
   });
 
+  it("names the question in the hand-off push, cut to a sane length, and keeps generic mode generic", async () => {
+    const { sandbox, devices, notifier } = await setup();
+    register(devices, TOKEN_A, ALL);
+    notifier.handOff("s1", question);
+    notifier.handOff("s2", { ...question, text: "Which one? ".repeat(60) });
+    await waitUntil(() => sandbox.requests.length === 2);
+    const bodies = [0, 1].map((index) => (payload(sandbox, index).aps["alert"] as { body: string }).body).sort();
+    expect(bodies).toContain("Still waiting at the computer: Tea or coffee?");
+    const long = bodies.find((body) => body.includes("Which one?")) ?? "";
+    expect(long.length).toBeLessThanOrEqual("Still waiting at the computer: ".length + REQUEST_BODY_MAX_CHARS);
+    expect(long.endsWith("...")).toBe(true);
+    const generic = await setup({ content: "generic" });
+    register(generic.devices, TOKEN_A, ALL);
+    generic.notifier.handOff("s1", question);
+    await waitUntil(() => generic.sandbox.requests.length === 1);
+    expect(generic.sandbox.requests[0]?.body).not.toContain("Tea or coffee");
+    expect(payload(generic.sandbox).aps["alert"]).toEqual({ title: "Fardesk", body: "A session on mac-mini needs you" });
+  });
+
   it("replaces the delivered request notification on the device (same collapse id), so no stale Allow/Deny stays", async () => {
     const { bus, sandbox, devices, notifier } = await setup();
     register(devices, TOKEN_A, ALL);
     bus.publish({ type: "activity", sessionId: "s1", activity: permission() });
     await waitUntil(() => sandbox.requests.length === 1);
-    notifier.handOff("s1", "permission");
+    notifier.handOff("s1", permission());
     await waitUntil(() => sandbox.requests.length === 2);
     const [request, handOff] = sandbox.requests.map((recorded) => recorded.headers["apns-collapse-id"]);
     expect(request).toBe("s1:PERMISSION");
     expect(handOff).toBe(request);
     bus.publish({ type: "activity", sessionId: "s1", activity: question });
-    notifier.handOff("s1", "question");
+    notifier.handOff("s1", question);
     await waitUntil(() => sandbox.requests.length === 4);
     expect(sandbox.requests.slice(2).map((recorded) => recorded.headers["apns-collapse-id"])).toEqual(["s1:QUESTION", "s1:QUESTION"]);
   });
@@ -260,15 +279,15 @@ describe("hand-off to the terminal (#87)", () => {
   it("says only that a session needs you in generic mode, and respects mute and pause", async () => {
     const generic = await setup({ content: "generic" });
     register(generic.devices, TOKEN_A, ALL);
-    generic.notifier.handOff("s1", "permission");
+    generic.notifier.handOff("s1", permission());
     await waitUntil(() => generic.sandbox.requests.length === 1);
     expect(payload(generic.sandbox).aps["alert"]).toEqual({ title: "Fardesk", body: "A session on mac-mini needs you" });
     const quiet = await setup();
     register(quiet.devices, TOKEN_A, ALL);
     quiet.muted.add("s1");
-    quiet.notifier.handOff("s1", "permission");
+    quiet.notifier.handOff("s1", permission());
     quiet.state.paused = true;
-    quiet.notifier.handOff("s2", "permission");
+    quiet.notifier.handOff("s2", permission());
     await sleep(150);
     expect(quiet.sandbox.requests).toHaveLength(0);
   });

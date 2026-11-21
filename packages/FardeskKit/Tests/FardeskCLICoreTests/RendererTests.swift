@@ -146,6 +146,10 @@ struct FeedRendererTests {
         09:07:00 ! Remove build folder - rm -rf .build DESTRUCTIVE [denied]
         09:08:00 ! Run crawler tests - npm test [expired]
         09:09:00 # Session resumed
+        09:10:00 ? Which export format should I use? [PNG | JPEG] [terminal]
+        09:10:30 ? Which export format should I use? [PNG | JPEG] [terminal]
+        09:11:00 ! Run swift test - swift test --parallel [terminal]
+        09:11:30 ! Run swift test - swift test --parallel [terminal]
         """)
     }
 

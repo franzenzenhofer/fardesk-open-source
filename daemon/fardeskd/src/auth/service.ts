@@ -1,5 +1,7 @@
 // The auth facade: master token + device tokens, password login, revoke with wipe pushes, password change.
 import type { z } from "zod";
+import type { AuditLog } from "../audit/store.js";
+import type { RunCommand } from "../config/bind.js";
 import type { Config } from "../config/config.js";
 import { loadConfig, writePasswordHash } from "../config/config.js";
 import { WIPE_COMMAND } from "../contract/schema.js";
@@ -13,6 +15,9 @@ import type { DeviceEntry, DeviceRegistry } from "./deviceRegistry.js";
 import { createMasterToken } from "./masterToken.js";
 import type { MasterToken } from "./masterToken.js";
 import { createPairOps } from "./pairOps.js";
+import type { PairOps } from "./pairOps.js";
+import { admitTailnetCaller, createTailnetGate } from "./tailnetCaller.js";
+import type { TailnetGate } from "./tailnetCaller.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { createLoginLimiter } from "./rateLimit.js";
 
@@ -28,18 +33,26 @@ export type AuthDeps = {
   pushDevices: DeviceStore;
   apns: Pick<ApnsClient, "sendBackground"> | null;
   machine: () => Machine;
+  /** Runs the Tailscale CLI to find out who a pairing caller is. */
+  run: RunCommand;
+  tailscaleCommands: string[];
   log: Logger;
+  audit: AuditLog;
   now: () => number;
 };
 
 export type AuthService = {
   authenticate: (token: string, ip: string) => Caller;
   login: (request: LoginRequest, ip: string) => Promise<LoginResult>;
-  /** A fresh single-use pairing code (valid 10 minutes) for the pairing link. */
-  issuePairCode: (callerId: string) => PairCodeResult;
+  /** Opens the pairing window (cancels the open one): a fresh single-use code, valid 2 minutes, for the pairing link. */
+  openPairWindow: (callerId: string) => PairCodeResult;
+  pairWindowStatus: PairOps["pairWindowStatus"];
+  closePairWindow: PairOps["closePairWindow"];
   /** Exchanges a pairing code for a device token (no bearer needed). */
-  pair: (request: PairRequest, ip: string) => LoginResult;
+  pair: (request: PairRequest, ip: string) => Promise<LoginResult>;
   rotateToken: (callerId: string) => void;
+  /** Rate limit + tailnet gate of `pair` alone: the hub runs it before it forwards an anonymous pairing request to a peer. */
+  verifyPairingCaller: (ip: string) => Promise<void>;
   logout: (deviceId: string, request: LogoutRequest) => void;
   devices: (currentId: string) => AuthDeviceList;
   revoke: (request: RevokeRequest) => Promise<{ revoked: number }>;
@@ -57,7 +70,7 @@ type Retirement = {
   onRevoked: AuthService["onRevoked"];
 };
 
-type PasswordGate = { check: (password: string, ip: string) => Promise<number>; requireCurrent: (revision: number) => void; replaceHash: (hash: string | null) => void };
+type PasswordGate = { admitCaller: (ip: string) => Promise<void>; check: (password: string, ip: string) => Promise<number>; requireCurrent: (revision: number) => void; replaceHash: (hash: string | null) => void };
 
 async function wipePush({ apns, log }: AuthDeps, entry: DeviceEntry): Promise<void> {
   if (apns === null || entry.apnsToken === null || entry.apnsEnvironment === null) return;
@@ -97,17 +110,15 @@ function createRetirement(deps: AuthDeps): Retirement {
 
 const changedPassword = (): FardeskError => new FardeskError("unauthorized", "password changed during authentication");
 
-function createPasswordGate({ config, now }: AuthDeps): PasswordGate {
+function createPasswordGate({ config, now }: AuthDeps, tailnet: TailnetGate): PasswordGate {
   const limiter = createLoginLimiter({ maxFailures: config.auth.maxFailures, windowMs: config.auth.windowSeconds * MS_PER_SECOND, now });
   let passwordHash = config.auth.passwordHash;
   let revision = 0;
   const requireCurrent = (checked: number): void => { if (checked !== revision) throw changedPassword(); };
   return {
     requireCurrent,
-    replaceHash(hash): void {
-      passwordHash = hash;
-      revision += 1;
-    },
+    async admitCaller(ip): Promise<void> { await admitTailnetCaller(limiter, tailnet, ip); },
+    replaceHash(hash): void { passwordHash = hash; revision += 1; },
     async check(password, ip): Promise<number> {
       if (passwordHash === null) throw new FardeskError("unsupported", "no password set: run fardeskd set-password");
       const release = limiter.reserve(ip);
@@ -149,6 +160,7 @@ function createSessionOps({ deps, gate, retirement, master }: Parts): Pick<AuthS
       return result.state === "ok" ? { state: "ok", deviceId: result.device.id } : result;
     },
     async login(request, ip): Promise<LoginResult> {
+      await gate.admitCaller(ip);
       gate.requireCurrent(await gate.check(request.password, ip));
       return issueLogin(request.deviceName, ip);
     },
@@ -192,7 +204,8 @@ function createRevocationOps({ deps, gate, retirement }: Parts): Pick<AuthServic
 
 export function createAuthService(deps: AuthDeps): AuthService {
   const master = createMasterToken(deps.config.token);
-  const parts = { deps, gate: createPasswordGate(deps), retirement: createRetirement(deps), master };
-  const pairing = createPairOps({ deps, master, issueLogin: issueLoginFor(deps) });
+  const tailnet = createTailnetGate({ run: deps.run, commands: deps.tailscaleCommands, policy: deps.config.pairing, log: deps.log });
+  const parts = { deps, gate: createPasswordGate(deps, tailnet), retirement: createRetirement(deps), master };
+  const pairing = createPairOps({ deps, tailnet, master, issueLogin: issueLoginFor(deps) });
   return { ...createSessionOps(parts), ...createRevocationOps(parts), ...pairing };
 }

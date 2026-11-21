@@ -73,6 +73,8 @@ public struct QuestionActivity: Codable, Sendable, Hashable, Identifiable {
     public let text: String
     public let options: [String]
     public let state: QuestionState
+    /// With state `.terminal`: tapping an option types its number into the dialog at the computer. Absent otherwise.
+    public let typable: Bool?
 }
 
 public struct PermissionActivity: Codable, Sendable, Hashable, Identifiable {
@@ -85,4 +87,6 @@ public struct PermissionActivity: Codable, Sendable, Hashable, Identifiable {
     public let cwd: String
     public let destructive: Bool
     public let state: PermissionState
+    /// With state `.terminal`: Allow or Deny types the matching key into the dialog at the computer. Absent otherwise.
+    public let typable: Bool?
 }

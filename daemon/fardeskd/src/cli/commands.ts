@@ -1,11 +1,9 @@
-// serve, init, pair and status.
-import { literalBindAddress, resolveBindAddress } from "../config/bind.js";
+// serve, init and status.
+import { literalBindAddress } from "../config/bind.js";
 import { createTailscaleProbe, describeState } from "../config/tailscale.js";
 import { loadConfig, writeInitialConfig } from "../config/config.js";
 import type { Config } from "../config/config.js";
-import { pairCodeResultSchema } from "../contract/schema.js";
-import { FardeskError } from "../core/errors.js";
-import { buildPairingPayload, daemonUrl, pairingLink, renderQr } from "../pairing/index.js";
+import { daemonUrl } from "../pairing/index.js";
 import { startHub } from "../hub/hub.js";
 import { createStreamRouter } from "../hub/relay.js";
 import { createApp } from "../server/app.js";
@@ -13,7 +11,6 @@ import { startServer } from "../server/listen.js";
 import { createServices } from "../service/services.js";
 import { readCrossSessionInbound } from "../sessions/crossSession.js";
 import { serveOnAddresses } from "./serveLoop.js";
-import { callDaemon } from "./daemonClient.js";
 import { printUnconfiguredHomes } from "./homesCommands.js";
 import { hookStateOf, settingsPathsOf } from "./hooks.js";
 import { EXIT_OK, EXIT_USAGE } from "./types.js";
@@ -53,17 +50,6 @@ export function runInit(context: CommandContext): number {
   return EXIT_OK;
 }
 
-export async function runPair(context: CommandContext): Promise<number> {
-  const config = loadConfig(context.configPath);
-  const address = await resolveBindAddress(config, context.run, context.tailscaleCommands);
-  const issued = await callDaemon(context, { method: "POST", path: "/v1/auth/pair-code" }, pairCodeResultSchema);
-  if (issued === null) throw new FardeskError("conflict", "no daemon answers: start fardeskd first, a pairing code lives in the memory of the running daemon");
-  const link = pairingLink(buildPairingPayload(config, address, issued.code));
-  context.io.stdout(link);
-  context.io.stdout(await renderQr(link));
-  context.io.stdout(`one-time code, valid until ${issued.expiresAt} (10 minutes), works once`);
-  return EXIT_OK;
-}
 
 async function daemonAnswer(url: string, token: string): Promise<string> {
   try {

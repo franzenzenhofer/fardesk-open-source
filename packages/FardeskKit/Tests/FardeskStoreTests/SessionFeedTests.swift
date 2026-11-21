@@ -40,7 +40,7 @@ struct SessionFeedTests {
         let feed = SessionFeed(page: try Fixtures.page("everyActivityKind"))
         let pending = feed.pendingRequests
         #expect(pending.map(\.id) == ["act_0007", "act_0010"])
-        #expect(feed.rows.count == feed.activities.count - 2)
+        #expect(feed.rows.count == feed.activities.count - 2 - feed.terminalRequests.count)
         #expect(feed.rows.allSatisfy { !$0.isPendingRequest })
     }
 

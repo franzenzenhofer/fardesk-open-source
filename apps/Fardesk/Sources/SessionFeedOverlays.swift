@@ -9,6 +9,9 @@ struct PendingRequestCards: View {
 
     var body: some View {
         ForEach(box.feed.pendingRequests) { RequestCard(activity: $0, ref: ref) }
+        ForEach(box.feed.terminalRequests) { activity in
+            if let presentation = TerminalRequestPresentation(activity) { TerminalRequestCard(presentation: presentation, ref: ref) }
+        }
     }
 }
 

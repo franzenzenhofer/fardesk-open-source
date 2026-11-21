@@ -17,6 +17,7 @@
             "internal",
             "token_revoked",
             "rate_limited",
+            "forbidden",
             "machine_offline"
           ]
         },

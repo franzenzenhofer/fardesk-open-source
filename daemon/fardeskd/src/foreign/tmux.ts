@@ -45,6 +45,15 @@ export async function sendEscape(options: SendEscapeOptions): Promise<void> {
   await tmux(options, ["send-keys", "-t", validPane(options.pane), ESCAPE_KEY], "send Escape");
 }
 
+/** Types `text` as keystrokes without pressing Enter (a dialog that takes a number key selects on the key alone). */
+export async function sendLiteral(options: TmuxOptions & { text: string }): Promise<void> {
+  await tmux(options, ["send-keys", "-t", validPane(options.pane), "-l", "--", options.text], "type keys");
+}
+
+export async function sendEnter(options: TmuxOptions): Promise<void> {
+  await tmux(options, ["send-keys", "-t", validPane(options.pane), ENTER_KEY], "press Enter");
+}
+
 async function panesOfServer(options: { tmuxBinary: string; run: RunCommand }, socket: string | null): Promise<PaneRef[]> {
   let listing: string;
   try {

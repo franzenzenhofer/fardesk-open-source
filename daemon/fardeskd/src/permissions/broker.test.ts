@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createBus } from "../core/bus.js";
 import { FardeskError } from "../core/errors.js";
-import type { StreamEvent } from "../contract/schema.js";
 import type { FinishedToolCall } from "../transcript/index.js";
+import { ask, bash, BROKER_NOW as NOW, setupBroker } from "../../test/support/brokerSetup.js";
 import { sleep } from "../../test/support/env.js";
-import { HISTORY_LIMIT, createBroker, type AskInput, type Broker } from "./broker.js";
+import { HISTORY_LIMIT } from "./broker.js";
 
-const NOW = new Date("2026-11-15T10:00:00.000Z");
 const SHORT_TIMEOUT_MS = 50;
 const LONG_TIMEOUT_MS = 60_000;
 const QUESTION_INPUT = {
@@ -14,17 +12,7 @@ const QUESTION_INPUT = {
 };
 const FREE_TEXT_INPUT = { questions: [{ question: "Your name?", options: [] }] };
 
-function setup(timeoutMs = LONG_TIMEOUT_MS): { broker: Broker; events: StreamEvent[] } {
-  const bus = createBus();
-  const events: StreamEvent[] = [];
-  bus.subscribe((event) => events.push(event));
-  let counter = 0;
-  const broker = createBroker({ timeoutMs, bus, now: () => NOW, newId: () => `id${String(++counter)}` });
-  return { broker, events };
-}
-
-const bash = (command: string): AskInput => ({ sessionId: "s1", toolName: "Bash", toolInput: { command }, cwd: "/work" });
-const ask = (input: unknown, sessionId = "s1"): AskInput => ({ sessionId, toolName: "AskUserQuestion", toolInput: input, cwd: "/work" });
+const setup = (timeoutMs = LONG_TIMEOUT_MS): ReturnType<typeof setupBroker> => setupBroker(timeoutMs);
 
 const finishedBash = (command: string, startOffsetMs: number): FinishedToolCall => ({
   id: "toolu_bash",
@@ -111,7 +99,7 @@ describe("broker permissions", () => {
     const { broker, events } = setup(SHORT_TIMEOUT_MS);
     const { answer } = broker.ask(bash("ls"));
     expect(await answer).toEqual({ state: "expired", timedOut: true });
-    expect(events[1]).toMatchObject({ activity: { state: "expired" } });
+    expect(events[1]).toMatchObject({ activity: { state: "terminal" } });
     expect(broker.pendingKind("s1")).toBeNull();
   });
 
@@ -212,7 +200,7 @@ describe("broker questions", () => {
   it("expires a question on timeout", async () => {
     const { broker, events } = setup(SHORT_TIMEOUT_MS);
     expect(await broker.ask(ask(FREE_TEXT_INPUT)).answer).toEqual({ state: "expired", timedOut: true });
-    expect(events[1]).toMatchObject({ activity: { kind: "question", state: "expired" } });
+    expect(events[1]).toMatchObject({ activity: { kind: "question", state: "terminal" } });
   });
 
   it("throws invalid_request for a malformed question without creating an entry", () => {

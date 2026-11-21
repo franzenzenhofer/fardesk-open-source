@@ -83,11 +83,11 @@ function commandRoutes(app: App, services: Services): void {
 
 function decisionRoutes(app: App, services: Services, hooks: RouteHooks): void {
   app.post("/v1/sessions/:id/permission/:rid", async (c) => {
-    services.decide(c.req.param("id"), c.req.param("rid"), (await parseBody(c, permissionRequestSchema)).decision);
+    await services.decide(c.req.param("id"), c.req.param("rid"), (await parseBody(c, permissionRequestSchema)).decision);
     return c.json(OK);
   });
   app.post("/v1/sessions/:id/answer/:qid", async (c) => {
-    services.answer(c.req.param("id"), c.req.param("qid"), (await parseBody(c, answerRequestSchema)).option);
+    await services.answer(c.req.param("id"), c.req.param("qid"), (await parseBody(c, answerRequestSchema)).option);
     return c.json(OK);
   });
   app.post("/v1/devices", async (c) => {

@@ -21,10 +21,12 @@ public enum ToolStatus: String, Codable, Sendable, Hashable {
 
 public enum PermissionState: String, Codable, Sendable, Hashable {
     case pending, allowed, denied, expired
+    /// Not answered in time: the dialog waits at the computer (the phone may still answer it when `typable`).
+    case terminal
 }
 
 public enum QuestionState: String, Codable, Sendable, Hashable {
-    case pending, answered, expired
+    case pending, answered, expired, terminal
 }
 
 public enum PermissionDecision: String, Codable, Sendable, Hashable {
@@ -48,6 +50,7 @@ public enum ErrorCode: String, Codable, Sendable, Hashable {
     case unauthorized, conflict, unsupported, `internal`
     case tokenRevoked = "token_revoked"
     case rateLimited = "rate_limited"
+    case forbidden
     case invalidRequest = "invalid_request"
     case notFound = "not_found"
     case machineOffline = "machine_offline"

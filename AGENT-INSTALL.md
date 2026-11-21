@@ -136,9 +136,9 @@ Check: `xcodebuild` finishes without error and the app is installed on the phone
 
 `bash scripts/setup/50-pair.sh` prints a QR code from the hub (or from the one machine, if there is no hub).
 
-HUMAN: open the app and scan the QR code. The code works once and expires after 10 minutes.
+HUMAN: open the app and scan the QR code. The pairing window lives 2 minutes, only while the command runs, and takes one device.
 
-Check: `fardeskd devices` on the hub lists the phone, and running `50-pair.sh` again gives a different code.
+Check: `fardeskd devices` on the hub lists the phone, and running `50-pair.sh` again opens a new window with a different code.
 
 ## Step 6: optional parts, one at a time, only if the user asks
 

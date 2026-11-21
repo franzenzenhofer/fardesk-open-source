@@ -36,14 +36,8 @@ export function createLocalEndpoint(services: LocalServices): MachineEndpoint {
     spawn: async (request) => (await services.newSession(request)).sessionId,
     stop: async (sessionId) => services.stop(sessionId),
     folders: (query, limit) => Promise.resolve(services.searchFolders(query, limit)),
-    async decide(sessionId, requestId, decision): Promise<void> {
-      services.decide(sessionId, requestId, decision);
-      return Promise.resolve();
-    },
-    async answer(sessionId, requestId, option): Promise<void> {
-      services.answer(sessionId, requestId, option);
-      return Promise.resolve();
-    },
+    decide: async (sessionId, requestId, decision) => services.decide(sessionId, requestId, decision),
+    answer: async (sessionId, requestId, option) => services.answer(sessionId, requestId, option),
     resume: async (sessionId) => (await services.resume(sessionId)).sessionId,
     clear: async (sessionId) => (await services.clear(sessionId)).sessionId,
     compact: async (sessionId) => (await services.compact(sessionId)).sessionId,

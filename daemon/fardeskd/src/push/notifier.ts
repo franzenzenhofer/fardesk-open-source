@@ -44,17 +44,19 @@ export type NotifierDeps = {
 
 export const DEFAULT_DONE_DELAY_MS = 20_000;
 
-export const HAND_OFF_BODY = "Still waiting: answer at the computer";
+export const HAND_OFF_LEAD = "Still waiting at the computer";
+export const REQUEST_BODY_MAX_CHARS = 160;
 
 export type Notifier = {
   done(report: StopReport): void;
-  /** One more push, of the kind of the request that timed out (so a device that enabled only that kind gets it), and Claude Code fell back to its dialog at the computer. */
-  handOff(sessionId: string, kind: "permission" | "question"): void;
+  /** One more push, of the kind of the request that timed out (so a device that enabled only that kind gets it), and Claude Code fell back to its dialog at the computer. It names what the dialog asks. */
+  handOff(sessionId: string, request: PendingRequest): void;
   ping(sessionId: string, title: string, body: string): Promise<number>;
   close(): void;
 };
 
 type Pending = Extract<Activity, { kind: "permission" | "question" }>;
+export type PendingRequest = Pending;
 type Outgoing = {
   type: NotificationType;
   category: ApnsCategory;
@@ -70,9 +72,10 @@ const isPendingRequest = (activity: Activity): activity is Pending =>
 
 const requestCategory = (kind: Pending["kind"]): ApnsCategory => (kind === "question" ? "QUESTION" : "PERMISSION");
 
+/** What the request is about: the (first) question, or the tool with a short summary of its input. */
 function requestBody(activity: Pending): string {
-  if (activity.kind === "question") return activity.text;
-  return activity.summary === "" ? activity.title : `${activity.title}: ${activity.summary}`;
+  if (activity.kind === "question") return truncate(activity.text, REQUEST_BODY_MAX_CHARS);
+  return activity.summary === "" ? activity.title : truncate(`${activity.tool}: ${activity.summary}`, REQUEST_BODY_MAX_CHARS);
 }
 
 /** True when APNs accepted the push; a dead token also removes the device. */
@@ -198,9 +201,10 @@ export function createNotifier(deps: NotifierDeps): Notifier {
     done: (report): void => {
       quiet.schedule(report);
     },
-    handOff: (sessionId, kind): void => {
+    handOff: (sessionId, request): void => {
       // Same collapse id as the request push: the device swaps the stale Allow/Deny notification for this one.
-      push(deps, { type: kind, category: "TERMINAL", sessionId, body: HAND_OFF_BODY, requestId: null, replaces: requestCategory(kind) });
+      const body = `${HAND_OFF_LEAD}: ${requestBody(request)}`;
+      push(deps, { type: request.kind, category: "TERMINAL", sessionId, body, requestId: null, replaces: requestCategory(request.kind) });
     },
     ping: async (sessionId, title, body) => ping(deps, sessionId, title, body),
     close: (): void => {

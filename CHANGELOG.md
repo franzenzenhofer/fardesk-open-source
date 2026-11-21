@@ -8,6 +8,20 @@ The daemon, the app and the command-line tool share one version and are updated 
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-21
+
+### Added
+- Answer a question or a permission request from the phone even after it moved to the computer: the app keeps
+  showing it with its options, and a tap types the answer into the terminal dialog where the session can be typed
+  into (a single-choice question; allow or deny for a plain permission in tmux).
+- Every "needs you" notification names the question or the tool.
+- Pairing accepts only a device of the same tailnet user (checked with `tailscale whois`); a pairing code lives two
+  minutes, only while `fardeskd pair` runs, and five wrong codes close the window.
+
+### Changed
+- A question or permission stays answerable in the app for 15 minutes (was 2) before it moves to the computer;
+  the hook timeouts follow the setting.
+
 ## [2.0.1] - 2026-11-21
 
 ### Fixed

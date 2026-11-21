@@ -8,7 +8,8 @@ import { defaultConfigPath } from "../config/config.js";
 import { runAudit } from "./auditCommand.js";
 import { runDevices, runRevoke, runRotateToken, runSetPassword } from "./authCommands.js";
 import { runCrossSession } from "./crossSession.js";
-import { runInit, runPair, runServe, runStatus } from "./commands.js";
+import { runInit, runServe, runStatus } from "./commands.js";
+import { runPair } from "./pairCommand.js";
 import { runHomes } from "./homesCommands.js";
 import { runHooksCommand } from "./hooks.js";
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from "./types.js";
@@ -22,7 +23,7 @@ export const USAGE = [
   "  init --name <name>     write the initial config",
   "  install-hooks [--dry-run]  add the Fardesk hooks to every Claude home (--dry-run: print the diff, change nothing)",
   "  uninstall-hooks        remove them again",
-  "  pair                   print the pairing link and QR code (one-time code, valid 10 minutes; needs the running daemon)",
+  "  pair                   open a 2 minute pairing window: link + QR code, one device; stays open only while this command runs",
   "  rotate-token           replace the master token; device tokens stay valid",
   "  audit [--since <time>] print the audit log (ISO time or 30m, 2h, 7d)",
   "  status                 show config, bind address, daemon and hook state",

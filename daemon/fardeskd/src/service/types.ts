@@ -45,6 +45,8 @@ export type ServiceOptions = {
   /** Quiet period before a "done" push (default 20 s); tests shorten it. */
   doneDelayMs?: number;
   run?: RunCommand;
+  /** Tailscale commands to try for `whois` on a pairing request (default: `tailscale`, plus the macOS app's CLI). */
+  tailscaleCommands?: string[];
   runWithInput?: RunWithInput;
   log?: Logger;
   /** The config file this daemon was started from: where a password change is written. */
@@ -97,8 +99,10 @@ export type Services = {
   coordinatorState(): CoordinatorState;
   /** Lists Ghostty terminals once so macOS asks for the Automation consent; answers the resulting status. */
   ghosttyProbe(): Promise<GhosttyAutomation>;
-  decide(sessionId: string, requestId: string, decision: PermissionDecision): void;
-  answer(sessionId: string, requestId: string, option: string): void;
+  /** Allow or deny a request. After a hand-off to the terminal this types the matching key into the dialog (typable ones only). */
+  decide(sessionId: string, requestId: string, decision: PermissionDecision): Promise<void>;
+  /** Answers a question. After a hand-off to the terminal this types the option number into the dialog (single choice only). */
+  answer(sessionId: string, requestId: string, option: string): Promise<void>;
   mute(sessionId: string, muted: boolean): void;
   label(sessionId: string, request: LabelRequest): void;
   registerDevice(request: DeviceRequest): void;

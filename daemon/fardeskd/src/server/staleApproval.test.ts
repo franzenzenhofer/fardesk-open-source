@@ -13,7 +13,7 @@ import { HOOK_SESSION_ID, fireHook, hookFixtureText, pendingRequestId, seedHookS
 import { buildHookCommand } from "../hooks/command.js";
 import { runHook } from "../../test/support/hookRun.js";
 import { createLogger } from "../core/log.js";
-import { HAND_OFF_BODY } from "../push/notifier.js";
+import { HAND_OFF_LEAD } from "../push/notifier.js";
 
 let daemon: TestDaemon;
 let apnsServer: ApnsTestServer | null = null;
@@ -79,7 +79,7 @@ describe("a request that timed out hands off to the terminal", () => {
     expect(run).toMatchObject({ code: 0, stdout: "" });
     await waitUntil(() => (apnsServer?.requests.length ?? 0) === 2);
     expect(alertOf(0).category).toBe("PERMISSION");
-    expect(alertOf(1)).toEqual({ category: "TERMINAL", body: HAND_OFF_BODY });
+    expect(alertOf(1)).toEqual({ category: "TERMINAL", body: `${HAND_OFF_LEAD}: Bash: touch a1.txt` });
 
     setRegistryStatus("waiting");
     await waitUntil(() => summary()?.waitingFor === "terminal");

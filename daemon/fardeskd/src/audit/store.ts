@@ -13,14 +13,16 @@ const ROTATED_SUFFIX = ".1";
 
 export const auditEntrySchema = z.strictObject({
   time: z.iso.datetime(),
-  /** `login_failed` is a rejected login or pairing attempt; `request` is every other state-changing call. */
-  event: z.enum(["request", "login_failed"]),
+  /** `login_failed` is a rejected login or pairing attempt; `pairing_locked` is a pairing window closed by 5 wrong codes; `request` is every other state-changing call. */
+  event: z.enum(["request", "login_failed", "pairing_locked"]),
   deviceId: z.string().min(1).nullable(),
   method: z.string().min(1),
   route: z.string().min(1),
   sessionId: z.string().min(1).nullable(),
   result: z.number().int(),
   ip: z.string().min(1),
+  /** Only on a pairing refused for its caller: the caller's tailnet device name. */
+  peer: z.string().min(1).optional(),
 });
 export type AuditEntry = z.infer<typeof auditEntrySchema>;
 export type AuditInput = Omit<AuditEntry, "time">;

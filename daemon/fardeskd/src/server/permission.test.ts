@@ -107,7 +107,7 @@ describe("requests nobody answers", () => {
     await boot({ permissionTimeoutSeconds: 1 });
     const run = await fireHook(daemon, "PermissionRequest-bash.json");
     expect(run).toMatchObject({ code: 0, stdout: "" });
-    await waitUntil(() => requestStates("permission").includes("expired"));
+    await waitUntil(() => requestStates("permission").includes("terminal"));
     expect((await daemon.call("POST", permissionPath("whatever"), { decision: "allow" })).status).toBe(404);
   });
 

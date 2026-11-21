@@ -104,6 +104,7 @@ export const errorResponseFixtures: FixtureCases<"ErrorResponse"> = {
   unauthorized: { error: { code: "unauthorized", message: "Missing or invalid token" } },
   tokenRevoked: { error: { code: "token_revoked", message: "This device was revoked" } },
   rateLimited: { error: { code: "rate_limited", message: "Too many attempts, try again later" } },
+  forbidden: { error: { code: "forbidden", message: "This device is not allowed to pair with this computer" } },
   notFound: { error: { code: "not_found", message: "No such session" } },
   invalidRequest: { error: { code: "invalid_request", message: "Field text must not be empty" } },
   conflict: { error: { code: "conflict", message: "Permission already decided" } },

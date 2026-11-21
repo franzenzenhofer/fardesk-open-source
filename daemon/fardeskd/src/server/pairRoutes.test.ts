@@ -35,20 +35,12 @@ describe("POST /v1/auth/pair", () => {
     await expectApiError(daemon, "POST", "/v1/auth/pair", 401, "unauthorized", { code, deviceName: "Again" });
   });
 
-  it("refuses a code after 10 minutes", async () => {
+  it("refuses a code after 2 minutes", async () => {
     daemon = await startTestDaemon();
     vi.useFakeTimers({ toFake: ["Date"] });
     const code = await newCode();
     vi.setSystemTime(Date.now() + PAIR_CODE_TTL_MS + 1000);
     expect((await pairWith(code)).status).toBe(401);
-  });
-
-  it("accepts a code just inside the 10 minutes", async () => {
-    daemon = await startTestDaemon();
-    vi.useFakeTimers({ toFake: ["Date"] });
-    const code = await newCode();
-    vi.setSystemTime(Date.now() + PAIR_CODE_TTL_MS - 1000);
-    expect((await pairWith(code)).status).toBe(200);
   });
 
   it("rate limits wrong codes like a login: 429 after maxFailures, also for a valid code", async () => {

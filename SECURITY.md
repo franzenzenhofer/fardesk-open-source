@@ -18,7 +18,7 @@ other rules below exist to keep that token in the right hands.
 | Topic | Behaviour |
 |---|---|
 | Network | The daemon binds to the Tailscale address or loopback. Another address needs TLS and `bind.allowNonTailnet: true`; otherwise it exits with an error. |
-| Pairing | The QR code and link carry a one-time code (32 random bytes, valid 10 minutes, used once, kept in memory). The app swaps it for its own device token. |
+| Pairing | The QR code and link carry a one-time code (32 random bytes, valid 2 minutes, used once, kept in memory, compared in constant time; open only while `fardeskd pair` runs; five wrong codes close the window and write an audit line). The app swaps it for its own device token. Before the code is checked, the daemon asks Tailscale who is calling and refuses (403, audited) any device that is not of the same tailnet user as this computer (login and pairing through a hub get the same check; a reverse proxy on this computer would make every caller look local, so none belongs in front of the daemon); `pairing.allowedUsers` and `pairing.allowedTags` widen this on purpose. |
 | Device tokens | Stored as SHA-256 on the daemon. Each device can be revoked (`fardeskd revoke`) and gets a wipe push. Stored in the Keychain on the phone, available after first unlock, not synced. |
 | Password | Optional. scrypt, constant-time compare, minimum 12 characters, 5 failures per 300 seconds per address, failures are logged. |
 | Browser attacks | Every route needs an `Authorization` header and there are no cookies, so a web page cannot act with your rights. |

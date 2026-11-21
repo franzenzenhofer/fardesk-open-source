@@ -26,7 +26,7 @@ export const CONFIG_DEFAULTS = {
   stateDir: "~/.local/state/fardesk",
   models: ["default", "fable", "opus", "sonnet", "haiku"],
   intervals: { registryPollMs: 1000, transcriptPollMs: 500, pingMs: 20000, typablePollMs: 5000 },
-  permissionTimeoutSeconds: 120,
+  permissionTimeoutSeconds: 900,
   activityPageLimit: { default: 50, max: 200 },
   detail: { maxOutputLines: 40, maxDiffLines: 400 },
   owned: { permissionMode: "default" as PermissionMode, allowBypass: false, interruptTimeoutMs: 5000 },
@@ -38,6 +38,7 @@ export const CONFIG_DEFAULTS = {
   tmuxBinary: "tmux",
   osascriptBinary: "osascript",
   auth: { passwordHash: null, maxFailures: 5, windowSeconds: 300 },
+  pairing: { allowedUsers: [] as string[], allowedTags: [] as string[] },
   peers: [] as Peer[],
   sessions: { maxEnded: 200, maxFolders: 20, readsPerPoll: 20, tidyList: true, listEnded: 10, listEndedWithinDays: 24 },
   coordinator: {
@@ -100,6 +101,12 @@ const ownedSchema = z.strictObject({
   interruptTimeoutMs: z.number().int().positive().default(CONFIG_DEFAULTS.owned.interruptTimeoutMs),
 });
 
+/** Advanced: tailnet login names and tags that may pair although they are not the user of this computer (families, teams). */
+const pairingSchema = z.strictObject({
+  allowedUsers: z.array(z.string().min(1)).default(CONFIG_DEFAULTS.pairing.allowedUsers),
+  allowedTags: z.array(z.string().min(1)).default(CONFIG_DEFAULTS.pairing.allowedTags),
+});
+
 const bindSchema = z.strictObject({
   address: z.string().min(1),
   port: z.number().int().min(1).max(65535),
@@ -155,6 +162,7 @@ export const configSchema = z.strictObject({
   tmuxBinary: z.string().min(1).default(CONFIG_DEFAULTS.tmuxBinary),
   osascriptBinary: z.string().min(1).default(CONFIG_DEFAULTS.osascriptBinary),
   auth: authSchema.default(CONFIG_DEFAULTS.auth),
+  pairing: pairingSchema.default(CONFIG_DEFAULTS.pairing),
   peers: z.array(peerSchema).default(CONFIG_DEFAULTS.peers),
   sessions: sessionsSchema.default(CONFIG_DEFAULTS.sessions),
   coordinator: coordinatorSchema.default(CONFIG_DEFAULTS.coordinator),

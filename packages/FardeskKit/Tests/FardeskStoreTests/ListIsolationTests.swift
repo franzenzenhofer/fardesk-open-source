@@ -52,7 +52,8 @@ struct SessionFeedBatchTests {
 
     @Test func derivedRowsAndPendingRequestsFollowTheActivities() throws {
         let feed = SessionFeed(page: try Fixtures.page("everyActivityKind"))
-        #expect(feed.rows == feed.activities.filter { !$0.isPendingRequest })
+        #expect(feed.rows == feed.activities.filter { !$0.isPendingRequest && !$0.isTerminalRequest })
+        #expect(feed.terminalRequests == feed.activities.filter(\.isTerminalRequest))
         #expect(feed.pendingRequests == feed.activities.filter(\.isPendingRequest))
         #expect(feed.blocks == FeedBlock.group(feed.rows))
     }

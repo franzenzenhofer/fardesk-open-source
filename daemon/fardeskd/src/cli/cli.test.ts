@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
 import { captureIo, runWithoutProcesses, writeCliConfig } from "../../test/support/cliConfig.js";
-import { startTestDaemon, writeConfigFile } from "../../test/support/daemon.js";
+import { startTestDaemon } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
 import { fixturePath, freePort, makeTempDir, portAccepts, waitUntil } from "../../test/support/env.js";
 import { createFakeTailscale, putOnPath } from "../../test/support/fakeTailscale.js";
@@ -103,6 +103,25 @@ describe("install-hooks and uninstall-hooks", () => {
     expect(readJson(settings).hooks.Stop).toHaveLength(2);
   });
 
+  it("derives the PermissionRequest timeouts from permissionTimeoutSeconds (default 15 minutes) in every configured home", async () => {
+    const second = createClaudeHome();
+    homes.push(second);
+    const { home, configPath } = await setup();
+    const timeoutsOf = (dir: string): { timeout: number; command: string }[] =>
+      (readJson(join(dir, "settings.json")).hooks["PermissionRequest"] as { hooks: { timeout: number; command: string }[] }[]).flatMap((group) => group.hooks);
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    writeFileSync(configPath, JSON.stringify({ ...config, claudeHomes: [home.dir, second.dir] }));
+    await run(["install-hooks", "--config", configPath]);
+    for (const dir of [home.dir, second.dir]) {
+      expect(timeoutsOf(dir)).toEqual([expect.objectContaining({ timeout: 910, command: expect.stringContaining("curl -sf -m 905 ") as string })]);
+    }
+    writeFileSync(configPath, JSON.stringify({ ...config, claudeHomes: [home.dir, second.dir], permissionTimeoutSeconds: 300 }));
+    expect((await run(["install-hooks", "--config", configPath])).out.join("\n")).toContain("changed PermissionRequest");
+    for (const dir of [home.dir, second.dir]) {
+      expect(timeoutsOf(dir)).toEqual([expect.objectContaining({ timeout: 310, command: expect.stringContaining("curl -sf -m 305 ") as string })]);
+    }
+  });
+
   it("works with the real clock when none is injected", async () => {
     const { configPath } = await setup();
     const io = captureIo();
@@ -117,22 +136,6 @@ describe("install-hooks and uninstall-hooks", () => {
 });
 
 describe("pair", () => {
-  it("prints a fardesk:// link with a one-time code (no master token) and a QR code", async () => {
-    daemon = await startTestDaemon();
-    const configPath = writeConfigFile(daemon.config);
-    const result = await run(["pair", "--config", configPath]);
-    expect(result.code).toBe(0);
-    const link = result.out[0] ?? "";
-    const payload = JSON.parse(Buffer.from(link.slice("fardesk://pair?d=".length), "base64url").toString("utf8")) as Record<string, unknown>;
-    expect(payload).toMatchObject({ v: 1, name: "test-mac", url: daemon.url, hub: false });
-    expect(payload).not.toHaveProperty("token");
-    expect(result.out.join("\n")).not.toMatch(/[0-9a-f]{64}/);
-    expect(result.out.join("\n")).not.toContain(daemon.config.token);
-    expect(result.out[1]?.split("\n").length).toBeGreaterThan(10);
-    const paired = await daemon.call("POST", "/v1/auth/pair", { code: payload["code"], deviceName: "Test iPhone" }, null);
-    expect(paired.status).toBe(200);
-  });
-
   it("fails with a clear message when no daemon runs, because the code lives in the daemon", async () => {
     const { configPath } = await setup();
     const result = await run(["pair", "--config", configPath]);

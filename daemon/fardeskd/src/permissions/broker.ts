@@ -4,9 +4,12 @@ import type { FinishedToolCall } from "../transcript/index.js";
 import type { Bus } from "../core/bus.js";
 import { FardeskError } from "../core/errors.js";
 import { describeRequest } from "./describe.js";
+import { canType, terminalShapeOf } from "./terminalKeys.js";
+import type { TerminalReach, TerminalShape } from "./terminalKeys.js";
 
 export const HISTORY_LIMIT = 50;
 const PENDING = "pending";
+const TERMINAL = "terminal";
 
 export type BrokerAnswer =
   | { state: "allowed"; always: boolean }
@@ -15,8 +18,11 @@ export type BrokerAnswer =
   | { state: "expired"; timedOut?: true };
 
 export type AskInput = { sessionId: string; toolName: string; toolInput: unknown; cwd: string };
-export type AskHandle = { requestId: string; kind: PendingKind; answer: Promise<BrokerAnswer> };
+export type AskHandle = { requestId: string; kind: PendingKind; activity: BrokerActivity; answer: Promise<BrokerAnswer> };
 export type PendingKind = "permission" | "question";
+
+/** A request that timed out: its dialog now waits at the computer, and may still be answered by typing into it. */
+export type HandedOff = { activity: BrokerActivity; shape: TerminalShape | null; typable: boolean };
 
 export type BrokerOptions = {
   timeoutMs: number;
@@ -36,15 +42,20 @@ export type Broker = {
   toolFinished(sessionId: string, call: FinishedToolCall): void;
   activities(sessionId: string): Activity[];
   pendingKind(sessionId: string): PendingKind | null;
+  /** The request when it was handed off to the terminal and is still open there, else null. */
+  handedOff(sessionId: string, requestId: string): HandedOff | null;
+  /** Records whether the terminal of a handed-off request can be typed into (`typable` of its activity). */
+  markReach(sessionId: string, requestId: string, reach: TerminalReach): void;
   close(): void;
 };
 
-type BrokerActivity = Extract<Activity, { kind: PendingKind }>;
+export type BrokerActivity = Extract<Activity, { kind: PendingKind }>;
 
 type Entry = {
   sessionId: string;
   requestId: string;
   activity: BrokerActivity;
+  shape: TerminalShape | null;
   /** What the hook asked about: a finished tool call only ends the request for exactly this input. */
   toolInput: unknown;
   settle: (answer: BrokerAnswer) => void;
@@ -57,6 +68,8 @@ type Ledger = {
   finish(entry: Entry, answer: BrokerAnswer): void;
   findPending(sessionId: string, requestId: string): Entry;
   expire(entries: Entry[]): void;
+  /** Sends the entry's current activity to the clients again. */
+  republish(entry: Entry): void;
   all(): Entry[][];
 };
 
@@ -78,6 +91,8 @@ function permissionState(answer: BrokerAnswer): PermissionState {
 }
 
 function resolvedActivity(activity: BrokerActivity, answer: BrokerAnswer): BrokerActivity {
+  // No answer in time: Claude Code shows its own dialog at the computer, so the request stays visible as "terminal".
+  if (answer.state === "expired" && answer.timedOut === true) return { ...activity, state: TERMINAL };
   if (activity.kind === "permission") return { ...activity, state: permissionState(answer) };
   return { ...activity, state: answer.state === "answered" ? "answered" : "expired" };
 }
@@ -96,6 +111,9 @@ function buildActivity(input: AskInput, requestId: string, ts: string): BrokerAc
 }
 
 const isPending = (entry: Entry): boolean => entry.activity.state === PENDING;
+const isHandedOff = (entry: Entry): boolean => entry.activity.state === TERMINAL;
+/** Still unresolved: waiting for the phone, or for the computer after the hand-off. */
+const isOpen = (entry: Entry): boolean => isPending(entry) || isHandedOff(entry);
 
 function findPendingEntry(entries: Entry[], sessionId: string, requestId: string): Entry {
   const entry = entries.find((e) => e.requestId === requestId && isPending(e));
@@ -105,7 +123,7 @@ function findPendingEntry(entries: Entry[], sessionId: string, requestId: string
 
 function trimHistory(entries: Entry[]): void {
   while (entries.length > HISTORY_LIMIT) {
-    const oldestResolved = entries.findIndex((entry) => !isPending(entry));
+    const oldestResolved = entries.findIndex((entry) => !isOpen(entry));
     if (oldestResolved === -1) return;
     entries.splice(oldestResolved, 1);
   }
@@ -114,8 +132,7 @@ function trimHistory(entries: Entry[]): void {
 function createLedger(bus: Bus): Ledger {
   const sessions = new Map<string, Entry[]>();
   const entriesOf = (sessionId: string): Entry[] => sessions.get(sessionId) ?? [];
-  const publish = (entry: Entry): void => {
-    bus.publish({ type: "activity", sessionId: entry.sessionId, activity: entry.activity });
+  const publish = (entry: Entry): void => {    bus.publish({ type: "activity", sessionId: entry.sessionId, activity: entry.activity });
   };
   const finish = (entry: Entry, answer: BrokerAnswer): void => {
     clearTimeout(entry.timer);
@@ -133,8 +150,9 @@ function createLedger(bus: Bus): Ledger {
     finish,
     findPending: (sessionId, requestId): Entry => findPendingEntry(entriesOf(sessionId), sessionId, requestId),
     expire(entries): void {
-      for (const entry of entries.filter(isPending)) finish(entry, EXPIRED);
+      for (const entry of entries.filter(isOpen)) finish(entry, EXPIRED);
     },
+    republish: publish,
     all: (): Entry[][] => [...sessions.values()],
   };
 }
@@ -164,13 +182,31 @@ function startRequest(ledger: Ledger, options: BrokerOptions, input: AskInput): 
     ledger.finish(entry, TIMED_OUT);
   }, options.timeoutMs);
   timer.unref();
-  const entry: Entry = { sessionId: input.sessionId, requestId, activity, toolInput: input.toolInput, settle, timer };
+  const shape = terminalShapeOf(input.toolName, input.toolInput);
+  const entry: Entry = { sessionId: input.sessionId, requestId, activity, shape, toolInput: input.toolInput, settle, timer };
   ledger.add(entry);
-  return { requestId, kind: activity.kind, answer };
+  return { requestId, kind: activity.kind, activity, answer };
 }
 
-function expireWhere(ledger: Ledger, sessionId: string, matches: (entry: Entry) => boolean): void {
-  for (const entry of ledger.entriesOf(sessionId).filter((e) => isPending(e) && matches(e))) ledger.finish(entry, EXPIRED);
+function expireWhere(ledger: Ledger, sessionId: string, matches: (entry: Entry) => boolean, open: (entry: Entry) => boolean): void {
+  for (const entry of ledger.entriesOf(sessionId).filter((e) => open(e) && matches(e))) ledger.finish(entry, EXPIRED);
+}
+
+function handedOffEntry(ledger: Ledger, sessionId: string, requestId: string): Entry | null {
+  return ledger.entriesOf(sessionId).find((entry) => entry.requestId === requestId && isHandedOff(entry)) ?? null;
+}
+
+function handedOffView(entry: Entry | null): HandedOff | null {
+  return entry === null ? null : { activity: entry.activity, shape: entry.shape, typable: entry.activity.typable === true };
+}
+
+function markReach(ledger: Ledger, sessionId: string, requestId: string, reach: TerminalReach): void {
+  const entry = handedOffEntry(ledger, sessionId, requestId);
+  if (entry === null) return;
+  const typable = canType(entry.shape, reach);
+  if (entry.activity.typable === typable) return;
+  entry.activity = { ...entry.activity, typable };
+  ledger.republish(entry);
 }
 
 /** A permission request is for this tool call when it names the tool, carries the same input and was asked right then. */
@@ -184,27 +220,26 @@ export function createBroker(options: BrokerOptions): Broker {
   const ledger = createLedger(options.bus);
   return {
     ask: (input): AskHandle => startRequest(ledger, options, input),
-    decide(sessionId, requestId, decision): void {
+    decide: (sessionId, requestId, decision): void => {
       const entry = ledger.findPending(sessionId, requestId);
       requireKind(entry, "permission");
       ledger.finish(entry, DECISION_ANSWERS[decision]);
     },
-    answer(sessionId, requestId, option): void {
+    answer: (sessionId, requestId, option): void => {
       const entry = ledger.findPending(sessionId, requestId);
       checkOption(requireKind(entry, "question").options, option);
       ledger.finish(entry, { state: "answered", option });
     },
-    cancelSession: (sessionId): void => {
-      ledger.expire(ledger.entriesOf(sessionId));
-    },
-    cancelRequest: (sessionId, requestId): void => {
-      expireWhere(ledger, sessionId, (entry) => entry.requestId === requestId);
-    },
-    toolFinished: (sessionId, call): void => {
-      expireWhere(ledger, sessionId, (entry) => isCallOf(entry, call));
-    },
+    cancelSession: (sessionId): void => { ledger.expire(ledger.entriesOf(sessionId)); },
+    // The hook connection also closes after a time-out hand-off, so only a pending request is moot here.
+    cancelRequest: (sessionId, requestId): void => { expireWhere(ledger, sessionId, (entry) => entry.requestId === requestId, isPending); },
+    toolFinished: (sessionId, call): void => { expireWhere(ledger, sessionId, (entry) => isCallOf(entry, call), isOpen); },
     activities: (sessionId): Activity[] => ledger.entriesOf(sessionId).map((entry) => entry.activity),
     pendingKind: (sessionId): PendingKind | null => ledger.entriesOf(sessionId).find(isPending)?.activity.kind ?? null,
+    handedOff: (sessionId, requestId): HandedOff | null => handedOffView(handedOffEntry(ledger, sessionId, requestId)),
+    markReach: (sessionId, requestId, reach): void => {
+      markReach(ledger, sessionId, requestId, reach);
+    },
     close(): void {
       for (const entries of ledger.all()) ledger.expire(entries);
     },

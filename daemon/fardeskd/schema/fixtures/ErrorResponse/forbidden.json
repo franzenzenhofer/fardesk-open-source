@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "This device is not allowed to pair with this computer"
+  }
+}

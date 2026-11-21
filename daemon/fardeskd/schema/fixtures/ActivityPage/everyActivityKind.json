@@ -138,6 +138,58 @@
       "ts": "2026-11-14T09:09:00.000Z",
       "kind": "system",
       "text": "Session resumed"
+    },
+    {
+      "id": "act_0016",
+      "ts": "2026-11-14T09:10:00.000Z",
+      "kind": "question",
+      "requestId": "req_a5",
+      "text": "Which export format should I use?",
+      "options": [
+        "PNG",
+        "JPEG"
+      ],
+      "state": "terminal",
+      "typable": true
+    },
+    {
+      "id": "act_0017",
+      "ts": "2026-11-14T09:10:30.000Z",
+      "kind": "question",
+      "requestId": "req_a6",
+      "text": "Which export format should I use?",
+      "options": [
+        "PNG",
+        "JPEG"
+      ],
+      "state": "terminal",
+      "typable": false
+    },
+    {
+      "id": "act_0018",
+      "ts": "2026-11-14T09:11:00.000Z",
+      "kind": "permission",
+      "requestId": "req_b5",
+      "tool": "Bash",
+      "title": "Run swift test",
+      "summary": "swift test --parallel",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "state": "terminal",
+      "typable": true
+    },
+    {
+      "id": "act_0019",
+      "ts": "2026-11-14T09:11:30.000Z",
+      "kind": "permission",
+      "requestId": "req_b6",
+      "tool": "Bash",
+      "title": "Run swift test",
+      "summary": "swift test --parallel",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "state": "terminal",
+      "typable": false
     }
   ],
   "nextBefore": "act_0001"

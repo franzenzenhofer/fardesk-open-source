@@ -1,6 +1,6 @@
 import Foundation
 
-/// What a `fardesk://pair` link carries. Current links hold a one-time `code` (valid 10 minutes) that is
+/// What a `fardesk://pair` link carries. Current links hold a one-time `code` (valid 2 minutes) that is
 /// exchanged for a device token; links from older daemons hold the machine's permanent `token` instead.
 public struct PairingPayload: Codable, Sendable, Hashable {
     public let v: ContractVersion

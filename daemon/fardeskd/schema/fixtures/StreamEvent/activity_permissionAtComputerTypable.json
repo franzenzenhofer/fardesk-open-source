@@ -1,0 +1,17 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "act_0018",
+    "ts": "2026-11-14T09:11:00.000Z",
+    "kind": "permission",
+    "requestId": "req_b5",
+    "tool": "Bash",
+    "title": "Run swift test",
+    "summary": "swift test --parallel",
+    "cwd": "/Users/dev/smear-studio",
+    "destructive": false,
+    "state": "terminal",
+    "typable": true
+  }
+}

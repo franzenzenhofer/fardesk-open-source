@@ -57,9 +57,14 @@ export async function inspectTailscale(command: string, run: RunCommand): Promis
  * Resolves the command once: the first candidate that reaches a Tailscale daemon is kept for good and
  * named in one log line. While none does, the best answer so far (unreachable beats not installed) is returned.
  */
-export function createTailscaleProbe(commands: string[], run: RunCommand, log: (line: string) => void): () => Promise<TailscaleState> {
+export type TailscaleProbe = (() => Promise<TailscaleState>) & {
+  /** The command a probe settled on, or null while none reached a daemon. */
+  command: () => string | null;
+};
+
+export function createTailscaleProbe(commands: string[], run: RunCommand, log: (line: string) => void): TailscaleProbe {
   let chosen: string | null = null;
-  return async (): Promise<TailscaleState> => {
+  const probe = async (): Promise<TailscaleState> => {
     if (chosen !== null) return inspectTailscale(chosen, run);
     let best: TailscaleState = { kind: "not-installed" };
     for (const command of commands) {
@@ -74,6 +79,7 @@ export function createTailscaleProbe(commands: string[], run: RunCommand, log: (
     }
     return best;
   };
+  return Object.assign(probe, { command: (): string | null => chosen });
 }
 
 /** Short form for "waiting for Tailscale: <label>" log lines. */

@@ -28,7 +28,7 @@ export function createApp(services: Services, log?: Logger, hub?: HubWiring | nu
     return next();
   });
   registerRoutes(app, services, hub === undefined || hub === null ? {} : hubRouteHooks(hub.hub));
-  if (hub !== undefined && hub !== null) registerHubRoutes(app, hub.hub, hub.config);
+  if (hub !== undefined && hub !== null) registerHubRoutes(app, hub.hub, hub.config, services.auth);
   app.notFound((c) => c.json(errorBody("not_found", `no route ${c.req.method} ${c.req.path}`), 404));
   app.onError((error, c) => {
     if (error instanceof FardeskError) return c.json(errorBody(error.code, error.message), HTTP_STATUS[error.code] as ContentfulStatusCode);

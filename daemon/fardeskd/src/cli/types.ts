@@ -20,6 +20,8 @@ export type CliDeps = {
   /** Tailscale commands to try in order (default: the one on PATH, plus the Mac app's own on macOS). */
   tailscaleCommands?: string[];
   tailnetTiming?: TailnetTiming;
+  /** `fardeskd pair`: how often it asks the daemon whether the window is still open (default 1 second). */
+  pairPollMs?: number;
 };
 
 export type CommandContext = {

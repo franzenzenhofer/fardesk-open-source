@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CONFIG_DEFAULTS } from "../config/config.js";
 import { buildHookCommand, buildHookEntries, HOOK_MARKER } from "./command.js";
 
 describe("buildHookCommand", () => {
@@ -30,6 +31,12 @@ describe("buildHookEntries", () => {
         hooks: [{ type: "command", command: buildHookCommand("/tmp/h.sock", 125), timeout: 130 }],
       },
     ]);
+  });
+
+  it("follows the configured permission window: the default of 15 minutes gives 905 s for curl and 910 s for the hook", () => {
+    expect(CONFIG_DEFAULTS.permissionTimeoutSeconds).toBe(900);
+    const defaults = buildHookEntries({ socketPath: "/tmp/h.sock", permissionTimeoutSeconds: CONFIG_DEFAULTS.permissionTimeoutSeconds });
+    expect(defaults["PermissionRequest"]).toEqual([{ hooks: [{ type: "command", command: buildHookCommand("/tmp/h.sock", 905), timeout: 910 }] }]);
   });
 
   it("makes the other three async with a 0.25 s curl limit and no matcher", () => {

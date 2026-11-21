@@ -31,7 +31,7 @@ async function askBroker(deps: HookHandlerDeps, event: HookEvent, closed: AbortS
   else closed.addEventListener("abort", cancel, { once: true });
   const answer = await handle.answer;
   // The broker gave up waiting: Claude Code now shows its own dialog in the terminal. Say so once.
-  if (answer.state === "expired" && answer.timedOut === true) deps.notifier.handOff(sessionId, handle.kind);
+  if (answer.state === "expired" && answer.timedOut === true) deps.notifier.handOff(sessionId, handle.activity);
   return { output: toHookOutput(answer, { toolName, toolInput, suggestions: event.permissionSuggestions }) };
 }
 

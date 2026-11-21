@@ -39,7 +39,7 @@ type Config = {            // zod: configSchema, strict
   stateDir: string         // default "~/.local/state/fardesk": hook socket, state file, logs
   models: string[]         // offered in New Session
   intervals: { registryPollMs: number; transcriptPollMs: number; pingMs: number }
-  permissionTimeoutSeconds: number
+  permissionTimeoutSeconds: number   // default 900 (15 minutes); install-hooks derives the hook timeouts from it: curl -m = value + 5, hook "timeout" = value + 10
   activityPageLimit: { default: number; max: number }
   detail: { maxOutputLines: number }
   summaryMaxChars: number
@@ -95,9 +95,26 @@ type Broker = {
   toolFinished(sessionId: string, call: FinishedToolCall): void  // the transcript holds that call's result; matches tool name + exact input
 }
 // A request that ends by the timeout answers { state: "expired", timedOut: true }: the hook handler then sends ONE
-// "Still waiting: answer at the computer" push (category TERMINAL; generic text in generic-push mode; same collapse id as the
+// "Still waiting at the computer: <what the dialog asks>" push (category TERMINAL; the question, or `Tool: short input summary`,
+// cut to 160 characters; generic text in generic-push mode; same collapse id as the
 // request push of that kind and sent as that kind, so the device swaps the stale Allow/Deny notification), and the
 // session stays in the terminal waiting state (`waitingFor: terminal`) until the registry leaves `waiting` or the process ends. A Stop of the main thread does NOT clear it on purpose: a subagent can still sit at the dialog while the main thread finishes turns.
+// The request's activity stays in the feed with `state: "terminal"` (question text and options, or tool and summary), and
+// `typable` says whether the phone can still answer it (below). It ends (`expired`) when the session leaves its wait.
+//
+// Answering a handed-off request (`POST .../answer/:qid`, `POST .../permission/:rid` as before; `typable: true` only):
+// the daemon finds the session's terminal (tmux pane, else Ghostty terminal; the same lookup as replies) and types
+//   - AskUserQuestion, exactly one question, not multi-select, 1 to 9 options with distinct labels: the option's number
+//     (1-based, in the order Claude Code lists them). In a tmux pane the digit is sent alone; if the dialog is still open
+//     after 700 ms the daemon also presses Enter. In Ghostty the digit and Enter go in one step (the existing type script).
+//   - permission of Bash, Edit, Write, MultiEdit, NotebookEdit, WebFetch or an MCP tool (the plain "Do you want to proceed?"
+//     dialog), tmux pane only: Allow = `1` (the first option is "Yes"), Deny = Escape (cancels the dialog). "Always allow"
+//     is refused: its option number depends on the suggestions the dialog shows.
+// Relied-on behaviour of Claude Code's terminal dialogs (its own documented key handling, not checked against a live
+// dialog in the tests, which use a plain pane that records the keys): numbered options select with their digit, the first
+// permission option is "Yes", Escape rejects. Anything else (several questions, multi-select, plan approval, unknown
+// tools, no typable terminal) has `typable: false`: the app shows the text and "Answer at the computer", and the route
+// answers 409. The answer counts as delivered when the session leaves `waiting`; otherwise the route answers 409.
 
 // src/owned/*
 function createOwnedRunner(deps): OwnedRunner
@@ -204,7 +221,7 @@ POST /v1/auth/reload                                   -> OkResult      (CLI hoo
 POST /v1/homes/reload                                  -> { homes: string[] } (CLI hook of `homes add`: re-read claudeHomes from the config file, no restart)
 ```
 
-Errors: `ErrorResponse` with status 401 (`unauthorized`, `token_revoked`), 404, 400, 409, 429 (`rate_limited`), 501, 500.
+Errors: `ErrorResponse` with status 401 (`unauthorized`, `token_revoked`), 403 (`forbidden`, pairing from a device of another tailnet user), 404, 400, 409, 429 (`rate_limited`), 501, 500.
 Bearer: the config `token` (pairing/master, device id `master`) or a device token from the registry. A revoked
 device token answers 401 `token_revoked`; anything unknown 401 `unauthorized`.
 WebSocket auth: `Authorization: Bearer` header on the upgrade request; a revoked token gets 401 with the same
@@ -336,12 +353,26 @@ Every default below is the safe one; each is a key in `config.json` and can be t
 | `coordinator.fullTools` | `false` | Built-in tools limited to Read and Grep (plus the fardesk tools, pre-approved). `true` = every tool. |
 | `coordinator.mayApprove` | `false` | `answer_request` refuses `allow` and `allow_always` (deny still works). The system prompt always says session output is untrusted data. |
 | `push.content` | `"generic"` | APNs payload says "Fardesk" and "A session on <machine> needs you / is done / has ended". `"full"` adds titles, summaries and assistant text. |
+| `pairing.allowedUsers` | `[]` | Tailnet login names (other than this computer's user) whose devices may pair. Advanced, for families and teams. |
+| `pairing.allowedTags` | `[]` | Tags (e.g. `tag:ci`) whose devices may pair; tagged devices are refused otherwise. |
 | `bind.allowNonTailnet` | `false` | Start only on `tailscale`, loopback or 100.64.0.0/10. Any other address needs `tls` and this flag. |
 
-Pairing: `fardeskd pair` asks the running daemon for a one-time code (`POST /v1/auth/pair-code`, master token only; 32 random
-bytes, held hashed in memory, valid 10 minutes, single use). The link carries `{v, name, url, code, hub}`, never the master token.
-The app exchanges it at `POST /v1/auth/pair` (no bearer, rate limited like login) for a device token of its own. Old links with
-`token` still work in the app. `fardeskd rotate-token` replaces the master token (`POST /v1/auth/rotate-token`, master only); device
+Pairing: `fardeskd pair` opens a pairing window in the running daemon (`POST /v1/auth/pair-code`, master token only): one open code at a time (32 random
+bytes, held hashed in memory, compared in constant time), valid 2 minutes, single use; a new window cancels the open one. The window stays open only while
+`fardeskd pair` runs (it polls `GET /v1/auth/pair-window`; no poll for 10 seconds, Ctrl-C or the end of the command closes it, `POST /v1/auth/pair-window/close`).
+Five wrong codes close it, write a `pairing_locked` audit line and make the command exit non-zero; with no window open every pairing request is refused. When a device
+pairs, the command prints its name, its tailnet device name and the `fardeskd revoke` command. The fifth wrong code writes two audit lines:
+`login_failed` from the rate limiter (429) and `pairing_locked`. When a hub forwards a pairing to a peer, the peer sees the hub as the caller, so
+the command on the peer prints the hub's tailnet device. The link carries `{v, name, url, code, hub}`, never the master token.
+The app exchanges it at `POST /v1/auth/pair` (no bearer, rate limited like login) for a device token of its own. Before the code
+is looked at, the daemon asks the local Tailscale (`tailscale whois --json <caller address>`, and the same for its own address)
+and accepts only a device of the same tailnet and the same tailnet user as this computer. Another user, a device shared in from
+another tailnet, a tagged device, or a `whois` that fails all answer 403 `forbidden` with a fixed text (fail closed) and write an
+audit line with the caller's tailnet device name in `peer`. The same check runs on `POST /v1/auth/login` and on a pairing request a hub forwards to a peer (the peer only sees the hub's address, so the hub checks the real caller first). A caller on this computer (loopback) needs no check; a reverse proxy on this computer would make every caller look like loopback, so do not put one in front of the daemon. Advanced:
+`pairing.allowedUsers` (tailnet login names, empty by default) and `pairing.allowedTags` (e.g. `tag:ci`, empty by default) admit
+those users and tags too (an allowed login is admitted from any tailnet, shared-in devices included; `allowedTags` applies only to
+devices of this computer's own tailnet, a tag name from another tailnet means nothing here). If this computer is itself a tagged node it
+has no user login, so every untagged caller not listed in `allowedUsers` is refused (fail closed). `fardeskd rotate-token` replaces the master token (`POST /v1/auth/rotate-token`, master only); device
 tokens stay valid, and every hub that holds this machine in `coordinator.peerTokens` must be given the new token.
 
 Attachments: a `content-length` is required, the body is read as a stream and cut off at 20 MB, 200 MB per session in total,

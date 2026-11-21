@@ -1,12 +1,16 @@
 // The one facade the server and the CLI talk to.
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createDeviceRegistry, REGISTRY_FILE } from "../auth/deviceRegistry.js";
 import { createAuditLog } from "../audit/store.js";
+import type { AuditLog } from "../audit/store.js";
 import { createAuthService } from "../auth/service.js";
+import type { AuthService } from "../auth/service.js";
 import type { RunCommand, RunWithInput } from "../config/bind.js";
 import { runCommand, runCommandWithInput } from "../config/bind.js";
 import type { Config } from "../config/config.js";
-import type { ActivityPage, GhosttyAutomation } from "../contract/schema.js";
+import { MAC_APP_CLI, tailscaleCommandsFor } from "../config/tailscale.js";
+import type { ActivityPage, GhosttyAutomation, Machine } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import { createLogger, stderrSink } from "../core/log.js";
 import type { Logger } from "../core/log.js";
@@ -19,6 +23,8 @@ import { createAttachmentStore, type AttachmentStore } from "../attachments/stor
 import { createTelemetryStore } from "../telemetry/store.js";
 import { createGhostty, type Ghostty } from "../foreign/ghostty.js";
 import { createActions } from "./actions.js";
+import { createTerminalAnswers, watchHandOffs } from "./terminalAnswer.js";
+import type { TerminalAnswers } from "./terminalAnswer.js";
 import { createTypableWatch } from "./typable.js";
 import type { TerminalDeps } from "./terminal.js";
 import { createCore } from "./core.js";
@@ -126,14 +132,10 @@ function intake(config: Config, { store, pauseStore }: Core, attachments: Attach
   };
 }
 
-function writes({ broker, store, devices, muteStore, labelStore }: Core): Writes {
+function writes({ store, devices, muteStore, labelStore }: Core, terminalAnswers: TerminalAnswers): Writes {
   return {
-    decide: (sessionId, requestId, decision): void => {
-      broker.decide(sessionId, requestId, decision);
-    },
-    answer: (sessionId, requestId, option): void => {
-      broker.answer(sessionId, requestId, option);
-    },
+    decide: async (sessionId, requestId, decision) => terminalAnswers.decide(sessionId, requestId, decision),
+    answer: async (sessionId, requestId, option) => terminalAnswers.answer(sessionId, requestId, option),
     mute(sessionId, muted): void {
       store.get(sessionId);
       muteStore.set(sessionId, muted);
@@ -150,6 +152,24 @@ function writes({ broker, store, devices, muteStore, labelStore }: Core): Writes
   };
 }
 
+type AuthParts = { config: Config; options: ServiceOptions; core: Core; machine: () => Machine; run: RunCommand; log: Logger; audit: AuditLog };
+
+function authFor({ config, options, core, machine, run, log, audit }: AuthParts): AuthService {
+  return createAuthService({
+    config,
+    configPath: options.configPath,
+    registry: createDeviceRegistry({ path: join(config.stateDir, REGISTRY_FILE), now: () => new Date() }),
+    pushDevices: core.devices,
+    apns: core.apns,
+    machine,
+    run,
+    tailscaleCommands: options.tailscaleCommands ?? tailscaleCommandsFor(process.platform, existsSync(MAC_APP_CLI)),
+    log,
+    audit,
+    now: () => Date.now(),
+  });
+}
+
 export async function createServices(config: Config, options: ServiceOptions): Promise<Services> {
   const log = options.log ?? createLogger(stderrSink, () => new Date());
   const run: RunCommand = options.run ?? runCommand;
@@ -162,19 +182,13 @@ export async function createServices(config: Config, options: ServiceOptions): P
     const ghostty = startTerminals({ config, core, io: { run, runWithInput, log }, closers });
     const actions = createActions({ config, store: core.store, owned: core.owned, run, runWithInput, attachments, ghostty, log });
     const close = async (): Promise<void> => runClosers(closers);
+    const terminalAnswers = createTerminalAnswers({ config, store: core.store, owned: core.owned, run, runWithInput, attachments, ghostty, log }, core.broker);
+    closers.push(watchHandOffs(core, terminalAnswers, log));
     const read = reads(config, core, { facts, ghostty });
-    const auth = createAuthService({
-      config,
-      configPath: options.configPath,
-      registry: createDeviceRegistry({ path: join(config.stateDir, REGISTRY_FILE), now: () => new Date() }),
-      pushDevices: core.devices,
-      apns: core.apns,
-      machine: read.machine,
-      log,
-      now: () => Date.now(),
-    });
-    const base = { ...read, ...actions, ghosttyProbe: async (): Promise<GhosttyAutomation> => ghostty.probe(), ...intake(config, core, attachments), ...ownedActions(core), ...reach(config, core), ...writes(core), reloadHomes: (): { homes: string[] } => reloadHomes(config, options.configPath, core.store) };
-    return { bus: core.bus, auth, audit: createAuditLog({ stateDir: config.stateDir }), ...base, ...coordinate(config, core, base), close };
+    const audit = createAuditLog({ stateDir: config.stateDir });
+    const auth = authFor({ config, options, core, machine: read.machine, run, log, audit });
+    const base = { ...read, ...actions, ghosttyProbe: async (): Promise<GhosttyAutomation> => ghostty.probe(), ...intake(config, core, attachments), ...ownedActions(core), ...reach(config, core), ...writes(core, terminalAnswers), reloadHomes: (): { homes: string[] } => reloadHomes(config, options.configPath, core.store) };
+    return { bus: core.bus, auth, audit, ...base, ...coordinate(config, core, base), close };
   } catch (error) {
     await runClosers(closers);
     throw error;

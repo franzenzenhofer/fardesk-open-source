@@ -9,6 +9,7 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   internal: 500,
   token_revoked: 401,
   rate_limited: 429,
+  forbidden: 403,
   machine_offline: 503,
 };
 
