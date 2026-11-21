@@ -8,6 +8,19 @@ The daemon, the app and the command-line tool share one version and are updated 
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-21
+
+### Fixed
+- The daemon no longer waits forever for a tool that hangs: every external command (ps, tailscale, osascript, tmux)
+  has a hard deadline, and concurrent reads of the process table share one call. A slow or stuck `ps` used to pile
+  up until the computer ran out of processes, and the machine then looked offline in the app.
+- Finding Claude homes reads the environment of `claude` processes only, never of other programs.
+- Sessions in the system temp folder (tests, scripts) are not listed and send no notifications.
+- The session list stays still while you use the app: going back from a chat never reorders it. The freshest
+  chats move up when you come back after at least two minutes away, or when you pull to refresh. A session that
+  needs you, a new session and pin changes show at once. Opening or switching a chat lands at the newest message.
+- Delivery marks: one check for sent, two checks when Claude has the message.
+
 ## [2.0.0] - 2026-11-21
 
 ### Changed

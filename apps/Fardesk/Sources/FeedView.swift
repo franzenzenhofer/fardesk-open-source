@@ -9,6 +9,8 @@ struct FeedView: View {
     private static let bottomID = "feed-bottom"
     /// Only this close to the end counts as "at the bottom": reading a little higher up must never be pulled down.
     private static let nearBottomDistance = 24.0
+    /// When the landing passes run after a session opens (see `land`).
+    private static let landingDelays: [Duration] = [.milliseconds(60), .milliseconds(120), .milliseconds(250)]
 
     private struct Position: Equatable {
         var isNearBottom = true
@@ -73,7 +75,13 @@ struct FeedView: View {
             }
             .onChange(of: model.sendSignal) { scrollToBottom(proxy) }
             .onChange(of: feed.blocks.last?.id) { hasLanded ? rowsChanged() : land(proxy) }
-            .onAppear { if !feed.blocks.isEmpty { land(proxy) } }
+            // Every other session (a new ref) opens at its newest row, also when this view was reused for it
+            // (the split view detail, the Coordinator) and also for a chat opened and scrolled up before.
+            .task(id: ref) {
+                hasLanded = false
+                hasNewActivity = false
+                if !box.feed.blocks.isEmpty { land(proxy) }
+            }
             .overlay(alignment: .bottom) {
                 if FeedPinning.pillVisible(
                     hasNewActivity: hasNewActivity, isNearBottom: position.isNearBottom, contentFitsViewport: position.fitsViewport
@@ -96,11 +104,15 @@ struct FeedView: View {
 
     /// Opens at the newest row, also when the rows arrive after the screen appeared (the initial anchor only covers
     /// rows that are there at the first layout). One layout pass later, so the rows have a size.
+    /// Several passes: a LazyVStack only estimates the height of rows it has not laid out, so the first jump can
+    /// stop short of the real end; each pass after the rows got their size corrects it, without animation.
     private func land(_ proxy: ScrollViewProxy) {
         hasLanded = true
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(60))
-            jumpToBottom(proxy)
+            for delay in Self.landingDelays {
+                try? await Task.sleep(for: delay)
+                jumpToBottom(proxy)
+            }
         }
     }
 

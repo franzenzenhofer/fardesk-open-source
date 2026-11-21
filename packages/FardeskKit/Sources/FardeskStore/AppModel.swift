@@ -232,8 +232,15 @@ public final class AppModel {
         Task { await flushTelemetry() }
     }
 
-    /// Re-reads machines and sessions over HTTP, for pull to refresh.
+    /// The app became active or went away. The session list order is held during active use; coming back after a
+    /// pause of `ReturnAfterPause.refreshAfterAbsence` applies the moves held meanwhile. `now` is injected.
+    public func noteActivity(_ activity: AppActivity, at now: Date = Date()) {
+        state.noteActivity(activity, at: now)
+    }
+
+    /// Re-reads machines and sessions over HTTP, for pull to refresh; held row moves are applied after it.
     public func refresh() async {
+        defer { state.releaseHeldOrder() }
         if isHubMode { await pollHub() }
         let endpoints = machines.endpoints
         let answers = await withTaskGroup(of: (MachineEndpoint, Result<StreamEvent, any Error>).self) { group in

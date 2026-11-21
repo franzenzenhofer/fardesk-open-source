@@ -247,7 +247,7 @@ final class FardeskUITests: XCTestCase {
         tapAndMeasure("send", app, send, key: "send.pending")
         XCTAssertLessThanOrEqual(app.descendants(matching: .any).matching(identifier: "pending-message").count, 1, "one message, not two")
         // Claude may answer before the test looks again: the pending row is then already the real row, marked "Claude got it".
-        let gotIt = app.staticTexts["Claude got it"]
+        let gotIt = app.descendants(matching: .any)["Claude got it"]
         XCTAssertTrue(gotIt.waitForExistence(timeout: 60), "the message never became \"Claude got it\"")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == 'Reply only: ok'")).count, 2, "the first prompt and the reply: two rows, not three")
         shot("sent")
@@ -285,7 +285,7 @@ final class FardeskUITests: XCTestCase {
         card.buttons["Resume"].tap()
         XCTAssertTrue(NSPredicate(format: "exists == false").evaluate(with: card) || !card.waitForExistence(timeout: 1))
         // Claude may answer before the test looks again: the pending row is then already the real row, marked "Claude got it".
-        XCTAssertTrue(app.staticTexts["Claude got it"].waitForExistence(timeout: 60), "the message went on after the choice and Claude got it")
+        XCTAssertTrue(app.descendants(matching: .any)["Claude got it"].waitForExistence(timeout: 60), "the message went on after the choice and Claude got it")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == 'Reply only: ok'")).count, 2, "sent once: the first prompt and the reply")
         shot("after Resume")
     }

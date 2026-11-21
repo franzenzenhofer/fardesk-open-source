@@ -20,8 +20,21 @@ export function parseProcessTable(output: string): ProcessTable {
   return table;
 }
 
+// One read of the process table at a time per runner: callers that arrive while a read runs share its answer instead
+// of starting another `ps`. On 2026-11-21 an overloaded machine made each `ps` take minutes, every poll started a new
+// one, and thousands piled up. Only this read-only query is shared; commands with side effects never are.
+const inFlight = new WeakMap<RunCommand, Promise<ProcessTable>>();
+
 export async function readProcessTable(run: RunCommand): Promise<ProcessTable> {
-  return parseProcessTable(await run("ps", ["-A", "-o", "pid=,ppid=,tty=,comm="]));
+  const running = inFlight.get(run);
+  if (running !== undefined) return running;
+  const read = run("ps", ["-A", "-o", "pid=,ppid=,tty=,comm="])
+    .then(parseProcessTable)
+    .finally(() => {
+      inFlight.delete(run);
+    });
+  inFlight.set(run, read);
+  return read;
 }
 
 /** Executable name without path and without the leading dash of a login shell. */

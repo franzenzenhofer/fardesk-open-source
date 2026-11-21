@@ -2,10 +2,12 @@ import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTempDir } from "../../test/support/env.js";
+import { fakePs as psOf, type PsCall } from "../../test/support/fakePs.js";
 import { canonicalPath, configDirsOfRunningClaude, discoverClaudeHomes, hasClaudeLayout } from "./discover.js";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const noProcesses = (): Promise<string> => Promise.resolve("");
+
 
 function homeWithRegistry(dir: string): string {
   mkdirSync(join(dir, "sessions"), { recursive: true });
@@ -60,12 +62,22 @@ describe("discoverClaudeHomes", () => {
       `  104 /bin/zsh CLAUDE_CONFIG_DIR=${join(home, "from-a-shell")}`,
       `  105 /usr/local/bin/claude CLAUDE_CONFIG_DIR=${join(home, "deleted-home")}`,
       "  106 /usr/local/bin/claude TERM=xterm",
-    ].join("\n");
-    const found = await discoverClaudeHomes({ home, run: () => Promise.resolve(ps) });
+    ];
+    const calls: PsCall[] = [];
+    const found = await discoverClaudeHomes({ home, run: psOf(ps, calls) });
     expect(found).toEqual([
       { path: elsewhere, sources: ["process"] },
       { path: inHome, sources: ["folder", "process"] },
     ].sort((a, b) => a.path.localeCompare(b.path)));
+    // environments are read for the claude processes only, never for the shell (104)
+    expect(calls.at(-1)?.args.at(-1)).toBe("101,102,103,105,106");
+  });
+
+  it("reads no environment at all when no claude process runs", async () => {
+    const calls: PsCall[] = [];
+    expect(await configDirsOfRunningClaude(psOf(["  201 /bin/zsh HOME=/x", "  202 /Applications/Browser"], calls))).toEqual([]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.args).not.toContain("eww");
   });
 
   it("finds a home that is a symlinked folder and merges it with the process that names its target", async () => {
@@ -73,14 +85,14 @@ describe("discoverClaudeHomes", () => {
     const target = homeWithRegistry(join(makeTempDir(), "real-home"));
     const link = join(home, ".claude-linked");
     symlinkSync(target, link);
-    const found = await discoverClaudeHomes({ home, run: () => Promise.resolve(`  101 /usr/local/bin/claude CLAUDE_CONFIG_DIR=${target}`) });
+    const found = await discoverClaudeHomes({ home, run: psOf([`  101 /usr/local/bin/claude CLAUDE_CONFIG_DIR=${target}`]) });
     expect(found).toEqual([{ path: link, sources: ["folder", "process"] }]);
     expect(canonicalPath(link)).toBe(canonicalPath(target));
   });
 
   it("scans no folder when there is no home folder, and still reads the processes", async () => {
     const elsewhere = makeTempDir();
-    const found = await discoverClaudeHomes({ home: null, run: () => Promise.resolve(`  101 /usr/local/bin/claude CLAUDE_CONFIG_DIR=${elsewhere}`) });
+    const found = await discoverClaudeHomes({ home: null, run: psOf([`  101 /usr/local/bin/claude CLAUDE_CONFIG_DIR=${elsewhere}`]) });
     expect(found).toEqual([{ path: elsewhere, sources: ["process"] }]);
   });
 

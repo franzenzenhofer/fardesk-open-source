@@ -48,3 +48,22 @@ export function sandboxAllowsDefaultServer(binary: string): boolean {
 export function sandboxAllowsSocket(path: string): boolean {
   return root() === null || basename(path).startsWith(SANDBOX_TMUX_PREFIX);
 }
+
+/**
+ * Under the sandbox a daemon ends when the process that started it is gone. A test run that is killed (a timeout, an
+ * agent stopping it) never runs its teardown, and its daemons used to live on: 154 of them on 2026-11-21, each still
+ * polling and spawning tools. Outside the sandbox nothing is watched. Returns a function that stops the watch.
+ */
+export function endWithParent(parentPid: () => number, onGone: () => void, everyMs: number): () => void {
+  if (root() === null) return () => undefined;
+  const first = parentPid();
+  const timer = setInterval(() => {
+    if (parentPid() === first) return;
+    clearInterval(timer);
+    onGone();
+  }, everyMs);
+  timer.unref();
+  return () => {
+    clearInterval(timer);
+  };
+}

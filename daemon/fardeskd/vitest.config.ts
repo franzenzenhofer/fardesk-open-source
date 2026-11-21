@@ -8,7 +8,9 @@ const COVERAGE_FLOOR = 90;
 export default defineConfig({
   test: {
     // Every delivery (inbox socket, tmux, osascript) must stay inside the temp dir: see src/core/sandbox.ts.
-    env: { FARDESK_TEST_SANDBOX: realpathSync(tmpdir()) },
+    // Test homes and folders live in the temp dir, which production treats as automation: point the automation
+    // roots at a folder no test uses, so the suites see their sessions. src/sessions/automation.test.ts sets its own.
+    env: { FARDESK_TEST_SANDBOX: realpathSync(tmpdir()), FARDESK_AUTOMATION_ROOTS: "/fardesk-test-no-automation-root" },
     include: ["src/**/*.test.ts"],
     // Many suites start real claude, tmux and daemons: with one worker per core they starve each other
     // and time out (3 timeouts on 2026-11-16 at 10 workers; every one passed alone).

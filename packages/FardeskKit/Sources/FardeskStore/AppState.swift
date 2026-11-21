@@ -36,7 +36,8 @@ public struct AppState: Equatable, Sendable {
     /// Follows a changed machine list: keeps the state of machines still present, adds new ones.
     public mutating func sync(endpoints: [MachineEndpoint]) {
         let kept = endpoints.map { endpoint in
-            machines.first { $0.endpoint == endpoint } ?? MachineState(endpoint: endpoint)
+            if let known = machines.first(where: { $0.endpoint == endpoint }) { return known }
+            return MachineState(endpoint: endpoint)
         }
         machines = MachineOrdering.sorted(kept, preferred: machineOrder)
     }
@@ -45,6 +46,22 @@ public struct AppState: Equatable, Sendable {
     private mutating func reorder() {
         let ordered = MachineOrdering.sorted(machines, preferred: machineOrder)
         if ordered.map(\.id) != machines.map(\.id) { machines = ordered }
+    }
+
+    private var pause = ReturnAfterPause()
+    /// Machines whose next hello (the fresh state after coming back) must also apply the held order.
+    private var releaseOnNextHello = Set<UUID>()
+
+    public mutating func releaseHeldOrder() {
+        for index in machines.indices { machines[index].releaseHeldOrder() }
+    }
+
+    /// The app became active or went away. Coming back after a pause applies the held moves now and again with
+    /// each machine's next hello; any shorter absence changes nothing.
+    public mutating func noteActivity(_ activity: AppActivity, at time: Date) {
+        guard pause.note(activity, at: time) else { return }
+        releaseHeldOrder()
+        releaseOnNextHello = Set(machines.map(\.id))
     }
 
     public mutating func restore(_ snapshot: MachineSnapshot) throws {
@@ -61,7 +78,10 @@ public struct AppState: Equatable, Sendable {
 
     public mutating func apply(_ event: StreamEvent, from machineID: UUID) throws {
         try update(machineID) { $0.apply(event) }
-        if case .hello = event { reorder() }
+        if case .hello = event {
+            if releaseOnNextHello.remove(machineID) != nil { try update(machineID) { $0.releaseHeldOrder() } }
+            reorder()
+        }
     }
 
     public mutating func markOffline(machineID: UUID, now: Date) throws {

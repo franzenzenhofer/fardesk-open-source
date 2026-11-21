@@ -7,7 +7,7 @@ import { EMPTY_SUMMARY, cacheKeyOf, diffActivities, newEntry } from "./storeEntr
 import type { StoreContext, StoreEntry } from "./storeEntry.js";
 import { readSummaryLines } from "./storeIo.js";
 import { acceptsCrossSession } from "./crossSession.js";
-import { isProcessAlive } from "./processes.js";
+import { errorCode, isProcessAlive } from "./processes.js";
 import { collectProcesses, collectTranscripts } from "./storeSources.js";
 import type { HomedProcess } from "./storeSources.js";
 import type { TranscriptRef } from "./transcriptFiles.js";
@@ -83,25 +83,42 @@ export function stopTailer(entry: StoreEntry): void {
   entry.activities = [];
 }
 
+/** A transcript that vanishes between the scan and the read (its folder was trashed) means the session is gone: null, quietly. */
+function unlessVanished<T>(read: () => T): T | null {
+  try {
+    return read();
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function syncLive(ctx: StoreContext, entry: StoreEntry, live: HomedProcess, ref: TranscriptRef | null): void {
   const { process, home } = live;
   entry.home = home;
   entry.process = process;
   entry.ref = ref;
-  if (ref !== null && entry.tailerPath !== ref.path) startTailer(ctx, entry, ref.path, process.cwd);
+  if (ref !== null && entry.tailerPath !== ref.path) {
+    const started = unlessVanished(() => { startTailer(ctx, entry, ref.path, process.cwd); return true; });
+    if (started === null) entry.ref = null;
+  }
   entry.summary ??= EMPTY_SUMMARY;
 }
 
-function syncEnded(ctx: StoreContext, entry: StoreEntry, ref: TranscriptRef, budget: { reads: number }): void {
+/** False when the transcript vanished: the session is not there any more. */
+function syncEnded(ctx: StoreContext, entry: StoreEntry, ref: TranscriptRef, budget: { reads: number }): boolean {
   entry.home = null;
   entry.process = null;
   entry.ref = ref;
   stopTailer(entry);
   const key = cacheKeyOf(ref);
-  if (key === entry.cacheKey || budget.reads <= 0) return;
+  if (key === entry.cacheKey || budget.reads <= 0) return true;
   budget.reads -= 1;
+  const lines = unlessVanished(() => readSummaryLines(ref));
+  if (lines === null) return false;
   entry.cacheKey = key;
-  entry.summary = summarise(readSummaryLines(ref), ctx.deps.summaryMaxChars);
+  entry.summary = summarise(lines, ctx.deps.summaryMaxChars);
+  return true;
 }
 
 const MISSED_POLLS_BEFORE_GONE = 2;
@@ -145,7 +162,9 @@ export function refreshStore(ctx: StoreContext): void {
   const transcripts = collectTranscripts(deps.claudeHomes, new Set(processes.keys()), deps.limits.maxEnded);
   const budget = { reads: deps.limits.maxEndedReadsPerRefresh };
   for (const [id, process] of processes) syncLive(ctx, entryFor(ctx, id), process, transcripts.get(id) ?? null);
-  for (const [id, ref] of transcripts) if (!processes.has(id)) syncEnded(ctx, entryFor(ctx, id), ref, budget);
+  for (const [id, ref] of transcripts) {
+    if (!processes.has(id) && !syncEnded(ctx, entryFor(ctx, id), ref, budget)) transcripts.delete(id);
+  }
   const gone = [...entries.values()].filter((entry) => !processes.has(entry.id) && !transcripts.has(entry.id));
   for (const entry of gone) {
     entry.process = null;

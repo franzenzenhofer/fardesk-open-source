@@ -12,7 +12,16 @@ export type DiscoverDeps = { home: string | null; run: RunCommand };
 
 const REGISTRY_FILE = /^\d+\.json$/;
 const TRANSCRIPT_FILE = /\.jsonl$/;
-const PS_ARGS = ["eww", "-x", "-o", "pid=,command="];
+const PS_ARGS = ["eww", "-o", "pid=,command="];
+/** Process names only (no environments, no arguments): safe even when some process cannot be read. */
+const PS_LIST_ARGS = ["-x", "-o", "pid=,comm="];
+
+function claudePids(listing: string): string[] {
+  return listing.split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(.+)$/.exec(line);
+    return match?.[1] !== undefined && match[2] !== undefined && basename(match[2].trim()) === CLAUDE_EXECUTABLE ? [match[1]] : [];
+  });
+}
 const CONFIG_DIR_IN_ENV = new RegExp(`(?:^|\\s)${CLAUDE_CONFIG_ENV}=(\\S+)`);
 const CLAUDE_EXECUTABLE = "claude";
 
@@ -66,7 +75,12 @@ function isClaudeCommand(command: string): boolean {
 export async function configDirsOfRunningClaude(run: RunCommand): Promise<string[]> {
   let output: string;
   try {
-    output = await run("ps", PS_ARGS);
+    // Environments are read only for claude processes: reading every process's environment hangs on any process
+    // that is stuck in uninterruptible sleep (2026-11-21: browser helpers), and other programs' environments are
+    // none of our business.
+    const pids = claudePids(await run("ps", PS_LIST_ARGS));
+    if (pids.length === 0) return [];
+    output = await run("ps", [...PS_ARGS, "-p", pids.join(",")]);
   } catch {
     return [];
   }

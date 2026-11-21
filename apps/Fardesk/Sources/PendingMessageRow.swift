@@ -19,17 +19,10 @@ struct PendingMessageRow: View {
             if !message.message.attachments.isEmpty {
                 PendingAttachmentsView(message: message).opacity(message.canRetry ? 0.6 : 1)
             }
-            HStack(spacing: 6) {
-                if message.isInFlight {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: message.symbolName).foregroundStyle(stateColor)
-                }
-                Text(message.statusLabel).font(.callout).foregroundStyle(stateColor)
-                if message.canRetry {
-                    Button("Retry") { model.retry(message.id) }.buttonStyle(.fardeskSecondary).accessibilityIdentifier("retry-button")
-                    Button("Discard") { model.discard(message.id) }.buttonStyle(.plain).font(.callout)
-                }
+            if let mark = message.deliveryMark {
+                DeliveryMarkView(mark: mark)
+            } else {
+                stateLine
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -38,6 +31,21 @@ struct PendingMessageRow: View {
         .accessibilityLabel("\(message.text). \(message.statusLabel)")
         .accessibilityIdentifier("pending-message")
         .onAppear { TapClock.finish("send.pending", model: model) }
+    }
+
+    private var stateLine: some View {
+        HStack(spacing: 6) {
+            if message.isInFlight {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: message.symbolName).font(.callout).foregroundStyle(stateColor)
+            }
+            Text(message.statusLabel).font(.callout).foregroundStyle(stateColor)
+            if message.canRetry {
+                Button("Retry") { model.retry(message.id) }.buttonStyle(.fardeskSecondary).accessibilityIdentifier("retry-button")
+                Button("Discard") { model.discard(message.id) }.buttonStyle(.plain).font(.callout)
+            }
+        }
     }
 
     private var stateColor: Color { StateColor.color(StateTone(outbox: message.state)) }

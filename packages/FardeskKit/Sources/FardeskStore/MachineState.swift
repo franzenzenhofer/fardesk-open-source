@@ -16,8 +16,9 @@ public struct MachineState: Equatable, Sendable, Identifiable {
     public private(set) var connection: ConnectionState
     public private(set) var machine: Machine?
     public private(set) var sessions: [SessionSummary] {
-        didSet { sortSessions() }
+        didSet { sortSessions(previous: oldValue) }
     }
+    private var listOrder = SessionListOrder()
     /// The sessions in list order, kept sorted here so a view body never sorts: not ended, then ended.
     public private(set) var activeSessions: [SessionSummary] = []
     public private(set) var endedSessions: [SessionSummary] = []
@@ -46,14 +47,29 @@ public struct MachineState: Equatable, Sendable, Identifiable {
     /// The most recent ended sessions a machine lists; older ones are found through the Coordinator.
     public static let endedRowLimit = 10
 
-    private mutating func sortSessions() {
-        let sorted = SessionOrdering.sorted(sessions)
+    private mutating func sortSessions(previous: [SessionSummary]) {
+        let immediate = listOrder.note(sessions, previous: previous)
+        let sorted = SessionOrdering.listOrder(sessions, sortedAt: listOrder.sortedAt)
         activeSessions = sorted.filter { $0.status != .ended }
         endedSessions = Array(sorted.filter { $0.status == .ended }.prefix(Self.endedRowLimit))
         // Pinned rows first (any status, never cut by the ended limit), then the usual order.
         let pinned = sorted.filter(\.label.pinned)
         let rest = activeSessions + endedSessions
-        listedSessions = (pinned + rest.filter { !$0.label.pinned }).filter { !$0.isCoordinatorSession }
+        let target = (pinned + rest.filter { !$0.label.pinned }).filter { !$0.isCoordinatorSession }
+        listOrder.update(target: target.map(\.id), immediate: immediate)
+        rebuildListedSessions()
+    }
+
+    private mutating func rebuildListedSessions() {
+        let byID = Dictionary(sessions.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
+        listedSessions = listOrder.shown.compactMap { byID[$0] }
+    }
+
+    /// Rows hold their place: only new rows, gone rows and rows that newly need the user (or were pinned) move.
+    /// Applies the held moves now (pull to refresh, or back after a pause).
+    public mutating func releaseHeldOrder() {
+        listOrder.release()
+        rebuildListedSessions()
     }
 
     /// Whether this event would change anything a screen shows. An unchanged poll, hello or ping must not wake

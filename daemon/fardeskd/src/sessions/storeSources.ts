@@ -1,6 +1,8 @@
 // What exists on disk right now: live processes from the registries, transcripts from the projects.
+// Automation sessions (working folder in the system temp folder) are dropped here, the one entry to the store.
 import { readClaudeRegistry } from "./claudeRegistry.js";
 import type { LiveProcess } from "./claudeRegistry.js";
+import { isAutomationCwd, isAutomationProjectDir } from "./automation.js";
 import { findTranscripts } from "./transcriptFiles.js";
 import type { TranscriptRef } from "./transcriptFiles.js";
 
@@ -10,6 +12,7 @@ export function collectProcesses(claudeHomes: readonly string[]): Map<string, Ho
   const byId = new Map<string, HomedProcess>();
   for (const home of claudeHomes) {
     for (const process of readClaudeRegistry(home).processes) {
+      if (isAutomationCwd(process.cwd)) continue;
       const known = byId.get(process.sessionId);
       if (known === undefined || known.process.updatedAt < process.updatedAt) byId.set(process.sessionId, { process, home });
     }
@@ -23,7 +26,10 @@ export function collectTranscripts(
   liveIds: ReadonlySet<string>,
   maxEnded: number,
 ): Map<string, TranscriptRef> {
-  const newestFirst = claudeHomes.flatMap(findTranscripts).sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const newestFirst = claudeHomes
+    .flatMap(findTranscripts)
+    .filter((ref) => !isAutomationProjectDir(ref.projectDir))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
   const kept = new Map<string, TranscriptRef>();
   let ended = 0;
   for (const ref of newestFirst) {

@@ -21,6 +21,7 @@ struct RootView: View {
             PlatformPush.phaseChanged(to: phase)
         }
         .onChange(of: scenePhase) { _, phase in
+            model.noteActivity(phase == .active ? .active : .away)
             guard model.phase == .ready else { return }
             if phase == .background {
                 model.stop()

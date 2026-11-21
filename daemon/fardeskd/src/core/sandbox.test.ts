@@ -1,10 +1,10 @@
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeTempDir } from "../../test/support/env.js";
 import { writePlainWrapper, writeWrapper } from "../../test/support/terminals.js";
 import { postToInbox } from "../foreign/inbox.js";
 import { listAllPanes, sendText } from "../foreign/tmux.js";
-import { assertSandboxPath, assertSandboxTmux, sandboxAllowsSocket, SANDBOX_ENV } from "./sandbox.js";
+import { assertSandboxPath, assertSandboxTmux, endWithParent, sandboxAllowsSocket, SANDBOX_ENV } from "./sandbox.js";
 
 describe("test sandbox guard (FARDESK_TEST_SANDBOX is set by vitest.config.ts)", () => {
   it("is active in the test run", () => {
@@ -56,5 +56,33 @@ describe("test sandbox guard (FARDESK_TEST_SANDBOX is set by vitest.config.ts)",
     asked.length = 0;
     await listAllPanes({ tmuxBinary: writeWrapper().binary, run });
     expect(asked.filter((args) => args[0] !== "-S")).toEqual([["list-panes", "-a", "-F", "#{pane_pid} #{pane_id}"]]);
+  });
+});
+
+describe("endWithParent", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("ends a sandboxed daemon once its parent is gone, and only then", async () => {
+    let parent = 4242;
+    let gone = 0;
+    const stop = endWithParent(() => parent, () => { gone += 1; }, 10);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(gone).toBe(0);
+    parent = 1;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(gone).toBe(1);
+    stop();
+  });
+
+  it("watches nothing outside the sandbox", async () => {
+    vi.stubEnv(SANDBOX_ENV, "");
+    let gone = 0;
+    let reads = 0;
+    const stop = endWithParent(() => { reads += 1; return reads; }, () => { gone += 1; }, 10);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect([gone, reads]).toEqual([0, 0]);
+    stop();
   });
 });

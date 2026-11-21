@@ -1,5 +1,4 @@
 // The one facade the server and the CLI talk to.
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDeviceRegistry, REGISTRY_FILE } from "../auth/deviceRegistry.js";
 import { createAuditLog } from "../audit/store.js";
@@ -33,8 +32,6 @@ const GHOSTTY_CACHE_MS = 3000;
 const GHOSTTY_TIMEOUT_MS = 15_000;
 
 type OwnedActions = Pick<Services, "resume" | "takeover" | "fork" | "newSession">;
-/** Temp folders of test runs (macOS and Linux); `tmpdir()` is added at runtime. */
-const TEMP_ROOTS = ["/tmp", "/private/tmp", "/private/var/folders", "/var/tmp"];
 
 type Reads = Pick<Services, "machine" | "sessions" | "allSessions" | "activity" | "detail" | "recentFolders">;
 type Writes = Pick<Services, "decide" | "answer" | "mute" | "label" | "registerDevice">;
@@ -83,7 +80,7 @@ function reach(config: Config, { store, notifier }: Core): Pick<Services, "searc
 
 function reads(config: Config, { broker, store }: Core, machine: { facts: MachineFacts; ghostty: Ghostty }): Reads {
   const { tidyList, listEnded, listEndedWithinDays } = config.sessions;
-  const hiddenRoots = [...TEMP_ROOTS, tmpdir(), join(config.stateDir, COORDINATOR_DIR)];
+  const hiddenRoots = [join(config.stateDir, COORDINATOR_DIR)];
   const visible = (): ReturnType<Core["store"]["list"]> =>
     tidyList ? visibleSessions(store.list(), { now: Date.now(), endedWithinDays: listEndedWithinDays, maxEnded: listEnded, hiddenRoots }) : store.list();
   return {

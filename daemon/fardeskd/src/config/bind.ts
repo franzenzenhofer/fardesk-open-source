@@ -10,26 +10,48 @@ const TAILSCALE_KEYWORD = "tailscale";
 
 export type RunWithInput = (command: string, args: string[], input: string) => Promise<string>;
 
+/**
+ * Every external tool (ps, tailscale, osascript, tmux, claude) gets a hard deadline. A tool that hangs must never hang
+ * the daemon: on 2026-11-21 `ps` hung on processes stuck in uninterruptible sleep, callers without a deadline kept
+ * waiting and new calls piled up to the per-user process limit. The deadline rejects on its own clock: a process in
+ * uninterruptible sleep ignores even SIGKILL, so waiting for its exit would hang again.
+ */
+export const COMMAND_TIMEOUT_MS = 20_000;
+
 // `input`, when given, is written to the command's stdin.
-async function execute(command: string, args: string[], input: string | null): Promise<string> {
+function execute(command: string, args: string[], input: string | null, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (finish: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      finish();
+    };
     const child = execFile(command, args, (error, stdout, stderr) => {
-      if (error === null) {
-        resolve(stdout);
-        return;
-      }
-      reject(new Error(stderr.trim() || error.message));
+      settle(() => {
+        if (error === null) resolve(stdout);
+        else reject(new Error(stderr.trim() || error.message));
+      });
     });
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      settle(() => {
+        reject(new Error(`${command} did not answer within ${timeoutMs / 1000} s`));
+      });
+    }, timeoutMs);
     if (input !== null) child.stdin?.end(input);
   });
 }
 
-export async function runCommand(command: string, args: string[]): Promise<string> {
-  return execute(command, args, null);
+export function createRunCommand(timeoutMs: number): RunCommand {
+  return async (command, args) => execute(command, args, null, timeoutMs);
 }
 
+export const runCommand: RunCommand = createRunCommand(COMMAND_TIMEOUT_MS);
+
 export async function runCommandWithInput(command: string, args: string[], input: string): Promise<string> {
-  return execute(command, args, input);
+  return execute(command, args, input, COMMAND_TIMEOUT_MS);
 }
 
 /** Only the tailnet and loopback are safe for plain-HTTP bearer tokens; anything else needs TLS and an explicit opt-in. */

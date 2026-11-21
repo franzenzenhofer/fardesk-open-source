@@ -28,6 +28,8 @@ public final class TestDaemon: @unchecked Sendable {
     public let root: URL
     let home: TestClaudeHome
     private var server: RunningProcess?
+    /// This daemon's share of the machine-wide cap (see DaemonSlot), held while the server runs.
+    private var slot: DaemonSlot?
 
     public var url: URL { URL(string: "http://127.0.0.1:\(port)")! }
 
@@ -98,13 +100,29 @@ public final class TestDaemon: @unchecked Sendable {
 
     /// Stops the daemon process (SIGTERM) and waits for it; the port and config stay for `launch`.
     public func stopServer() async {
-        guard let server else { return }
+        guard let server else { releaseSlot(); return }
         server.terminate()
         _ = await server.result()
         self.server = nil
+        releaseSlot()
+    }
+
+    private func releaseSlot() {
+        slot?.release()
+        slot = nil
     }
 
     public func launch() async throws {
+        if slot == nil { slot = await DaemonSlot.acquire() }
+        do {
+            try await launchServer()
+        } catch {
+            releaseSlot()
+            throw error
+        }
+    }
+
+    private func launchServer() async throws {
         let server = try RunningProcess(
             executable: "/usr/bin/env",
             arguments: ["node", RepoPaths.daemonMain.path, "serve", "--config", configURL.path],

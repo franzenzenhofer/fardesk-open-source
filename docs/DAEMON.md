@@ -137,6 +137,20 @@ function startServer(app, config, bus): Promise<{ close(): Promise<void>; addres
 function createServices(config: Config): Services             // wires everything above
 ```
 
+## Automation sessions (`src/sessions/automation.ts`)
+
+Sessions whose working folder is inside the system temp folder (`os.tmpdir()`, `/tmp`, `/private/tmp`,
+`/var/folders`, `/private/var/folders`, compared after resolving symlinks) are treated as automation, for
+example test runs of real Claude Code: the session store never takes them in (`storeSources.ts`), so they are
+not listed, not streamed and never cause a push. A transcript is recognised by its project folder name, which
+encodes the working folder, so it is not even read. Sessions started from the phone never run in a temp folder.
+Tests override the roots with `FARDESK_AUTOMATION_ROOTS` (a path-delimiter separated list that replaces the
+defaults); the test config points it at a folder no test uses, because test homes live in the temp folder.
+
+A transcript that disappears between the scan and the read (ENOENT, its folder was trashed) means the session is
+gone: it is dropped quietly, with no `session_refresh_failed` or `hook_handler_failed` line. Every other read
+error still fails loudly.
+
 ## Session status mapping (one function: `src/sessions/status.ts`)
 
 | Source | SessionSummary |

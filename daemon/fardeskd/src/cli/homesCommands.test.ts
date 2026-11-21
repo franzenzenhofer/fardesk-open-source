@@ -8,6 +8,7 @@ import { makeTempDir, freePort } from "../../test/support/env.js";
 import { trackHomes } from "../../test/support/trackedHomes.js";
 import { createRealOwned } from "../service/ownedFactory.js";
 import { runCli } from "./index.js";
+import { claudeProcesses, fakePs } from "../../test/support/fakePs.js";
 
 const SESSION_ID = "55555555-5555-4555-8555-555555555555";
 const tracker = trackHomes();
@@ -20,11 +21,12 @@ afterEach(async () => {
   daemon = null;
 });
 
-const psOf = (...dirs: string[]): string => dirs.map((dir, index) => `  ${100 + index} /usr/local/bin/claude TERM=xterm CLAUDE_CONFIG_DIR=${dir}`).join("\n");
+const psOf = (...dirs: string[]): string[] => claudeProcesses(...dirs);
 
-async function run(argv: string[], env: { home: string; ps: string }): Promise<{ code: number; out: string[]; err: string[] }> {
+async function run(argv: string[], env: { home: string; ps: string[] }): Promise<{ code: number; out: string[]; err: string[] }> {
   const io = captureIo({ HOME: env.home });
-  const code = await runCli(argv, io, { createOwned: createRealOwned, run: () => Promise.resolve(env.ps) });
+  const ps = fakePs(env.ps);
+  const code = await runCli(argv, io, { createOwned: createRealOwned, run: async (command, args) => (command === "ps" ? ps(command, args) : env.ps.join("\n")) });
   return { code, out: io.out, err: io.err };
 }
 
@@ -57,7 +59,7 @@ describe("homes and status", () => {
     writeFileSync(join(userHome, "lookalike", "sessions", "agenda.txt"), "");
     const listed = await run(["homes", "--config", configPath], { home: userHome, ps: psOf(configured.dir) });
     expect(listed.out).toEqual([`configured ${configured.dir}: hooks no settings file`, "no other Claude home found"]);
-    const status = await run(["status", "--config", configPath], { home: userHome, ps: "" });
+    const status = await run(["status", "--config", configPath], { home: userHome, ps: [] });
     expect(status.out.some((line) => line.includes("not configured"))).toBe(false);
   });
 });
@@ -84,7 +86,7 @@ describe("homes add", () => {
     const before = readFileSync(configPath, "utf8");
     chmodSync(other.dir, 0o500);
     try {
-      const result = await run(["homes", "add", other.dir, "--config", configPath], { home: userHome, ps: "" });
+      const result = await run(["homes", "add", other.dir, "--config", configPath], { home: userHome, ps: [] });
       expect(result.code).toBe(1);
       expect(result.err.join("\n")).toContain("could not install the hooks");
       expect(result.out.join("\n")).not.toContain("added");
@@ -98,7 +100,7 @@ describe("homes add", () => {
 
   it("installs the hooks, writes the config and says no daemon runs when none answers", async () => {
     const { configured, other, configPath, userHome } = await cliSetup();
-    const result = await run(["homes", "add", other.dir, "--config", configPath], { home: userHome, ps: "" });
+    const result = await run(["homes", "add", other.dir, "--config", configPath], { home: userHome, ps: [] });
     expect(result.code).toBe(0);
     expect(result.out.join("\n")).toContain(`${join(other.dir, "settings.json")}: changed PermissionRequest`);
     expect(result.out.at(-1)).toContain("no daemon answers");
@@ -109,7 +111,7 @@ describe("homes add", () => {
   it("changes nothing and says so for a home that is already configured", async () => {
     const { configured, configPath, userHome } = await cliSetup();
     const before = readFileSync(configPath, "utf8");
-    const result = await run(["homes", "add", configured.dir, "--config", configPath], { home: userHome, ps: "" });
+    const result = await run(["homes", "add", configured.dir, "--config", configPath], { home: userHome, ps: [] });
     expect(result).toEqual({ code: 0, out: [`${configured.dir} is already in claudeHomes: nothing changed`], err: [] });
     expect(readFileSync(configPath, "utf8")).toBe(before);
     expect(existsSync(join(configured.dir, "settings.json"))).toBe(false);
@@ -117,10 +119,10 @@ describe("homes add", () => {
 
   it("refuses a path that is not a folder and a call without a path", async () => {
     const { configPath, userHome } = await cliSetup();
-    const missing = await run(["homes", "add", join(userHome, "nowhere"), "--config", configPath], { home: userHome, ps: "" });
+    const missing = await run(["homes", "add", join(userHome, "nowhere"), "--config", configPath], { home: userHome, ps: [] });
     expect(missing.code).toBe(1);
     expect(missing.err[0]).toContain("is not a folder");
-    const bare = await run(["homes", "add", "--config", configPath], { home: userHome, ps: "" });
+    const bare = await run(["homes", "add", "--config", configPath], { home: userHome, ps: [] });
     expect(bare.code).toBe(2);
     expect(bare.err[0]).toBe("usage: fardeskd homes [add <path>]");
   });

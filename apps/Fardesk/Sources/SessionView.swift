@@ -32,7 +32,7 @@ struct SessionView: View {
         let presentation = SessionPresentation(session: session, now: Date())
         let line = SessionHeaderLine(session: session, machineName: machine.endpoint.name)
         return VStack(spacing: 0) {
-            FeedView(ref: ref, box: box).environment(\.attachmentSession, ref)
+            FeedView(ref: ref, box: box).id(ref).environment(\.attachmentSession, ref)
             ComposerBar(ref: ref, mode: presentation.composerMode)
         }
         .onAppear { TapClock.finish("session.open", model: model) }

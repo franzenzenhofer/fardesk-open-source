@@ -26,7 +26,7 @@ struct FeedRow: View, Equatable {
                     AttachedFilesView(files: files)
                 }
                 if gotIt {
-                    Label(Outbox.gotItLabel, systemImage: "checkmark.circle").font(.callout).foregroundStyle(.secondary)
+                    DeliveryMarkView(mark: .gotIt)
                 }
             }
         case .assistant(_, let text):

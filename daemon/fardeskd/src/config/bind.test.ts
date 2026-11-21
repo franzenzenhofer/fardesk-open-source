@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { FardeskError } from "../core/errors.js";
-import { resolveBindAddress, runCommand } from "./bind.js";
+import { COMMAND_TIMEOUT_MS, createRunCommand, resolveBindAddress, runCommand } from "./bind.js";
 import { CONFIG_DEFAULTS, type Config } from "./config.js";
 
 const TOKEN = "t".repeat(32);
@@ -45,6 +45,18 @@ describe("runCommand", () => {
   it("rejects with the spawn error when the command does not exist", async () => {
     const error = await rejection(runCommand("fardesk-no-such-binary", []));
     expect((error as Error).message).toContain("ENOENT");
+  });
+
+  it("gives up on a command that hangs, on its own clock, and kills it", async () => {
+    const started = Date.now();
+    const error = await rejection(createRunCommand(300)("sleep", ["30"]));
+    expect((error as Error).message).toBe("sleep did not answer within 0.3 s");
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it("has a deadline for every external tool", () => {
+    expect(COMMAND_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(COMMAND_TIMEOUT_MS).toBeLessThanOrEqual(30_000);
   });
 });
 
