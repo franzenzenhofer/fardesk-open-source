@@ -12,6 +12,12 @@ final class FardeskUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// The words the pairing screen must show (the UI test bundle does not link FardeskStore, so they are spelled out).
+    private enum TailscaleLine {
+        static let off = "Fardesk works only over Tailscale. Your phone is not on Tailscale right now. Open the Tailscale app, turn it on, then come back."
+        static let instruction = "On your computer run `fardeskd pair`, then point the camera at the code."
+    }
+
     // MARK: Helpers
 
     private func pairLink() throws -> String {
@@ -21,10 +27,9 @@ final class FardeskUITests: XCTestCase {
         return link
     }
 
-    private func launch(hubDown: Bool = false, forceCold: Bool = false) throws -> XCUIApplication {
+    private func launch(hubDown: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-FardeskPairLink", try pairLink(), "-FardeskUITest", "YES"]
-        if forceCold { app.launchArguments += ["-FardeskForceCold", "YES"] }
+        app.launchArguments = ["-FardeskPairLink", try pairLink(), "-FardeskUITest", "YES", "-FardeskTailscale", "on"]
         if hubDown { app.launchArguments += ["-FardeskHubDown", "YES"] }
         app.launch()
         return app
@@ -83,6 +88,153 @@ final class FardeskUITests: XCTestCase {
 
     // MARK: Taps answer within the budget
 
+    /// A clean install (no pairing link, no machine): the onboarding, not a password form with nothing to log in to.
+    func testFirstStartShowsOnboarding() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-FardeskUITest", "YES", "-FardeskCleanStart", "YES", "-FardeskTailscale", "on"]
+        app.launch()
+        XCTAssertTrue(element(app, "onboarding-scan").waitForExistence(timeout: 10), "the onboarding offers to pair a machine")
+        XCTAssertFalse(app.secureTextFields["Password"].exists, "no password field without a machine or hub")
+        shot("first start onboarding")
+    }
+
+    /// Ticket #94: the first screen shows the scanner panel (no paste-link section on the iPhone, ticket #103), and a scanned
+    /// link (injected by the DEBUG launch argument -FardeskScannedLink, since the simulator has no camera) pairs the
+    /// machine through the same call as a pasted link.
+    func testAScannedLinkPairsFromTheFirstScreen() throws {
+        let link = try pairLink()
+        let app = XCUIApplication()
+        app.launchArguments = ["-FardeskUITest", "YES", "-FardeskCleanStart", "YES", "-FardeskScannedLink", link, "-FardeskTailscale", "on"]
+        app.launch()
+        XCTAssertTrue(element(app, "onboarding-scan").waitForExistence(timeout: 10), "the first screen is the scanner")
+        XCTAssertTrue(app.staticTexts["Scan the QR code"].exists)
+        XCTAssertFalse(element(app, "onboarding-pair").exists, "the iPhone has no paste-link section (ticket #103)")
+        XCTAssertTrue(element(app, "onboarding-demo").exists, "the demo stays on the first screen")
+        waitForCachedOrLiveSessions(app)
+        shot("paired by a scanned link")
+    }
+
+    /// Everything of the pairing screen is on screen at once, no scrolling: the Tailscale line, the scanner area, the
+    /// one instruction line and the demo button are all hittable, and no scroll view holds them at the default text size.
+    func testThePairingScreenFitsWithoutScrolling() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-FardeskUITest", "YES", "-FardeskCleanStart", "YES", "-FardeskTailscale", "on"]
+        app.launch()
+        XCTAssertTrue(element(app, "onboarding-scan").waitForExistence(timeout: 10))
+        XCTAssertTrue(element(app, "tailscale-on").isHittable, "the Tailscale status line is on screen")
+        XCTAssertTrue(app.staticTexts[TailscaleLine.instruction].isHittable, "the instruction line is on screen")
+        XCTAssertTrue(element(app, "onboarding-demo").isHittable, "the demo button is on screen")
+        XCTAssertEqual(app.scrollViews.count, 0, "nothing scrolls at the default text size")
+        shot("pairing screen above the fold")
+    }
+
+    /// Tailscale off: no scanner at all, the plain words and a button that checks again.
+    func testWithoutTailscaleThereIsNoScannerOnlyTheWayToTurnItOn() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-FardeskUITest", "YES", "-FardeskCleanStart", "YES", "-FardeskTailscale", "off"]
+        app.launch()
+        XCTAssertTrue(element(app, "tailscale-off").waitForExistence(timeout: 10), "the screen says Tailscale is off")
+        XCTAssertTrue(app.staticTexts[TailscaleLine.off].exists, "the plain words are on screen")
+        XCTAssertTrue(element(app, "tailscale-recheck").isHittable, "the re-check button is on screen")
+        XCTAssertFalse(element(app, "scanner-photo").exists, "there is no scanner and no camera button")
+        XCTAssertFalse(element(app, "tailscale-on").exists)
+        shot("pairing screen without Tailscale")
+    }
+
+    /// Demo mode (ticket #73): a clean install, no pairing link, no daemon anywhere. The demo has no network path at all
+    /// (pretend machines in memory), so this walk works with the network off: list, session (read-only since 4.1.0), leave.
+    func testDemoShowsListAndSessionReadOnlyWithoutAComputerAndLeavingReturnsToOnboarding() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-FardeskUITest", "YES", "-FardeskCleanStart", "YES", "-FardeskTailscale", "on"]
+        app.launch()
+        let start = app.buttons["See a demo"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10), "the first screen offers the demo")
+        start.tap()
+        XCTAssertTrue(element(app, "demo-tag").waitForExistence(timeout: 10), "the Demo tag is on screen")
+        XCTAssertTrue(sessionRows(app).firstMatch.waitForExistence(timeout: 10), "the list shows sessions without a computer")
+
+        let waiting = app.staticTexts["Hero section redesign"]
+        XCTAssertTrue(waiting.waitForExistence(timeout: 5), "a session that waits for approval is in the list")
+        waiting.tap()
+        let allow = app.buttons["Allow"].firstMatch
+        XCTAssertTrue(allow.waitForExistence(timeout: 10), "the permission request can be approved")
+        XCTAssertTrue(
+            element(app, "demo-notice-line").exists || element(app, "demo-tag").exists,
+            "the notice is part of the content while a session is open"
+        )
+        XCTAssertFalse(allow.isEnabled, "the demo shows the request but does not act on it")
+        let field = element(app, "composer-field")
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertFalse(field.isEnabled, "the demo never talks to an AI: the reply field is greyed")
+        shot("demo session")
+
+        if !element(app, "demo-leave").exists { app.navigationBars.buttons.firstMatch.tap() }
+        let leave = element(app, "demo-leave")
+        XCTAssertTrue(leave.waitForExistence(timeout: 5))
+        leave.tap()
+        XCTAssertTrue(element(app, "onboarding-scan").waitForExistence(timeout: 10), "leaving the demo returns to the onboarding")
+        XCTAssertFalse(element(app, "demo-tag").exists)
+    }
+
+    private func startDemo(extra: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-FardeskUITest", "YES", "-FardeskCleanStart", "YES", "-FardeskTailscale", "on"] + extra
+        app.launch()
+        app.buttons["See a demo"].tap()
+        XCTAssertTrue(sessionRows(app).firstMatch.waitForExistence(timeout: 10))
+        return app
+    }
+
+    /// Ticket #98: the demo notice is a content element (the first row of the list), and nothing covers the navigation
+    /// bar: every button in it is hittable, also at the largest accessibility text size.
+    func testDemoNoticeIsContentAndNavigationStaysHittable() throws {
+        for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryAccessibilityXXXL"] {
+            let app = startDemo(extra: ["-UIPreferredContentSizeCategoryName", size])
+            XCTAssertTrue(element(app, "demo-tag").exists, "the notice is an element of the list content (\(size))")
+            XCTAssertTrue(element(app, "demo-leave").exists)
+            let buttons = app.navigationBars.buttons.allElementsBoundByIndex
+            XCTAssertFalse(buttons.isEmpty)
+            for button in buttons { XCTAssertTrue(button.isHittable, "\(button.label) is not covered (\(size))") }
+            shot("demo list \(size)")
+            app.terminate()
+        }
+    }
+
+    /// 4.1.0 (#120): left to right shows only Pin, right to left only End this chat (or Remove from list), each with
+    /// its label; in the demo both are shown greyed, because the demo changes nothing.
+    func testSwipesArePinAndEndOnlyAndGreyInTheDemo() throws {
+        let app = startDemo()
+        let row = sessionRows(app).firstMatch
+        row.swipeRight()
+        let pin = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'swipe-pin-' OR identifier BEGINSWITH 'swipe-unpin-'")).firstMatch
+        XCTAssertTrue(pin.waitForExistence(timeout: 3), "the leading swipe is Pin")
+        XCTAssertFalse(app.buttons["Open"].exists, "Open is no swipe")
+        XCTAssertFalse(pin.isEnabled, "the demo greys it out")
+        shot("leading swipe")
+        row.swipeLeft()
+        let trailing = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'swipe-end-' OR identifier BEGINSWITH 'swipe-hide-'"))
+        XCTAssertTrue(trailing.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(trailing.count, 1, "one button per side")
+        XCTAssertFalse(trailing.firstMatch.label.isEmpty, "the swipe button has a visible label")
+        shot("trailing swipe")
+    }
+
+    /// Ticket #104: in the demo the Coordinator row is disabled, and Settings greys out Add Machine, Log Out and the
+    /// notification switches.
+    func testDemoDisablesWhatNeedsARealMachine() throws {
+        let app = startDemo()
+        XCTAssertFalse(element(app, "coordinator-row").isEnabled, "the Coordinator is not part of the demo")
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.buttons["Add Machine"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Add Machine"].isEnabled)
+        XCTAssertFalse(app.buttons["Log Out"].isEnabled)
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Devices"].exists, "the Devices section is shown, greyed out")
+        XCTAssertFalse(app.buttons["Revoke all"].isEnabled)
+        XCTAssertTrue(element(app, "demo-notice-line").exists, "the notice is at the top of the Settings content")
+        XCTAssertTrue(app.buttons["Leave demo"].isEnabled, "what works in the demo stays enabled")
+    }
+
     func testCoordinatorRowOpensTheScreenAtOnce() throws {
         let app = try launch()
         let row = element(app, "coordinator-row")
@@ -100,7 +252,7 @@ final class FardeskUITests: XCTestCase {
         XCTAssertTrue(element(first, "coordinator-row").waitForExistence(timeout: 30))
         first.terminate()
         let app = XCUIApplication()
-        app.launchArguments = ["-FardeskHubDown", "YES", "-FardeskUITest", "YES"]
+        app.launchArguments = ["-FardeskHubDown", "YES", "-FardeskUITest", "YES", "-FardeskTailscale", "on"]
         app.launch()
         return app
     }
@@ -174,7 +326,7 @@ final class FardeskUITests: XCTestCase {
         first.terminate()
 
         let app = XCUIApplication()
-        app.launchArguments = ["-FardeskHubDown", "YES", "-FardeskUITest", "YES"]
+        app.launchArguments = ["-FardeskHubDown", "YES", "-FardeskUITest", "YES", "-FardeskTailscale", "on"]
         let start = ProcessInfo.processInfo.systemUptime
         app.launch()
         XCTAssertTrue(sessionRows(app).firstMatch.waitForExistence(timeout: 1), "cached sessions within 1 s of launch")
@@ -268,26 +420,17 @@ final class FardeskUITests: XCTestCase {
         XCTAssertFalse(app.buttons["End Session and Close Tab"].exists, "one End session, no second variant")
     }
 
-    func testAColdSessionAsksBeforeSendingAndKeepsTheMessage() throws {
-        let app = try launch(forceCold: true)
+    func testAMessageIsSentAtOnceWithoutAnyQuestion() throws {
+        let app = try launch()
         try startTestSession(app)
         let field = element(app, "composer-field")
         field.tap()
         field.typeText("Reply only: ok")
-        let card = element(app, "cold-card")
-        tapAndMeasure("send to a cold session", app, element(app, "send-button"), key: "send.pending", until: card)
-        XCTAssertTrue(element(app, "cold-warning").label.hasPrefix("Resume this conversation? Inactive for "), element(app, "cold-warning").label)
-        for choice in ["Resume", "Resume from summary", "Start new"] {
-            XCTAssertTrue(card.buttons[choice].exists, "button \(choice)")
-        }
-        XCTAssertEqual(element(app, "pending-message").label.contains("Waiting for your choice"), true, "the typed message stays in the feed")
-        shot("cold card")
-        card.buttons["Resume"].tap()
-        XCTAssertTrue(NSPredicate(format: "exists == false").evaluate(with: card) || !card.waitForExistence(timeout: 1))
-        // Claude may answer before the test looks again: the pending row is then already the real row, marked "Claude got it".
-        XCTAssertTrue(app.descendants(matching: .any)["Claude got it"].waitForExistence(timeout: 60), "the message went on after the choice and Claude got it")
+        element(app, "send-button").tap()
+        XCTAssertFalse(app.buttons["Start a new conversation"].exists, "the app asks nothing before sending")
+        XCTAssertTrue(app.descendants(matching: .any)["Claude got it"].waitForExistence(timeout: 60), "the message went on and Claude got it")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == 'Reply only: ok'")).count, 2, "sent once: the first prompt and the reply")
-        shot("after Resume")
+        shot("after send")
     }
 
     func testSendingWithTheHubGoneSaysSoAndKeepsOneMessage() throws {
@@ -295,7 +438,7 @@ final class FardeskUITests: XCTestCase {
         waitForCachedOrLiveSessions(first)
         first.terminate()
         let app = XCUIApplication()
-        app.launchArguments = ["-FardeskHubDown", "YES", "-FardeskUITest", "YES"]
+        app.launchArguments = ["-FardeskHubDown", "YES", "-FardeskUITest", "YES", "-FardeskTailscale", "on"]
         app.launch()
         let row = sessionRows(app).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
@@ -345,6 +488,33 @@ extension FardeskUITests {
         shot("swipe left")
     }
 
+    // MARK: Claude homes (ticket 61). Both need a machine of the real hub that has two homes; otherwise they skip.
+
+    func testHomeFilterShowsOnlyTheSessionsOfOneHome() throws {
+        let app = try launch()
+        waitForCachedOrLiveSessions(app)
+        let menu = element(app, "home-filter-menu")
+        guard menu.waitForExistence(timeout: 10) else { throw XCTSkip("no machine of this hub has two Claude homes") }
+        let before = sessionRows(app).count
+        menu.tap()
+        let choices = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'home-filter-' AND identifier != 'home-filter-menu'"))
+        XCTAssertGreaterThanOrEqual(choices.count, 2, "every home is a choice")
+        let home = String(choices.element(boundBy: 0).identifier.dropFirst("home-filter-".count))
+        choices.element(boundBy: 0).tap()
+        shot("home filter \(home)")
+        XCTAssertLessThanOrEqual(sessionRows(app).count, before, "the filter never adds rows")
+    }
+
+    func testNewSessionSheetAsksWhichHomeWhenTheMachineHasSeveral() throws {
+        let app = try launch()
+        waitForCachedOrLiveSessions(app)
+        element(app, "new-session-button").tap()
+        let picker = element(app, "new-session-home-picker")
+        guard picker.waitForExistence(timeout: 10) else { throw XCTSkip("the selected machine has a single Claude home") }
+        XCTAssertGreaterThanOrEqual(picker.buttons.count, 2, "one segment per home")
+        shot("new session asks for the home")
+    }
+
     func testTocChipsExistAndTheLastChipScrollsItsMachineIntoView() throws {
         let app = try launch()
         waitForCachedOrLiveSessions(app)
@@ -353,8 +523,8 @@ extension FardeskUITests {
         XCTAssertGreaterThanOrEqual(chips.count, 2, "one chip per machine")
         let first = String(chips.element(boundBy: 0).identifier.dropFirst("toc-chip-".count))
         let names = chips.allElementsBoundByIndex.map { String($0.identifier.dropFirst("toc-chip-".count)) }
-        let expectedFirst = ProcessInfo.processInfo.environment["FARDESK_UITEST_FIRST_MACHINE"] ?? names.min { $0.lowercased() < $1.lowercased() }
-        XCTAssertEqual(first, expectedFirst, "the configured machine order puts \(expectedFirst ?? "nothing") first")
+        let expectedFirst = names.min { $0.lowercased() < $1.lowercased() }
+        XCTAssertEqual(first, expectedFirst, "a clean install has no saved machine order: alphabetical, \(expectedFirst ?? "nothing") first")
         // The second chip is always fully on screen; the row scrolls sideways for the rest.
         let target = chips.element(boundBy: 1)
         let machineName = String(target.identifier.dropFirst("toc-chip-".count))
@@ -363,5 +533,45 @@ extension FardeskUITests {
         XCTAssertTrue(header.waitForExistence(timeout: 3))
         XCTAssertTrue(header.isHittable, "the section of \(machineName) is scrolled into view")
         shot("toc jump to \(machineName)")
+    }
+
+    // MARK: Colours (#93)
+
+    /// Picks a preset and then a colour from the system picker for the first session, and checks the row's bar
+    /// shows each. The label is cleared at the end so the real hub is left as it was. Not run in CI: needs the
+    /// second Mac (FARDESK_SIM_HOST) and a hub with a session.
+    func testAPresetAndASystemPickerColourShowOnTheSessionRow() throws {
+        let app = try launch()
+        waitForCachedOrLiveSessions(app)
+        let row = sessionRows(app).firstMatch
+        let sessionID = String(row.identifier.dropFirst("session-row-".count))
+        row.press(forDuration: 1)
+        app.buttons["Colour"].tap()
+        app.buttons["More colours"].tap()
+        let preset = element(app, "colour-preset-#1AA1FB")
+        XCTAssertTrue(preset.waitForExistence(timeout: 5), "the sheet shows the 64 presets as a grid")
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'colour-preset-'")).count, 64)
+        preset.tap()
+        XCTAssertTrue(preset.waitForNonExistence(timeout: 5), "a tap on a colour closes the sheet: the list is back")
+        let bar = element(app, "session-row-\(sessionID)")
+        XCTAssertTrue(bar.waitForExistence(timeout: 5), "the row is there")
+        let ringed = NSPredicate(format: "value == %@", "Colour #1AA1FB")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: ringed, evaluatedWith: bar)], timeout: 5), .completed, "the avatar ring shows the preset that was tapped")
+        shot("colour preset")
+        bar.press(forDuration: 1)
+        app.buttons["Colour"].tap()
+        app.buttons["More colours"].tap()
+        element(app, "colour-custom-picker").tap()
+        let swatch = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Color'")).element(boundBy: 12)
+        XCTAssertTrue(swatch.waitForExistence(timeout: 5), "the system colour picker opens with its grid")
+        swatch.tap()
+        app.buttons["Close"].tap()
+        let changed = NSPredicate(format: "value != %@", "Colour #1AA1FB")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: changed, evaluatedWith: bar)], timeout: 5), .completed, "the system picker's colour reached the row")
+        shot("colour system picker")
+        element(app, "colour-none").tap()
+        XCTAssertTrue(element(app, "colour-none").waitForNonExistence(timeout: 5), "No colour closes the sheet too")
+        let plain = NSPredicate(format: "value == %@", "")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: plain, evaluatedWith: bar)], timeout: 5), .completed, "no colour of its own and automatic colours off: no ring")
     }
 }

@@ -37,7 +37,10 @@ struct FeedCacheTests {
         try #require(rows.count > 4)
         var feed = SessionFeed(page: try Fixtures.page(items: Array(rows.prefix(rows.count - 1)), nextBefore: "cursor"))
         feed.refresh(with: try Fixtures.page(items: Array(rows.suffix(3)), nextBefore: "later"))
-        #expect(feed.activities.map(\.id) == rows.map(\.id), "overlap: cached rows stay, the new row is added in order")
+        // The daemon lists every open request on the newest page; a cached one it no longer lists was answered.
+        let listed = Set(rows.suffix(3).map(\.id))
+        let expected = rows.filter { !($0.isPendingRequest || $0.isTerminalRequest) || listed.contains($0.id) }
+        #expect(feed.activities.map(\.id) == expected.map(\.id), "overlap: cached rows stay, the new row is added in order")
         #expect(feed.nextBefore == "cursor", "the cached cursor still points at older rows")
 
         var stale = SessionFeed(page: try Fixtures.page(items: Array(rows.prefix(2)), nextBefore: "c"))

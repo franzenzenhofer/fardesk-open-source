@@ -25,17 +25,19 @@ public struct FardeskAPI: Sendable {
     /// Starting a Claude session (new, fork, resume, take over) waits for Claude to come up, and an
     /// upload can be 20 MB: on a busy machine both take longer than `defaultTimeout`.
     public static let slowTimeout: TimeInterval = 120
+    /// `/compact` answers once Claude wrote the summary: up to 180 s on the machine, 240 s through the hub.
+    public static let compactTimeout: TimeInterval = 300
 
     public let baseURL: URL
     public let token: String?
     public let timeout: TimeInterval
     private let session: URLSession
 
-    public init(baseURL: URL, token: String?, timeout: TimeInterval = defaultTimeout, session: URLSession = FardeskSessions.http) {
+    public init(baseURL: URL, token: String?, timeout: TimeInterval = defaultTimeout) {
         self.baseURL = baseURL
         self.token = token
         self.timeout = timeout
-        self.session = session
+        session = FardeskSessions.http
     }
 
     /// The body of a 2xx answer as it came, for routes that return bytes instead of JSON.
@@ -73,7 +75,8 @@ public struct FardeskAPI: Sendable {
     private func transfer(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
             return try await session.data(for: request)
-        } catch let error as URLError where error.code != .cancelled {
+        } catch let error as URLError {
+            if error.code == .cancelled { throw error }
             throw FardeskAPIError.transport(error)
         }
     }
@@ -91,6 +94,8 @@ public struct FardeskAPI: Sendable {
         components?.percentEncodedPath = pathPrefix + "/" + encoded
         components?.queryItems = request.query.isEmpty ? nil : request.query
         guard let url = components?.url else { throw FardeskAPIError.decoding("bad URL for \(baseURL)") }
+        // The one network gate: whatever built this API value, only an http address on the tailnet is ever asked.
+        guard MachineAddress.isAllowed(url) else { throw FardeskAPIError.insecureAddress(baseURL) }
         var urlRequest = URLRequest(url: url, timeoutInterval: request.timeout ?? timeout)
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body

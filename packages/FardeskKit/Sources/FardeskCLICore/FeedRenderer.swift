@@ -36,7 +36,14 @@ public enum FeedRenderer {
         case .tool(let a): ("$", "\(a.title) (\(a.status.rawValue))")
         case .question(let a): ("?", question(a))
         case .permission(let a): ("!", permission(a))
+        case .dialog(let a): ("?", dialog(a))
         }
+    }
+
+    private static func dialog(_ a: DialogActivity) -> String {
+        let title = DialogPresentation(a, now: a.ts).title
+        let choices = a.choices.isEmpty ? "" : " [\(a.choices.joined(separator: " | "))]"
+        return "\(title)\(choices) \(requestState(a.state?.rawValue ?? "pending", id: a.requestId, pending: a.isPending))"
     }
 
     private static func question(_ a: QuestionActivity) -> String {

@@ -9,6 +9,7 @@ const WAITING_SUMMARIES: Record<WaitingReason, string> = {
   permission: "Needs approval",
   question: "Needs answer",
   terminal: "Needs you at the computer",
+  dialog: "Claude Code asks",
 };
 
 /** What the broker holds open for the phone to answer. */
@@ -26,8 +27,11 @@ export type StatusInput = {
   crossSessionAccepted: boolean;
   /** The terminal can be typed into, so replies work without an inbox. */
   typable?: boolean;
+  /** The configured name of the Claude home the session lives in. */
+  home: string | null;
   muted: boolean;
   label: SessionLabel;
+  autoColor: string | null;
 };
 
 export type SessionTimes = { startedAt: string; updatedAt: string };
@@ -106,17 +110,22 @@ export function buildSessionSummary(input: StatusInput, cwd: string, times: Sess
     cwd,
     status,
     waitingFor: waiting,
+    agent: "claude",
     owned: input.owned,
     replyMode: replyModeOf(input, status),
+    background: status === "ended" ? 0 : input.summary.backgroundTasks,
     canStop: status === "working" && (input.owned || hasTmux),
     summary: summaryOf(input, waiting),
     model: input.summary.model,
     pid: input.process?.pid ?? null,
+    home: input.home,
     muted: input.muted,
     label: input.label,
+    autoColor: input.autoColor,
     permissionMode: knownPermissionMode(input.summary.permissionMode),
     contextTokens: input.summary.contextTokens,
     cacheExpiresAt: input.summary.cacheExpiresAt,
+    lastTurnAt: input.summary.lastTurnAt,
     startedAt: times.startedAt,
     updatedAt: times.updatedAt,
   };

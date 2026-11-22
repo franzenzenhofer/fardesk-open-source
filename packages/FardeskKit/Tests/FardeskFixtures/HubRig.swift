@@ -15,7 +15,7 @@ public struct HubRig: Sendable {
     public let peer: TestDaemon
 
     /// The hub's own API (the root, where the hub token logs in and `GET /v1/hub` answers).
-    public var hubAPI: FardeskAPI { FardeskAPI(baseURL: hub.url, token: TestDaemon.token, timeout: 5) }
+    public var hubAPI: FardeskAPI { hub.api() }
 
     public static func with<Result: Sendable>(
         isolation: isolated (any Actor)? = #isolation,
@@ -62,7 +62,7 @@ extension StoreSandbox {
     @MainActor
     public func startedHubModel(for rig: HubRig) async throws -> AppModel {
         try keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: rig.hub.url))
-        let model = AppModel(configuration: configuration(hubURL: rig.hub.url))
+        let model = AppModel(configuration: configuration(hub: rig.hub.link))
         await model.start()
         return model
     }

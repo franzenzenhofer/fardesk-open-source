@@ -70,10 +70,20 @@ public struct SessionFeed: Equatable, Sendable {
             self = replaced
             return true
         }
-        var changed = false
+        var changed = dropClosedRequests(listedIn: page)
         for item in page.items where upsertWithoutRebuild(item) { changed = true }
         if changed { rebuildDerived() }
         return changed
+    }
+
+    /// The daemon lists every open request (pending or at the computer) on the newest page and leaves out the ones
+    /// that were answered, expired or dropped. A cached open request the newest page no longer lists is closed:
+    /// it goes, so no card asks for something nothing waits on any more.
+    private mutating func dropClosedRequests(listedIn page: ActivityPage) -> Bool {
+        let listed = Set(page.items.map(\.id))
+        let before = activities.count
+        activities.removeAll { ($0.isPendingRequest || $0.isTerminalRequest) && !listed.contains($0.id) }
+        return activities.count != before
     }
 
     /// Adds an older page in front, skipping ids already present, and moves the paging cursor.

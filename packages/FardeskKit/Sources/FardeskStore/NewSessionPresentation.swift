@@ -22,11 +22,26 @@ public struct NewSessionDraft: Equatable, Sendable {
     public var showsOtherFolder = false
     public var usesWorktree = false
     public var modelName: String?
+    /// The Claude home the session starts in; only used while the machine has several (see HomeTag.newSessionChoices).
+    public var homeName: String?
     public var permissionMode = PermissionMode.bypassPermissions
     public var prompt = ""
     public var description = ""
 
     public init() {}
+
+    /// "Start fresh here" on a stopped chat: the same computer, folder, Claude home, mode and model; only the first
+    /// message is left to write (Claude Code starts a chat with its first message, so there is no empty chat).
+    public static func startingFresh(from session: SessionSummary, on machineID: UUID) -> NewSessionDraft {
+        var draft = NewSessionDraft()
+        draft.machineID = machineID
+        draft.showsOtherFolder = true
+        draft.customFolder = session.cwd
+        draft.homeName = session.home
+        draft.modelName = session.model
+        draft.permissionMode = session.permissionMode ?? .default
+        return draft
+    }
 
     /// A machine that refuses bypassPermissions cannot be asked for it: the draft falls back to "Ask".
     public mutating func keepModeAllowed(on machine: OnlineMachine?) {
@@ -45,12 +60,26 @@ public struct NewSessionDraft: Equatable, Sendable {
         showsOtherFolder = false
     }
 
+    /// The home to ask for: the pick while it is one of `choices`, else the first choice; nil when there is nothing to choose.
+    public func home(among choices: [String]) -> String? {
+        guard let first = choices.first else { return nil }
+        return homeName.flatMap { choices.contains($0) ? $0 : nil } ?? first
+    }
+
+    /// The request the sheet sends; it names a home only when the machine has several.
+    public func request(homeChoices: [String]) -> NewSessionRequest {
+        NewSessionRequest(
+            cwd: cwd, prompt: prompt, worktree: usesWorktree, model: modelName,
+            permissionMode: permissionMode, home: home(among: homeChoices))
+    }
+
     /// A new machine brings its own folders and models: forget the old picks.
     public mutating func resetForMachine(firstFolder: String) {
         folder = firstFolder
         customFolder = ""
         showsOtherFolder = false
         modelName = nil
+        homeName = nil
     }
 }
 

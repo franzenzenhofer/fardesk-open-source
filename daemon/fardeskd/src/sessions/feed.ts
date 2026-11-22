@@ -10,8 +10,8 @@ const OPEN_STATES: readonly string[] = ["pending", "terminal"];
 export type DetailLimits = { maxOutputLines: number; maxDiffLines: number };
 
 export function sessionFeed(store: SessionStore, broker: Pick<Broker, "activities">, sessionId: string): Activity[] {
-  // The broker only ever holds permission and question activities, and both carry a `state`.
-  const requests = broker.activities(sessionId) as Extract<Activity, { kind: "permission" | "question" }>[];
+  // The broker only ever holds permission, question and dialog activities, and all carry a `state`.
+  const requests = broker.activities(sessionId) as Extract<Activity, { kind: "permission" | "question" | "dialog" }>[];
   const pending = requests.filter((activity) => OPEN_STATES.includes(activity.state));
   return [...store.activities(sessionId), ...pending];
 }

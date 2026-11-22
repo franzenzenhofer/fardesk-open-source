@@ -16,6 +16,8 @@ function body(activity: Activity): string {
       return `${activity.title}: ${activity.changed.join(", ")}`;
     case "question":
       return `${activity.text} (${activity.state}; options: ${activity.options.join(" | ")})`;
+    case "dialog":
+      return `${activity.dialogKind} (${activity.state}; choices: ${activity.choices.join(" | ")})`;
     case "permission":
       return `${activity.title} (${activity.state})`;
   }

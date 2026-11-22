@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs ON a machine: writes the peer list into the fardeskd config and restarts the service.
 # Usage: FARDESK_LABEL=<bundle prefix>.fardeskd bash set-peers.sh '<json array of {name,url}>'
-# The peer list lets a client that knows one machine find the others after login.
+# Every url is http on a tailnet address (Tailscale encrypts the link). The peer list lets a client that knows one machine find the others after login.
 set -euo pipefail
 umask 077
 PEERS_JSON="${1:?usage: set-peers.sh '<json array of {name,url}>'}"

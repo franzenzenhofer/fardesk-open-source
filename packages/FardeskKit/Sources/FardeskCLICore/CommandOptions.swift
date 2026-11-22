@@ -1,4 +1,5 @@
 import ArgumentParser
+import FardeskModels
 import FardeskStore
 
 /// `--json`: print the contract JSON instead of text.

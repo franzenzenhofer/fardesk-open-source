@@ -122,7 +122,7 @@ struct OfflineCacheAndWipeTests {
     }
 
     @Test func syncKeepsKnownMachinesAddsNewAndDropsRemoved() throws {
-        let (kept, dropped, added) = (Fixtures.endpoint("A"), Fixtures.endpoint("B", host: "192.0.2.11"), Fixtures.endpoint("C", host: "192.0.2.12"))
+        let (kept, dropped, added) = (Fixtures.endpoint("A"), Fixtures.endpoint("B", host: "100.64.0.11"), Fixtures.endpoint("C", host: "100.64.0.12"))
         var state = AppState(endpoints: [kept, dropped])
         try state.apply(.hello(machine: try Fixtures.machine(), sessions: []), from: kept.id)
         state.sync(endpoints: [added, kept])

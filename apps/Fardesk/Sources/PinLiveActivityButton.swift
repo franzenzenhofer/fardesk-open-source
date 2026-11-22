@@ -7,7 +7,7 @@ struct PinLiveActivityButton: View {
 
     var body: some View {
         #if os(iOS)
-        PinToggle(ref: ref)
+        PinToggle(ref: ref).disabledInDemo(.liveActivityPin)
         #else
         EmptyView()
         #endif

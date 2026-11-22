@@ -39,17 +39,14 @@ final class CapturedOutput: Sendable {
 
 /// Answers the prompts of one command run from a script instead of a terminal.
 final class ScriptedInput: Sendable {
-    private let secrets: Mutex<[String]>
     private let lines: Mutex<[String]>
 
-    init(secrets: [String], lines: [String]) {
-        self.secrets = Mutex(secrets)
+    init(lines: [String]) {
         self.lines = Mutex(lines)
     }
 
     var reader: InputReader {
         InputReader(
-            readSecret: { _ in self.secrets.withLock { $0.isEmpty ? "" : $0.removeFirst() } },
             readLine: { self.lines.withLock { $0.isEmpty ? nil : $0.removeFirst() } }
         )
     }
@@ -83,37 +80,36 @@ final class CLIHarness: Sendable {
     /// A second runner on the same home with its own output, to run commands next to a long one.
     func sibling() throws -> CLIHarness { try CLIHarness(home: home) }
 
-    func context(secrets: [String] = [], lines: [String] = []) -> CLIContext {
+    func context(lines: [String] = [], tailscaleIsOn: @escaping @Sendable () -> Bool = { true }) -> CLIContext {
         CLIContext(
             output: output.sink,
-            input: ScriptedInput(secrets: secrets, lines: lines).reader,
+            input: ScriptedInput(lines: lines).reader,
             environment: [:],
             home: home,
             hostName: "test-host",
             timeZone: TimeZone(identifier: "UTC") ?? .current,
-            requestTimeout: 5
+            requestTimeout: 5,
+            tailscaleIsOn: tailscaleIsOn
         )
     }
 
     @discardableResult
-    func run(_ arguments: [String], secrets: [String] = [], lines: [String] = []) async -> CLIResult {
+    func run(_ arguments: [String], lines: [String] = [], tailscaleIsOn: @escaping @Sendable () -> Bool = { true }) async -> CLIResult {
         output.clear()
-        let status = await FardeskCLI.execute(arguments, context: context(secrets: secrets, lines: lines))
+        let status = await FardeskCLI.execute(arguments, context: context(lines: lines, tailscaleIsOn: tailscaleIsOn))
         return CLIResult(status: status, out: output.out, err: output.err)
     }
 
     /// Pairs a daemon through the real `pair` command with a link built the way `fardeskd pair` does.
     @discardableResult
     func pair(_ daemon: TestDaemon, name: String = "box") async throws -> CLIResult {
-        let result = await run(["pair", try Self.pairingLink(daemon, name: name)])
+        let result = await run(["pair", try await Self.pairingLink(daemon, name: name)])
         guard result.status == 0 else { throw HarnessError.pairFailed(result.errText) }
         return result
     }
 
-    static func pairingLink(_ daemon: TestDaemon, name: String) throws -> String {
-        let json = ["v": 1, "name": name, "url": daemon.url.absoluteString, "token": TestDaemon.token] as [String: Any]
-        let payload = try FardeskJSON.makeDecoder().decode(PairingPayload.self, from: JSONSerialization.data(withJSONObject: json))
-        return try PairingLink.make(payload)
+    static func pairingLink(_ daemon: TestDaemon, name: String) async throws -> String {
+        try await PairingLinks.make(for: daemon, name: name)
     }
 
     /// Runs a command again and again until its output satisfies the check (or the time is up).

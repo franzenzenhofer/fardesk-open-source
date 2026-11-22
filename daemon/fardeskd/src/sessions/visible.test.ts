@@ -39,7 +39,7 @@ describe("visibleSessions", () => {
 
   it("keeps a pinned ended session past the age window, the cap and a missing folder", () => {
     const folder = makeTempDir();
-    const pinned = { name: null, color: null, pinned: true };
+    const pinned = { name: null, color: null, pinned: true, image: null };
     const sessions = [
       { ...ended, id: "pinned-old", cwd: folder, updatedAt: daysAgo(90), label: pinned },
       { ...ended, id: "pinned-gone", cwd: `${folder}/deleted-test-folder`, updatedAt: daysAgo(40), label: pinned },
@@ -66,6 +66,18 @@ describe("visibleSessions", () => {
     const shown = visibleSessions(sessions, rules({ maxEnded: 30, folderExists }));
     expect(shown).toHaveLength(30);
     expect(lookups).toBe(30);
+  });
+
+  it("leaves out a hidden ended session, also a pinned one, but never a live one", () => {
+    const folder = makeTempDir();
+    const pinned = { name: null, color: null, pinned: true, image: null };
+    const sessions = [
+      { ...ended, id: "hidden", cwd: folder, updatedAt: daysAgo(1) },
+      { ...ended, id: "hidden-pinned", cwd: folder, updatedAt: daysAgo(1), label: pinned },
+      { ...ended, id: "shown", cwd: folder, updatedAt: daysAgo(2) },
+      { ...base, id: "live-again", cwd: folder },
+    ];
+    expect(ids(visibleSessions(sessions, rules({ hiddenIds: new Set(["hidden", "hidden-pinned", "live-again"]) })))).toEqual(["shown", "live-again"]);
   });
 
   it("hides ended sessions under the hidden roots (temp dirs, the coordinator folder) but never live ones", () => {

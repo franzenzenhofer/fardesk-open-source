@@ -43,7 +43,7 @@ public enum SessionsRenderer {
         let rows = SessionOrdering.sorted(state.sessions).map { session -> [String] in
             let presentation = SessionPresentation(session: session, now: options.now)
             return [
-                session.status.marker,
+                session.marker,
                 session.title,
                 presentation.subtitleParts.joined(separator: " - "),
                 presentation.relativeTime,
@@ -68,14 +68,15 @@ public enum SessionsRenderer {
     }
 }
 
-extension SessionStatus {
-    /// ASCII status marker for the CLI (the app uses SF Symbols).
+extension SessionSummary {
+    /// ASCII status marker for the CLI (the app uses SF Symbols): a finished turn with background jobs still works.
     var marker: String {
-        switch self {
+        switch status {
         case .waiting: "!"
         case .working: "~"
-        case .idle: "-"
+        case .idle: background > 0 ? "~" : "-"
         case .ended: "x"
+        case .unknown: "?"
         }
     }
 }

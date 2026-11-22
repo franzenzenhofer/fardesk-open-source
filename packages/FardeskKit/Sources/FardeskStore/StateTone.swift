@@ -9,17 +9,21 @@ public enum StateTone: Equatable, Sendable {
     case needsYou
     /// Green: online, OK, working fine, live.
     case ok
-    /// Grey: idle, ended, offline, connecting, queued, plain information.
+    /// Black (the text colour): a session that finished its turn and waits for the next message. Not a colour of its
+    /// own, so "your turn" stands out from grey (stopped) without adding a fifth state colour.
+    case ready
+    /// Grey: stopped, offline, connecting, queued, plain information.
     case inactive
 }
 
 extension StateTone {
-    /// A working session is green, a waiting one orange, an idle or ended one grey.
+    /// A working session is green, a waiting one orange, one whose turn ended black, a stopped one grey.
     public init(status: SessionStatus) {
         self = switch status {
         case .working: .ok
         case .waiting: .needsYou
-        case .idle, .ended: .inactive
+        case .idle: .ready
+        case .ended, .unknown: .inactive
         }
     }
 
@@ -41,12 +45,11 @@ extension StateTone {
         }
     }
 
-    /// Sent is green, failed red, a held message waits for the user's choice (orange), the rest grey.
+    /// Sent is green, failed red, the rest grey.
     public init(outbox state: PendingMessage.State) {
         self = switch state {
-        case .sent: .ok
+        case .sent, .delivered: .ok
         case .failed: .broken
-        case .held: .needsYou
         case .queued, .sending: .inactive
         }
     }
@@ -64,17 +67,6 @@ extension StateTone {
         case .done: .ok
         case .failed: .broken
         case .running: .inactive
-        }
-    }
-}
-
-extension SessionHeaderLine.Tone {
-    /// The state colour of the status word under the session title.
-    public var state: StateTone {
-        switch self {
-        case .working: .ok
-        case .attention: .needsYou
-        case .quiet: .inactive
         }
     }
 }

@@ -10,7 +10,7 @@ import type { RunCommand, RunWithInput } from "../config/bind.js";
 import { runCommand, runCommandWithInput } from "../config/bind.js";
 import type { Config } from "../config/config.js";
 import { MAC_APP_CLI, tailscaleCommandsFor } from "../config/tailscale.js";
-import type { ActivityPage, GhosttyAutomation, Machine } from "../contract/schema.js";
+import type { ActivityPage, GhosttyAutomation, HiddenSession, Machine } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import { createLogger, stderrSink } from "../core/log.js";
 import type { Logger } from "../core/log.js";
@@ -25,11 +25,18 @@ import { createGhostty, type Ghostty } from "../foreign/ghostty.js";
 import { createActions } from "./actions.js";
 import { createTerminalAnswers, watchHandOffs } from "./terminalAnswer.js";
 import type { TerminalAnswers } from "./terminalAnswer.js";
+import { startTailscaleWatch } from "./tailscaleWatch.js";
+import type { TailscaleWatch } from "./tailscaleWatch.js";
 import { createTypableWatch } from "./typable.js";
 import type { TerminalDeps } from "./terminal.js";
 import { createCore } from "./core.js";
+import { createImageStore } from "./imageStore.js";
+import type { StoredImage } from "./imageStore.js";
 import type { Closer, Core } from "./core.js";
+import { homeNames } from "../config/claudeHomes.js";
 import { reloadHomes } from "./homes.js";
+import { createUpdater } from "../update/updater.js";
+import type { Updater } from "../update/updater.js";
 import { collectMachineFacts } from "./machine.js";
 import type { MachineFacts } from "./machine.js";
 import type { ActionResult, ServiceOptions, Services } from "./types.js";
@@ -39,8 +46,8 @@ const GHOSTTY_TIMEOUT_MS = 15_000;
 
 type OwnedActions = Pick<Services, "resume" | "takeover" | "fork" | "newSession">;
 
-type Reads = Pick<Services, "machine" | "sessions" | "allSessions" | "activity" | "detail" | "recentFolders">;
-type Writes = Pick<Services, "decide" | "answer" | "mute" | "label" | "registerDevice">;
+type Reads = Pick<Services, "machine" | "sessions" | "allSessions" | "hiddenSessions" | "activity" | "detail" | "recentFolders">;
+type Writes = Pick<Services, "decide" | "answer" | "answerDialog" | "mute" | "label" | "hide" | "registerDevice">;
 
 async function runClosers(closers: Closer[]): Promise<void> {
   for (const close of closers.toReversed()) await close();
@@ -84,15 +91,33 @@ function reach(config: Config, { store, notifier }: Core): Pick<Services, "searc
   };
 }
 
-function reads(config: Config, { broker, store }: Core, machine: { facts: MachineFacts; ghostty: Ghostty }): Reads {
+type MachineParts = { facts: MachineFacts; ghostty: Ghostty; tailscale: TailscaleWatch; updater: Updater };
+
+/** The hidden mark ends when the session runs again, so it is not hidden again the next time it stops. */
+function forgetRevived({ store, hiddenStore }: Core): void {
+  for (const id of hiddenStore.ids()) {
+    if (store.find(id)?.summary.status !== "ended") hiddenStore.set(id, false);
+  }
+}
+
+function reads(config: Config, core: Core, machine: MachineParts): Reads {
+  const { broker, store, hiddenStore } = core;
   const { tidyList, listEnded, listEndedWithinDays } = config.sessions;
   const hiddenRoots = [join(config.stateDir, COORDINATOR_DIR)];
-  const visible = (): ReturnType<Core["store"]["list"]> =>
-    tidyList ? visibleSessions(store.list(), { now: Date.now(), endedWithinDays: listEndedWithinDays, maxEnded: listEnded, hiddenRoots }) : store.list();
+  const visible = (): ReturnType<Core["store"]["list"]> => {
+    forgetRevived(core);
+    const hiddenIds = hiddenStore.ids();
+    if (tidyList) return visibleSessions(store.list(), { now: Date.now(), endedWithinDays: listEndedWithinDays, maxEnded: listEnded, hiddenRoots, hiddenIds });
+    return store.list().filter((session) => !hiddenIds.has(session.id));
+  };
   return {
-    machine: () => ({ ...machine.facts, sessionsCount: visible().length, ghosttyAutomation: machine.ghostty.status() }),
+    machine: () => ({ ...machine.facts, homes: homeNames(config.claudeHomes), sessionsCount: visible().length, ghosttyAutomation: machine.ghostty.status(), tailscale: machine.tailscale.current(), update: machine.updater.status() }),
     sessions: visible,
     allSessions: () => store.list(),
+    hiddenSessions: (): HiddenSession[] => {
+      forgetRevived(core);
+      return store.list().filter((session) => hiddenStore.isHidden(session.id)).map(({ id, title, cwd, updatedAt, label }) => ({ id, title: label.name ?? title, cwd, updatedAt }));
+    },
     activity(sessionId, query): ActivityPage {
       const limit = Math.min(query.limit ?? config.activityPageLimit.default, config.activityPageLimit.max);
       return pagedFeed(store, broker, sessionId, query.before === undefined ? { limit } : { before: query.before, limit });
@@ -117,6 +142,30 @@ function startTerminals({ config, core, io, closers }: TerminalSetup): Ghostty {
   return ghostty;
 }
 
+/** The chat image: stored per session, its hash is part of the session label. */
+function images(config: Config, { store, labelStore }: Core): Pick<Services, "setSessionImage" | "clearSessionImage" | "readSessionImage"> {
+  const imageStore = createImageStore(config.stateDir);
+  return {
+    setSessionImage(sessionId, upload): string {
+      store.get(sessionId);
+      const hash = imageStore.save(sessionId, upload.mediaType, upload.bytes);
+      labelStore.setImage(sessionId, hash);
+      store.recompute(sessionId);
+      return hash;
+    },
+    clearSessionImage(sessionId): void {
+      store.get(sessionId);
+      imageStore.clear(sessionId);
+      labelStore.setImage(sessionId, null);
+      store.recompute(sessionId);
+    },
+    readSessionImage(sessionId): StoredImage {
+      store.get(sessionId);
+      return imageStore.read(sessionId);
+    },
+  };
+}
+
 function intake(config: Config, { store, pauseStore }: Core, attachments: AttachmentStore): Pick<Services, "saveAttachment" | "readAttachment" | "reportTelemetry" | "telemetry" | "notificationState" | "pauseNotifications"> {
   const telemetry = createTelemetryStore({ dir: config.stateDir });
   return {
@@ -132,10 +181,14 @@ function intake(config: Config, { store, pauseStore }: Core, attachments: Attach
   };
 }
 
-function writes({ store, devices, muteStore, labelStore }: Core, terminalAnswers: TerminalAnswers): Writes {
+function writes({ store, devices, muteStore, labelStore, hiddenStore, broker }: Core, terminalAnswers: TerminalAnswers): Writes {
   return {
-    decide: async (sessionId, requestId, decision) => terminalAnswers.decide(sessionId, requestId, decision),
+    decide: async (sessionId, requestId, decision, message) => terminalAnswers.decide(sessionId, requestId, decision, message),
     answer: async (sessionId, requestId, option) => terminalAnswers.answer(sessionId, requestId, option),
+    answerDialog: async (sessionId, requestId, answer): Promise<void> => {
+      broker.answerDialog(sessionId, requestId, answer);
+      return Promise.resolve();
+    },
     mute(sessionId, muted): void {
       store.get(sessionId);
       muteStore.set(sessionId, muted);
@@ -146,11 +199,22 @@ function writes({ store, devices, muteStore, labelStore }: Core, terminalAnswers
       labelStore.patch(sessionId, request);
       store.recompute(sessionId);
     },
+    hide(sessionId, hidden): void {
+      if (hidden && store.get(sessionId).summary.status !== "ended") throw new FardeskError("conflict", `session ${sessionId} is not stopped: only a stopped session can be removed from the list`);
+      if (!hidden) store.get(sessionId);
+      hiddenStore.set(sessionId, hidden);
+    },
     registerDevice: (request): void => {
       devices.upsert(request);
     },
   };
 }
+
+function updates(updater: Updater): Pick<Services, "updatePackage" | "startUpdate"> {
+  return { updatePackage: () => updater.readPackage(), startUpdate: async (bytes, sha256) => updater.start(bytes, sha256) };
+}
+
+const tailscaleCommandsOf = (options: ServiceOptions): string[] => options.tailscaleCommands ?? tailscaleCommandsFor(process.platform, existsSync(MAC_APP_CLI));
 
 type AuthParts = { config: Config; options: ServiceOptions; core: Core; machine: () => Machine; run: RunCommand; log: Logger; audit: AuditLog };
 
@@ -163,7 +227,8 @@ function authFor({ config, options, core, machine, run, log, audit }: AuthParts)
     apns: core.apns,
     machine,
     run,
-    tailscaleCommands: options.tailscaleCommands ?? tailscaleCommandsFor(process.platform, existsSync(MAC_APP_CLI)),
+    tailscaleCommands: tailscaleCommandsOf(options),
+    whoisCacheMs: options.whoisCacheMs,
     log,
     audit,
     now: () => Date.now(),
@@ -175,7 +240,8 @@ export async function createServices(config: Config, options: ServiceOptions): P
   const run: RunCommand = options.run ?? runCommand;
   const closers: Closer[] = [];
   try {
-    const facts = await collectMachineFacts(config, run, log);
+    const collected = await collectMachineFacts(config, run, log);
+    const facts = { ...collected, version: options.version ?? collected.version };
     const core = await createCore(config, options, log, closers);
     const attachments = createAttachmentStore({ stateDir: config.stateDir });
     const runWithInput = options.runWithInput ?? runCommandWithInput;
@@ -184,10 +250,13 @@ export async function createServices(config: Config, options: ServiceOptions): P
     const close = async (): Promise<void> => runClosers(closers);
     const terminalAnswers = createTerminalAnswers({ config, store: core.store, owned: core.owned, run, runWithInput, attachments, ghostty, log }, core.broker);
     closers.push(watchHandOffs(core, terminalAnswers, log));
-    const read = reads(config, core, { facts, ghostty });
+    const tailscale = startTailscaleWatch({ commands: tailscaleCommandsOf(options), run, log, pollMs: options.tailscalePollMs });
+    closers.push(() => { tailscale.close(); });
+    const updater = createUpdater({ stateDir: config.stateDir, machineName: config.name, ownVersion: facts.version, ...options.update });
+    const read = reads(config, core, { facts, ghostty, tailscale, updater });
     const audit = createAuditLog({ stateDir: config.stateDir });
     const auth = authFor({ config, options, core, machine: read.machine, run, log, audit });
-    const base = { ...read, ...actions, ghosttyProbe: async (): Promise<GhosttyAutomation> => ghostty.probe(), ...intake(config, core, attachments), ...ownedActions(core), ...reach(config, core), ...writes(core, terminalAnswers), reloadHomes: (): { homes: string[] } => reloadHomes(config, options.configPath, core.store) };
+    const base = { ...read, ...actions, ghosttyProbe: async (): Promise<GhosttyAutomation> => ghostty.probe(), ...intake(config, core, attachments), ...images(config, core), ...ownedActions(core), ...reach(config, core), ...writes(core, terminalAnswers), ...updates(updater), reloadHomes: (): { homes: string[] } => reloadHomes(config, options.configPath, core.store) };
     return { bus: core.bus, auth, audit, ...base, ...coordinate(config, core, base), close };
   } catch (error) {
     await runClosers(closers);

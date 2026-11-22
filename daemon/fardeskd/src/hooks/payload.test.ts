@@ -11,8 +11,8 @@ function load(name: string): unknown {
 }
 
 describe("parseHookPayload", () => {
-  it("has the 12 expected fixtures", () => {
-    expect(FIXTURES).toHaveLength(12);
+  it("has the 13 expected fixtures", () => {
+    expect(FIXTURES).toHaveLength(13);
   });
 
   it.each(FIXTURES)("parses %s and keeps the raw object", (name) => {

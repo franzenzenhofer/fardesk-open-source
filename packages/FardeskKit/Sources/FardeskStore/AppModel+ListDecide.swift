@@ -13,7 +13,7 @@ extension AppModel {
     /// loaded first so the request is current. Allowing a destructive request is never done from the list.
     public func decideOldestPending(_ decision: PermissionDecision, in ref: SessionRef) async -> ListDecision {
         await openSession(ref)
-        guard let permission = oldestPendingPermission(in: ref) else { return .openSession }
+        guard let permission = oldestPendingPermission(in: ref), permission.plan == nil else { return .openSession }
         let action = SessionAction.decide(decision, on: permission)
         if action.requiresConfirmation { return .openSession }
         return await self.decide(decision, requestID: permission.requestId, in: ref) ? .decided : .failed

@@ -13,7 +13,7 @@ struct WaitingTerminalTests {
         #expect(session.waitingFor == .terminal)
         let presentation = SessionPresentation(session: session, now: Date())
         #expect(presentation.statusLabel == "Needs you at the computer")
-        #expect(presentation.subtitleParts == ["Needs you at the computer: permission prompt"])
+        #expect(presentation.subtitleParts == ["Needs you at the computer", "permission prompt"])
         #expect(StateTone(status: session.status) == .needsYou)
         #expect(session.replyMode == .composer)
     }

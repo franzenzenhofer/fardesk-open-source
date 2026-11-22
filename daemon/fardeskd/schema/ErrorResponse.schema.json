@@ -18,7 +18,10 @@
             "token_revoked",
             "rate_limited",
             "forbidden",
-            "machine_offline"
+            "machine_offline",
+            "tailscale_unavailable",
+            "device_moved",
+            "master_token_wrong_node"
           ]
         },
         "message": {

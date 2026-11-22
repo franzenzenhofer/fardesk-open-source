@@ -36,6 +36,8 @@ struct AppModelLifecycleTests {
                 let machine = try model.state.machine(id: endpoint.id)
                 #expect(machine.sessions.count == SeedSession.standard.count)
                 #expect(machine.machine?.name == "test-box")
+                // The snapshot goes through the background cache writer: read the disk only after it wrote.
+                model.cacheWriter.flush()
                 #expect(sandbox.cache.load(machineID: endpoint.id)?.sessions.count == SeedSession.standard.count)
                 model.stop()
             }
@@ -52,19 +54,61 @@ struct AppModelLifecycleTests {
                 let cached = try second.state.machine(id: endpoint.id)
                 #expect(cached.sessions.count == SeedSession.standard.count)
                 #expect(!cached.isOnline)
-                second.stop()
+            second.stop()
             }
         }
     }
 
-    @Test func seedMachinesFillAnEmptyMachineListOnce() async throws {
+    @Test func aCleanStartHasNoMachineAndShowsTheOnboarding() async throws {
         try await StoreSandbox.with { sandbox in
-            let seed = [Peer(name: "Seeded", url: URL(string: "http://127.0.0.1:9")!)]
-            let model = AppModel(configuration: sandbox.configuration(seedMachines: seed))
+            let model = AppModel(configuration: sandbox.configuration())
             await model.start()
-            #expect(model.machines.endpoints.map(\.name) == ["Seeded"])
-            let stored = try sandbox.machinesFile.load()
-            #expect(stored.endpoints.map(\.name) == ["Seeded"])
+            #expect(model.machines.endpoints.isEmpty)
+            #expect(model.state.machines.isEmpty)
+            #expect(model.phase == .loggedOut)
+            #expect(model.needsOnboarding, "no machine and no hub: onboarding, not a password form")
+            #expect(!model.isHubMode)
+            #expect(!FileManager.default.fileExists(atPath: sandbox.machinesFile.url.path))
+        }
+    }
+
+    @Test func aPairedMachineWithoutATokenStaysOutOfTheOnboardingCount() async throws {
+        try await StoreSandbox.with { sandbox in
+            try sandbox.machinesFile.save(MachineList(endpoints: [MachineEndpoint(name: "box", url: URL(string: "http://127.0.0.1:9")!)]))
+            let model = AppModel(configuration: sandbox.configuration())
+            await model.start()
+            #expect(model.phase == .loggedOut)
+            #expect(!model.needsOnboarding)
+        }
+    }
+
+    @Test func aCorruptMachineOrderIsSaidAloudAndFallsBackToAlphabetical() async throws {
+        try await StoreSandbox.with { sandbox in
+            try Data("not json".utf8).write(to: sandbox.machineOrderFile.url)
+            let model = AppModel(configuration: sandbox.configuration())
+            #expect(model.lastError?.contains("machine order is unreadable") == true)
+            #expect(model.state.machineOrder.isEmpty)
+        }
+    }
+
+    @Test func theMachineOrderTheUserChoseIsKeptOnTheDevice() async throws {
+        try await StoreSandbox.with { sandbox in
+            let machines = ["Alpha", "Beta", "Gamma"].enumerated().map {
+                MachineEndpoint(name: $1, url: URL(string: "http://127.0.0.1:\(9 + $0)")!)
+            }
+            try sandbox.machinesFile.save(MachineList(endpoints: machines))
+            for machine in machines { try sandbox.keychainTokens.save("x", machine.id) }
+            let model = AppModel(configuration: sandbox.configuration())
+            await model.start()
+            #expect(model.state.machines.map(\.endpoint.name) == ["Alpha", "Beta", "Gamma"])
+            model.moveMachines(from: IndexSet(integer: 2), to: 0)
+            #expect(model.state.machines.map(\.endpoint.name) == ["Gamma", "Alpha", "Beta"])
+            #expect(try sandbox.machineOrderFile.load() == ["Gamma", "Alpha", "Beta"])
+            model.stop()
+            let second = AppModel(configuration: sandbox.configuration())
+            await second.start()
+            #expect(second.state.machines.map(\.endpoint.name) == ["Gamma", "Alpha", "Beta"])
+            second.stop()
         }
     }
 

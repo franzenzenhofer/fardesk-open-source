@@ -11,7 +11,7 @@ import Testing
 struct HubResponsivenessTests {
     private func hubModel(_ rig: HubRig, _ sandbox: StoreSandbox, waitForPeer: Bool = true) async throws -> AppModel {
         try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: rig.hub.url))
-        let model = AppModel(configuration: sandbox.configuration(hubURL: rig.hub.url))
+        let model = AppModel(configuration: sandbox.configuration(hub: rig.hub.link))
         await model.start()
         if waitForPeer {
             let ready = try await waitUntil {
@@ -33,12 +33,13 @@ struct HubResponsivenessTests {
     @Test func onlyAHubTokenOpensTheAppInHubMode() async throws {
         try await HubRig.with { rig in
             try await StoreSandbox.with { sandbox in
-                let old = Fixtures.endpoint("Mac mini Pro", host: "192.0.2.50")
+                let old = HubIdentity.endpoint(machine: "Mac mini Pro", hub: rig.hub.link)
                 var list = MachineList()
-                list.add(old)
+                list.setHub(rig.hub.link)
+                list.replaceEndpoints([old])
                 try sandbox.machinesFile.save(list)
                 try sandbox.keychainTokens.save(TestDaemon.token, old.id)
-                let model = AppModel(configuration: sandbox.configuration(hubURL: rig.hub.url))
+                let model = AppModel(configuration: sandbox.configuration(hub: rig.hub.link))
                 await model.start()
                 #expect(model.phase == .loggedOut, "a login to another machine is no login to the hub")
                 #expect(model.machines.endpoints.map(\.name) == ["Mac mini Pro"], "its name stays on screen")
@@ -46,37 +47,11 @@ struct HubResponsivenessTests {
         }
     }
 
-    @Test func anOlderBuildsListBecomesTheHubListAtOnceWithItsCachedSessions() async throws {
-        try await HubRig.with { rig in
-            try await StoreSandbox.with { sandbox in
-                let linux = MachineEndpoint(name: "Linux", url: rig.hub.url)
-                let mac = Fixtures.endpoint("Mac mini Pro", host: "192.0.2.50")
-                var list = MachineList()
-                list.add(linux)
-                list.add(mac)
-                try sandbox.machinesFile.save(list)
-                try sandbox.keychainTokens.save(TestDaemon.token, linux.id)
-                guard case .hello(_, let sessions) = try Fixtures.event("helloWithSessions") else { return }
-                try sandbox.cache.save(MachineSnapshot(machineID: mac.id, machine: nil, sessions: sessions, lastSeen: nil))
-                let model = AppModel(configuration: sandbox.configuration(hubURL: rig.hub.url))
-                await model.start()
-                #expect(model.phase == .ready, "the Linux login was reused for the hub")
-                #expect(model.machines.endpoints.map(\.name) == ["Linux", "Mac mini Pro"], "visible before the hub answered")
-                #expect(model.hubStatus == .connecting)
-                #expect(model.hubBannerText == "Connecting to the hub (Linux)...")
-                let migrated = try model.state.machine(id: HubIdentity.machineID(name: "Mac mini Pro"))
-                #expect(migrated.sessions.count == sessions.count, "cached sessions moved to the hub id")
-                #expect(try sandbox.machinesFile.load().endpoints.map(\.name) == ["Linux", "Mac mini Pro"], "persisted at once")
-                model.stop()
-            }
-        }
-    }
-
     @Test func anUnreachableHubSaysSoWithTheReasonAndAnEvent() async throws {
         try await StoreSandbox.with { sandbox in
-            let gone = URL(string: "http://127.0.0.1:\(try freePort())")!
-            try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: gone))
-            let model = AppModel(configuration: sandbox.configuration(hubURL: gone))
+            let gone = HubLink(url: URL(string: "http://127.0.0.1:\(try freePort())")!)
+            try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: gone.url))
+            let model = AppModel(configuration: sandbox.configuration(hub: gone))
             var list = MachineList()
             list.setHub(gone)
             list.replaceEndpoints([HubIdentity.endpoint(machine: "Linux", hub: gone)])
@@ -102,11 +77,7 @@ struct HubResponsivenessTests {
                 let result = await model.submit(OutgoingMessage(text: "queued before the call returns"), to: ref)
                 #expect(result == .sent)
                 let shown = try #require(model.outbox.pending(for: ref).first, "in the feed before any HTTP call could return")
-                #expect(["Queued", "Waiting for your choice"].contains(shown.statusLabel) && model.sendSignal == signal + 1)
-                if model.coldHolds[ref] != nil {
-                    // The fixture transcripts are old and long: the cold card asks first, Resume sends.
-                    Task { _ = await model.chooseCold(.resume, for: ref) }
-                }
+                #expect(shown.statusLabel == "Queued" && model.sendSignal == signal + 1, "no rule holds the message back")
 
                 try rig.peer.appendUserPrompt("queued before the call returns", toSession: SeedSession.hookSessionID)
                 let got = try await waitUntil { await MainActor.run { model.outbox.pending(for: ref).isEmpty } }
@@ -232,26 +203,20 @@ struct HubResponsivenessTests {
         try await HubRig.with { rig in
             try await StoreSandbox.with { sandbox in
                 var list = MachineList()
-                list.setHub(rig.hub.url)
+                list.setHub(rig.hub.link)
                 try sandbox.machinesFile.save(list)
-                let model = AppModel(configuration: sandbox.configuration(hubURL: rig.hub.url))
+                let model = AppModel(configuration: sandbox.configuration(hub: rig.hub.link))
                 await model.start()
                 #expect(model.phase == .loggedOut)
-                await model.pair(link: try link(rig.peer.url, name: "Peer", token: TestDaemon.token))
+                await model.pair(link: try await PairingLinks.make(for: rig.peer, name: "Peer", hub: true))
                 #expect(model.loginError?.contains("not for the hub") == true && model.phase == .loggedOut)
-                await model.pair(link: try link(rig.hub.url, name: "Linux", token: String(repeating: "cd", count: 32)))
+                await model.pair(link: try PairingLinks.make(url: rig.hub.url, name: "Linux", code: String(repeating: "cd", count: 32), hub: true))
                 #expect(model.loginError?.hasPrefix("Pairing failed") == true && model.phase == .loggedOut)
-                await model.pair(link: try link(rig.hub.url, name: "Linux", token: TestDaemon.token))
+                await model.pair(link: try await PairingLinks.make(for: rig.hub, name: "Linux", hub: true))
                 #expect(model.phase == .ready && model.loginError == nil)
                 #expect(model.notices[.list]?.text == "Paired with the hub (\(HubRig.hubName))")
                 model.stop()
             }
         }
-    }
-
-    private func link(_ url: URL, name: String, token: String) throws -> String {
-        let json = ["v": 1, "name": name, "url": url.absoluteString, "token": token] as [String: Any]
-        let payload = try FardeskJSON.makeDecoder().decode(PairingPayload.self, from: JSONSerialization.data(withJSONObject: json))
-        return try PairingLink.make(payload)
     }
 }

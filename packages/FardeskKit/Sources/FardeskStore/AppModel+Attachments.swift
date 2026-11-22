@@ -7,6 +7,6 @@ extension AppModel {
         guard let endpoint = machines.endpoints.first(where: { $0.id == ref.machineID }) else {
             throw AppStateError.unknownMachine(ref.machineID)
         }
-        return try await access.api(for: endpoint).attachment(sessionID: ref.sessionID, path: path)
+        return try await service(for: endpoint).attachment(sessionID: ref.sessionID, path: path)
     }
 }

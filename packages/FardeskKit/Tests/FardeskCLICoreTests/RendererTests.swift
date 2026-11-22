@@ -21,7 +21,7 @@ enum Samples {
     }
 
     static func offlineLinux() throws -> MachineState {
-        var state = MachineState(endpoint: Fixtures.endpoint("Linux", host: "192.0.2.2"))
+        var state = MachineState(endpoint: Fixtures.endpoint("Linux", host: "100.64.0.2"))
         state.apply(try Fixtures.event("helloEmpty"))
         state.apply(.ping(ts: now.addingTimeInterval(-300)))
         state.markOffline(now: now)
@@ -29,7 +29,7 @@ enum Samples {
     }
 
     static func connecting() -> MachineState {
-        MachineState(endpoint: Fixtures.endpoint("Fresh", host: "192.0.2.3"))
+        MachineState(endpoint: Fixtures.endpoint("Fresh", host: "100.64.0.3"))
     }
 
     static func jsonObjects(_ text: String) throws -> [Any] {
@@ -39,7 +39,7 @@ enum Samples {
 
 struct LoggedOutAndQueuedRendererTests {
     private func loggedOut() -> MachineState {
-        var state = MachineState(endpoint: Fixtures.endpoint("Revoked", host: "192.0.2.4"))
+        var state = MachineState(endpoint: Fixtures.endpoint("Revoked", host: "100.64.0.4"))
         state.markFailed(by: MachineAccessError.notLoggedIn(machine: "Revoked"), now: Samples.now)
         return state
     }
@@ -62,7 +62,7 @@ struct MachinesAndSessionsRendererTests {
         let text = try MachinesRenderer.render(machines, options: Samples.human)
         #expect(text == """
         NAME        STATUS      SESSIONS  VERSION  GHOSTTY
-        Studio Mac  online      8         0.1.0    ok
+        Studio Mac  online      11        0.1.0    ok
         Linux       offline     0         0.1.0    unknown
         Fresh       connecting  0         -        -
         """)
@@ -87,14 +87,17 @@ struct MachinesAndSessionsRendererTests {
         let text = try SessionsRenderer.render(machines, options: Samples.human)
         #expect(text == """
         Studio Mac  Online
-          !  Crawler retry logic    Needs approval              2m   sess_2c8
-          !  Export dialog          Needs answer                8m   sess_91d
-          ~  Smear brush engine     Edited PaintEngine.swift    1m   sess_7f3
-          -  Idle terminal session  Finished the retry rewrite  2h   sess_3a1
-          -  Idle terminal session  Finished the retry rewrite  2h   sess_5d9
-          -  Idle terminal session  Finished the retry rewrite  2h   sess_8e4
-          -  Docs cleanup           Looked through 6 files      16h  sess_e55
-          x  Release notes          Ended - Can resume          1d   sess_0b6
+          !  Back after a break      Needs your answer                                       Now  sess_91d
+          !  Crawler retry logic     Needs your approval                                     2m   sess_2c8
+          !  Export dialog           Needs your answer                                       8m   sess_91d
+          ~  Smear brush engine      Working - Edited PaintEngine.swift                      1m   sess_7f3
+          -  Codex: fix the crawler  Your turn - Finished the retry rewrite                  2h   sess_cod
+          -  Idle terminal session   Your turn - Finished the retry rewrite                  2h   sess_3a1
+          -  Idle terminal session   Your turn - Finished the retry rewrite                  2h   sess_5d9
+          -  Idle terminal session   Your turn - Finished the retry rewrite                  2h   sess_8e4
+          ~  Idle terminal session   In background - Started the test run in the background  2h   sess_bg0
+          -  Docs cleanup            Your turn - Looked through 6 files                      16h  sess_e55
+          x  Release notes           Stopped                                                 1d   sess_0b6
 
         Linux  Offline - last seen 5m ago
           (no sessions)
@@ -108,7 +111,7 @@ struct MachinesAndSessionsRendererTests {
         var recent = MachineState(endpoint: Fixtures.endpoint("Recent"))
         recent.apply(.ping(ts: Samples.now.addingTimeInterval(-3)))
         recent.markOffline(now: Samples.now)
-        var never = MachineState(endpoint: Fixtures.endpoint("Never", host: "192.0.2.9"))
+        var never = MachineState(endpoint: Fixtures.endpoint("Never", host: "100.64.0.9"))
         never.markOffline(now: Samples.now)
         let text = try SessionsRenderer.render([recent, never], options: Samples.human)
         #expect(text.hasPrefix("Recent  Offline - last seen just now\n"))
@@ -118,8 +121,9 @@ struct MachinesAndSessionsRendererTests {
     @Test func sessionsJsonCarriesMachineNameAndContractSession() throws {
         let text = try SessionsRenderer.render([try Samples.studio()], options: Samples.json)
         let items = try Samples.jsonObjects(text)
-        #expect(items.count == 8)
-        let first = try #require(items.first as? [String: Any])
+        #expect(items.count == 11)
+        let objects = items.compactMap { $0 as? [String: Any] }
+        let first = try #require(objects.first { ($0["session"] as? [String: Any])?["id"] as? String == "sess_2c84be" })
         #expect(first["machine"] as? String == "Studio Mac")
         let session = try #require(first["session"] as? [String: Any])
         #expect(session["id"] as? String == "sess_2c84be")
@@ -150,6 +154,13 @@ struct FeedRendererTests {
         09:10:30 ? Which export format should I use? [PNG | JPEG] [terminal]
         09:11:00 ! Run swift test - swift test --parallel [terminal]
         09:11:30 ! Run swift test - swift test --parallel [terminal]
+        09:12:00 ? Resume this conversation? [resume | new_conversation | compact | dismiss] [pending req_d1]
+        09:13:00 ? Resume this conversation? [resume | new_conversation | dismiss] [answered]
+        09:14:00 ? Resume this conversation? [resume | new_conversation | dismiss] [expired]
+        10:00:00 ! Ready to code? - Soften the brush smear [pending req_p1]
+        10:05:00 ! Ready to code? - Soften the brush smear [pending req_p2]
+        10:10:00 ! Ready to code? - Soften the brush smear [allowed]
+        10:15:00 ! Ready to code? - Soften the brush smear [denied]
         """)
     }
 
@@ -259,9 +270,9 @@ struct SmallRendererTests {
     @Test func pairingConfirmationShowsNameAndUrlOnly() throws {
         let endpoint = Fixtures.endpoint("Linux")
         let human = try PairingRenderer.render(endpoint, options: Samples.human)
-        #expect(human == "Paired Linux at http://192.0.2.10:7878")
+        #expect(human == "Paired Linux at http://100.64.0.10:7878")
         let json = try PairingRenderer.render(endpoint, options: Samples.json)
-        #expect(json == "{\"id\":\"\(endpoint.id.uuidString)\",\"name\":\"Linux\",\"url\":\"http://192.0.2.10:7878\"}")
+        #expect(json == "{\"id\":\"\(endpoint.id.uuidString)\",\"name\":\"Linux\",\"url\":\"http://100.64.0.10:7878\"}")
     }
 
     @Test(arguments: [

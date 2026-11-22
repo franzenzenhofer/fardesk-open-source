@@ -24,6 +24,7 @@ function contextOf(io: CapturedIo): CommandContext {
     args: [],
     all: false,
     dryRun: false,
+    show: false,
     since: null,
     io,
     deps: { createOwned: createRealOwned },

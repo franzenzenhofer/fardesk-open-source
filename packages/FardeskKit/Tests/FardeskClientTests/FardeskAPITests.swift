@@ -1,11 +1,12 @@
 @testable import FardeskClient
+import FardeskFixtures
 import FardeskModels
 import FardeskTestDaemon
 import Foundation
 import Testing
 
 func apiFor(_ daemon: TestDaemon, token: String? = TestDaemon.token) -> FardeskAPI {
-    FardeskAPI(baseURL: daemon.url, token: token, timeout: 5)
+    daemon.api(token: token, timeout: 5)
 }
 
 struct FardeskAPIReadTests {
@@ -78,7 +79,7 @@ struct FardeskAPIReadTests {
 
     @Test func nonContractAnswerIsADecodingError() async throws {
         try await TestDaemon.with { daemon in
-            let wrongShape = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let wrongShape = daemon.api(token: TestDaemon.token, timeout: 5)
             let error = try await #require(throws: FardeskAPIError.self) {
                 _ = try await wrongShape.send(APIRequest(method: .get, segments: ["v1", "sessions"]), as: AuthDeviceList.self)
             }

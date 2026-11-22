@@ -13,6 +13,11 @@ function root(): string | null {
   return value === undefined || value === "" ? null : value;
 }
 
+/** True inside the test runner's sandbox: the only place where a loopback address stands in for the tailnet. */
+export function inTestSandbox(): boolean {
+  return root() !== null;
+}
+
 function refuse(what: string, target: string): never {
   throw new FardeskError("internal", `${SANDBOX_ENV} is set: refusing ${what} outside the test sandbox: ${target}`);
 }

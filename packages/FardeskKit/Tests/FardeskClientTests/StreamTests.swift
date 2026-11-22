@@ -1,4 +1,5 @@
 @testable import FardeskClient
+import FardeskFixtures
 import FardeskModels
 import FardeskTestDaemon
 import Foundation
@@ -96,13 +97,16 @@ struct ReconnectingStreamTests {
         }
     }
 
-    @Test func finalErrorsAreRevokedAndUnauthorizedOnly() throws {
+    @Test func finalErrorsAreRefusedTokensAndNodesOnly() throws {
         func server(_ code: String) throws -> any Error {
             let body = Data(#"{"error":{"code":"\#(code)","message":"m"}}"#.utf8)
             return FardeskAPIError.server(status: 401, response: try FardeskJSON.makeDecoder().decode(ErrorResponse.self, from: body))
         }
         #expect(ReconnectingStream.isFinal(try server("token_revoked")))
         #expect(ReconnectingStream.isFinal(try server("unauthorized")))
+        #expect(ReconnectingStream.isFinal(try server("device_moved")))
+        #expect(ReconnectingStream.isFinal(try server("master_token_wrong_node")))
+        #expect(!ReconnectingStream.isFinal(try server("tailscale_unavailable")))
         #expect(!ReconnectingStream.isFinal(try server("internal")))
         #expect(!ReconnectingStream.isFinal(FardeskAPIError.transport(URLError(.timedOut))))
         #expect(!ReconnectingStream.isFinal(CancellationError()))

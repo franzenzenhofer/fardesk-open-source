@@ -1,6 +1,6 @@
 import { NO_LABEL } from "../service/labelStore.js";
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
@@ -45,7 +45,7 @@ function setup(claudeHomes: ClaudeHome[], overrides: Partial<StoreDeps> = {}): H
   const logs: string[] = [];
   const overlay: Overlay = { owned: new Set(), busy: new Set(), pending: new Map(), muted: new Set(), left: [] };
   const store = createSessionStore({
-    claudeHomes: claudeHomes.map((home) => home.dir),
+    claudeHomes: claudeHomes.map((home) => ({ path: home.dir, name: basename(home.dir) })),
     bus,
     log: createLogger((line) => logs.push(line), () => new Date()),
     registryPollMs: 50,
@@ -57,6 +57,7 @@ function setup(claudeHomes: ClaudeHome[], overrides: Partial<StoreDeps> = {}): H
     pendingKind: (id) => overlay.pending.get(id) ?? null,
     isMuted: (id) => overlay.muted.has(id),
     labelOf: () => NO_LABEL,
+    autoColors: { get: () => null, assign: () => undefined },
     onLeftWaiting: (id) => overlay.left.push(id),
     ...overrides,
   });
@@ -173,10 +174,10 @@ describe("sources", () => {
     const sessionId = "77777777-7777-4777-8777-777777777777";
     added.addTranscript({ fixture: "01-simple-session", sessionId });
     added.addRegistry({ fixture: "idle", sessionId });
-    const claudeHomes = [first.dir];
+    const claudeHomes = [{ path: first.dir, name: "first" }];
     const { store } = setup([first], { claudeHomes });
     expect(store.list()).toEqual([]);
-    claudeHomes.push(added.dir);
+    claudeHomes.push({ path: added.dir, name: "added" });
     await waitUntil(() => store.list().length === 1);
     expect(ids(store.list())).toEqual([sessionId]);
   });

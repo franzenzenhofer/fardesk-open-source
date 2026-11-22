@@ -8,6 +8,10 @@ struct SessionListView: View {
 
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var clock = SharedClock()
+    @State private var homeFilter: String?
+
+    /// The Claude homes to filter by; empty (no filter shown) while no machine has more than one home.
+    private var homeChoices: [String] { HomeTag.filterChoices(machines: model.state.machines) }
 
     private var hasNoSessions: Bool { model.state.machines.allSatisfy { $0.listedSessions.isEmpty } }
 
@@ -29,6 +33,7 @@ struct SessionListView: View {
         let _ = Breadcrumbs.mark("view SessionListView")
         ScrollViewReader { proxy in
         List(selection: selection) {
+                if model.isDemo { Section { DemoNoticeRow().selectionDisabled() } }
                 if !DebugFlags.noHubRow {
                     if model.hubStatus != nil, model.hubBannerText != nil { Section { HubStatusRow() } }
                     if let banner = model.connectivityBanner {
@@ -36,6 +41,7 @@ struct SessionListView: View {
                     }
                 }
                 if model.notices[.list] != nil { Section { NoticeRow(scope: .list) } }
+                if model.showsUpdateLine { Section { UpdateLine() } }
                 if !model.state.machines.isEmpty {
                     Section {
                         MachineTableOfContents(machines: model.state.machines) { jump(to: $0, proxy) }
@@ -50,7 +56,7 @@ struct SessionListView: View {
                         .selectionDisabled()
                 }
                 ForEach(model.state.machines) { machine in
-                    MachineSection(machine: machine)
+                    MachineSection(machine: machine, homeFilter: homeFilter)
                 }
             }
         .machineListStyle()
@@ -60,6 +66,9 @@ struct SessionListView: View {
         #endif
         .toolbar {
             if !DebugFlags.noToolbar {
+                if !homeChoices.isEmpty {
+                    ToolbarItem(placement: .primaryAction) { HomeFilterMenu(choices: homeChoices, selection: $homeFilter) }
+                }
                 ToolbarItem(placement: .primaryAction) { PauseMenu() }
                 ToolbarItem(placement: .primaryAction) {
                     Button { coordinator.showsSettings = true } label: { ToolbarIcon(systemName: "gearshape") }
@@ -73,6 +82,9 @@ struct SessionListView: View {
         .task { await clock.run() }
         .onAppear { if !hasNoSessions { TapClock.finish("launch.list", model: model) } }
         .onChange(of: hasNoSessions) { _, empty in if !empty { TapClock.finish("launch.list", model: model) } }
+        .onChange(of: homeChoices) { _, choices in
+            if let chosen = homeFilter, !choices.contains(chosen) { homeFilter = nil }
+        }
         }
     }
 
@@ -136,6 +148,7 @@ private struct BottomBar: View {
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
                 .fardeskGlassCapsule()
+                .disabledInDemo(.newSession)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)

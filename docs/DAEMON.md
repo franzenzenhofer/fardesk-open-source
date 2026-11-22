@@ -33,8 +33,7 @@ type Config = {            // zod: configSchema, strict
   name: string             // machine name shown in clients
   bind: { address: string | "tailscale"; port: number }   // "tailscale" = resolve with `tailscale ip -4`
   token: string            // bearer token, min 32 chars
-  tls: { cert: string; key: string } | null
-  claudeHomes: string[]    // default ["~/.claude"]
+  claudeHomes: ({ path: string; name: string })[]   // default [{ path: "~/.claude", name: ".claude" }]; a plain string is a path named after its folder
   claudeBinary: string     // default "claude" (resolved on PATH)
   stateDir: string         // default "~/.local/state/fardesk": hook socket, state file, logs
   models: string[]         // offered in New Session
@@ -59,7 +58,7 @@ function buildDetail(lines: TranscriptLine[], activityId: string, opts): Activit
 function summarise(lines: TranscriptLine[], maxChars: number): TranscriptSummary
   // { title: string|null (ai-title or custom title), summary: string, cwd: string|null, model: string|null,
   //   permissionMode: string|null, startedAt: string|null, updatedAt: string|null, pendingToolUse: boolean,
-  //   contextTokens: number|null, cacheExpiresAt: string|null }  (usage of the last main-chain assistant line, see "Cold sessions")
+  //   contextTokens: number|null, cacheExpiresAt: string|null, lastTurnAt: string|null }  (usage of the last main-chain assistant line, see "Cold sessions")
 function createTailer(deps: { path: string; pollMs: number; onLines(lines: TranscriptLine[]): void }): { close(): void; lines(): TranscriptLine[] }
 
 // src/sessions/*
@@ -99,6 +98,12 @@ type Broker = {
 // cut to 160 characters; generic text in generic-push mode; same collapse id as the
 // request push of that kind and sent as that kind, so the device swaps the stale Allow/Deny notification), and the
 // session stays in the terminal waiting state (`waitingFor: terminal`) until the registry leaves `waiting` or the process ends. A Stop of the main thread does NOT clear it on purpose: a subagent can still sit at the dialog while the main thread finishes turns.
+// The hand-off push is sent only while the request is still open AND the session's status is "waiting" (4.1.0).
+// A request that had a push and is then answered, denied or expired (not handed off) gets ONE "Answered" push with the
+// same collapse id (category RESOLVED, no actions, apns-priority 5, interruption-level passive, no sound; data
+// `kind: "resolved"`, `sessionId`, `machine`, `requestId`), so the stale Allow/Deny notification is replaced; it is sent
+// also while pushes are paused or the session is muted. The app removes any other delivered notification of that
+// `requestId` and does not show "Answered" over the open app.
 // The request's activity stays in the feed with `state: "terminal"` (question text and options, or tool and summary), and
 // `typable` says whether the phone can still answer it (below). It ends (`expired`) when the session leaves its wait.
 //
@@ -184,10 +189,14 @@ error still fails loudly.
 
 ## HTTP API
 
-As in SPEC 3.4, all under bearer auth, JSON bodies validated with the contract schemas:
+As in SPEC 3.4, all under bearer auth, JSON bodies validated with the contract schemas. Request bodies are `z.object`
+(unknown keys are dropped, never refused: `public/docs/VERSIONING.md` section 3); answers stay strict.
 
 ```
-GET  /v1/machine                              -> Machine
+GET  /v1/machine                              -> Machine (contractVersion 4; features: string[] from src/contract/features.ts; update: UpdateStatus)
+GET  /v1/update/package                       -> this machine's release package, application/gzip (404 not_found when the install has none)
+POST /v1/machine/update  raw .tgz + header X-Fardesk-Package-Sha256 -> MachineUpdateResult {ok: true, state: "running"}
+POST /v1/hub/update-all                       -> UpdateAllResult (only on a hub, else 404)
 GET  /v1/sessions                             -> SessionSummary[]
 GET  /v1/sessions/:id/activity?before=&limit= -> ActivityPage
 GET  /v1/sessions/:id/activity/:aid/detail    -> ActivityDetail
@@ -203,8 +212,13 @@ POST /v1/sessions/:id/fork                             -> ActionResult
 POST /v1/sessions/:id/clear                            -> ActionResult  (sessionId = the NEW id; see "/clear" below)
 POST /v1/sessions/:id/compact                          -> ActionResult  (sessionId = the SAME id; see "Cold sessions" below)
 POST /v1/sessions/:id/mute     MuteRequest             -> OkResult
+POST /v1/sessions/:id/label    LabelRequest            -> OkResult   (name, colour, pin; summary `label` = {name, color, pinned, image}; `image` = first 16 hex chars of the sha256 of the chat image, or null; set only by the image routes)
+POST /v1/sessions/:id/image    raw JPEG or PNG bytes   -> ImageResult {ok: true, image: "<16 hex>"}  (Content-Type image/jpeg or image/png, magic bytes must agree, content-length required, at most 2 MB (2,097,152 B), else 400 invalid_request; replaces an older image; stored in <stateDir>/session-images/<id>.jpg|.png)
+POST /v1/sessions/:id/image/clear                      -> OkResult   (removes the file, label image null)
+GET  /v1/sessions/:id/image                            -> the stored bytes, content-type image/jpeg or image/png, Cache-Control private, max-age=31536000, immutable (404 not_found without an image; apps add ?v=<hash> to bypass a stale cache)
 POST /v1/sessions/:id/permission/:rid PermissionRequest -> OkResult
 POST /v1/sessions/:id/answer/:qid     AnswerRequest     -> OkResult
+POST /v1/sessions/:id/dialog/:rid     DialogAnswerRequest {answer} -> OkResult  (a Claude Code dialog, see "Claude Code dialogs"; feature `claude-dialogs`)
 POST /v1/sessions/new          NewSessionRequest       -> ActionResult
 POST /v1/coordinator           CoordinatorRequest      -> ActionResult  (starts the coordinator session, or sends the prompt to the running one)
 GET  /v1/notifications                                 -> NotificationState {pausedUntil | null}
@@ -212,12 +226,13 @@ POST /v1/notifications/pause   NotificationPauseRequest -> NotificationState  (m
 GET  /v1/telemetry?since=&limit=&kind=error|event      -> TelemetryList  (kind absent = all; a report without kind counts as error; store rotates past 20 MB)
 POST /v1/devices               DeviceRequest           -> OkResult   (also attaches the APNs token to the calling device)
 
-POST /v1/auth/login            LoginRequest            -> LoginResult   (NO bearer; 501 until a password is set; 429 rate limited)
+POST /v1/auth/pair             PairRequest             -> LoginResult   (NO bearer; the one-time code of a pairing link; 401 wrong, used or expired; 429 rate limited)
+POST /v1/auth/pair-code                                -> PairCodeResult (master token only; opens the 2 minute pairing window)
+GET  /v1/auth/pair-window?window=<id>                  -> PairWindowStatus (master token only; asking keeps the window open)
+POST /v1/auth/pair-window/close?window=<id>            -> OkResult (master token only)
 POST /v1/auth/logout           LogoutRequest           -> OkResult      (revokes the calling device token; master token: 400)
 GET  /v1/auth/devices                                  -> AuthDeviceList (`current` marks the caller)
 POST /v1/auth/revoke           RevokeRequest           -> RevokeResult  (id or name, null = all; silent wipe push + stream sockets closed)
-POST /v1/auth/password         PasswordChangeRequest   -> OkResult      (verifies `current`, revokes ALL device tokens)
-POST /v1/auth/reload                                   -> OkResult      (CLI hook: re-read the hash from the config file, revoke all)
 POST /v1/homes/reload                                  -> { homes: string[] } (CLI hook of `homes add`: re-read claudeHomes from the config file, no restart)
 ```
 
@@ -230,33 +245,41 @@ JSON error body, and sockets of a device are closed (code 1008) the moment it is
 ## Auth (`src/auth`)
 
 ```ts
-// password.ts - scrypt$N$r$p$salt$hash (N=2^15, r=8, p=1, 16-byte salt, 32-byte key)
-hashPassword(password): Promise<string>;  verifyPassword(password, stored): Promise<boolean>  // malformed -> FardeskError("internal")
-// rateLimit.ts - per-IP sliding window + global cap of 10x maxFailures
-createLoginLimiter({ maxFailures, windowMs, now }): { check(ip) /* throws rate_limited */; recordFailure(ip); recordSuccess(ip) }
+// rateLimit.ts - failed pairing attempts: per-IP sliding window + global cap of 10x maxFailures
+createAttemptLimiter({ maxFailures, windowMs, now }): { check(ip) /* throws rate_limited */; reserve(ip); recordFailure(ip); recordSuccess(ip) }
 // deviceRegistry.ts - <stateDir>/auth-devices.json (600), SHA-256 of the token only, tombstones kept 90 days
-createDeviceRegistry({ path, now }): { issue, authenticate, list, entries, revoke, revokeAll, attachPush, detachPush }
+createDeviceRegistry({ path, now }): { issue, find, seen, list, entries, revoke, revokeAll, attachPush, detachPush }  // every entry holds stableId + tags (strict: an entry without them is refused)
+// nodeIdentity.ts - `tailscale whois --json <source address>` -> { stableId, userId, tags, addresses }, cached 60 s per address, fails closed
+createNodeIdentity({ run, commands, now, cacheMs, log }): { resolve(address, fresh?), self(fresh?) }
+// nodeBinding.ts - the node a request comes from, and where the master token counts
+createCallerNodes(identity, hubAddress): { nodeOf(ip, fresh?), requireMasterSource(ip, fresh?) }
 // service.ts - the facade the routes use (Services.auth)
-createAuthService(deps): { authenticate, login, logout, devices, revoke, changePassword, reload, attachPush, onRevoked }
+createAuthService(deps): { authenticate /* async; node check included */, nodeCheckMs, openPairWindow, pairWindowStatus, closePairWindow, pair, verifyPairingCaller, rotateToken, logout, devices, revoke, attachPush, onRevoked }
 ```
 
-Config keys: `auth: { passwordHash, maxFailures: 5, windowSeconds: 300 }`, `peers: [{ name, url }]`,
+There is no password and no login route: a device gets its token only by pairing (one-time code).
+
+Config keys: `bind: { address: "tailscale", port: 4780 }` (the address can only be `tailscale`: Tailscale only, no other way;
+only a test daemon inside `FARDESK_TEST_SANDBOX` may use loopback), `auth: { maxFailures: 5, windowSeconds: 300 }`, `pairing: { allowedUsers: [], allowedTags: [] }`,
+`peers: [{ name, url }]` (`url` is `http://` on a tailnet address, nothing else), `hubAddress` (on a member: the hub's tailnet address, so the hub's node may use this machine's master token; `null` by default; written by `scripts/setup/20-link-hub.sh`), a key from an older release that no longer exists (`tls`: "remove tls: Fardesk 4 uses Tailscale for encryption", `peers[].pin`) makes the
+daemon exit naming that key (`auth.<key>: this key was removed or never existed`),
 `sessions: { maxEnded: 200, maxFolders: 20, readsPerPoll: 20 }`. `updateConfigFile(path, patch)` rewrites only the
 given top-level keys (atomic, mode 600, validated).
 
-CLI: `fardeskd set-password` (stdin; TTY prompts twice without echo, a pipe reads one line), `fardeskd devices`,
-`fardeskd revoke <device|--all>`. They use the running daemon (master token, so wipe pushes and socket closing
-happen) and fall back to the registry file when no daemon answers. Owner script for all machines:
-`bash deploy/set-password.sh local laptop build-server`.
+CLI: `fardeskd devices`, `fardeskd revoke <device|--all>`, `fardeskd pair`. They use the running daemon (master token,
+so wipe pushes and socket closing happen) and fall back to the registry file when no daemon answers.
 
 ## Coordinator (`src/coordinator`, SPEC 4.5)
 
 One fardeskd-owned session titled "Coordinator" with an in-process MCP server named `fardesk` (tools
 `mcp__fardesk__*`): `list_sessions`, `read_activity {machine, sessionId, limit}`, `send_message {machine, sessionId, text}`,
 `spawn_session {machine, cwd, prompt, model?, worktree?}`, `stop_session {machine, sessionId}` (interrupts the running turn).
-Only those five tools are pre-approved (`allowedTools`); everything else goes through the normal permission broker.
+Further tools: `set_session_image {machine, sessionId, path}` (path = absolute path of a JPEG or PNG file on the coordinator's own machine, at most 2 MB;
+a bigger file is refused with the hint to scale it down, e.g. `sips -Z 512 <file>` on macOS or ImageMagick `convert -resize 512x512 <file> <out>`;
+the bytes go to the session's machine, local or peer, and the phone list shows them instead of the agent avatar) and `clear_session_image {machine, sessionId}`; `update_machines` (no arguments) brings every machine to the newest version in the fleet (see "Features, self-update and the lifeline").
+Only the first five tools are pre-approved (`allowedTools`); everything else goes through the normal permission broker.
 
-- `backend.ts`: one `MachineEndpoint` per machine, this daemon via the `Services` facade, each peer from `config.peers` over HTTP
+- `backend.ts`: one `MachineEndpoint` per machine, this daemon via the `Services` facade, each peer from `config.peers` over plain HTTP on its tailnet address (Tailscale encrypts)
   (`remote.ts`, bearer token, every response validated with the contract schemas). `list_sessions {machine?, status?, limit=30}` returns compact rows
   `{machine, id, title, status, waitingFor, summary, updatedAt}` (cut at `limit`, with `matching` = rows before the cut) plus a report per
   machine `{machine, state: ok | not linked | unreachable, count, detail}` where `count` is the machine's total session count.
@@ -271,7 +294,7 @@ Only those five tools are pre-approved (`allowedTools`); everything else goes th
 ## Hub (`src/hub`, round 3)
 
 One daemon can be the hub the apps and the CLI talk to; the others stay normal daemons. Config (default off):
-`hub: { enabled: false, probeMs: 5000 }`. The peers are `peers: [{name, url}]`, their tokens `coordinator.peerTokens[name]`.
+`hub: { enabled: false, probeMs: 5000 }`. The peers are `peers: [{name, url}]` (`url` is `http://` on a tailnet address), their tokens `coordinator.peerTokens[name]`.
 
 Per peer the hub keeps one upstream WebSocket to `<peer>/v1/stream` (bearer = the peer token, reconnect 1 s doubling to 15 s)
 and probes `GET /v1/machine` every `probeMs`. It caches machine, sessions (hello/session events), online, lastSeen, latencyMs,
@@ -287,15 +310,59 @@ WS   /m/<machine>/v1/stream           -> that machine's StreamEvent stream
 
 Rules for `/m/<machine>/...`:
 - `<machine>` is the hub's own name: served by the local app (path rewritten). Unknown machine: 404 `not_found` naming the known ones.
-- `/m/<any>/v1/auth/*` is always the hub's own auth; `POST /m/<any>/v1/auth/login` needs no bearer.
+- Only `/m/<any>/v1/auth/logout` is the hub's own (it ends the caller's session with the hub). The other auth routes
+  (`pair`, `devices`, `revoke`) are forwarded to the machine that is addressed. There is no login route; a device
+  gets in by pairing (`POST .../v1/auth/pair`, no bearer, rate limited).
 - Peer known offline: 503 `machine_offline` at once (`<name> is offline: <problem>; last seen <time>`).
 - Peer GET `/v1/machine`, `/v1/sessions`, `/v1/sessions/:id/activity` (no `before`, only `limit`) come from the cache while the upstream
   stream is live; a session page that is not cached yet is fetched (200 rows), cached and returned.
 - Everything else is forwarded with the peer token (method, query, body, headers); status, body and content-type pass through.
-  Timeout 15 s, 120 s for paths ending in `new|resume|takeover|fork|clear|attachments` (240 s for `compact`); no answer = 503 `machine_offline`.
+  Timeout 15 s, 120 s for paths ending in `new|resume|takeover|fork|clear|attachments|image|machine/update|update/package` (240 s for `compact`); no answer = 503 `machine_offline`.
 - `POST /m/<peer>/v1/devices` registers the device on the hub, then forwards it.
 - Stream: after the normal token check the hub sends `hello` from its cache, then relays the peer's upstream events and pings. An
   offline peer refuses the upgrade with HTTP 503.
+
+## Features, self-update and the lifeline (`src/update`, `src/contract/features.ts`)
+
+`GET /v1/machine` carries `features` (the constant list in `src/contract/features.ts`: `chat-image`, `self-update`,
+`cold-last-turn`, `claude-dialogs`; names are only added, never removed or reused inside a major) and `update`:
+
+```
+update: { state: "idle" | "running" | "failed" | "done", message: string | null, version: string | null, packageSha256: string | null, at: string | null }
+```
+
+`version` = the version of the last update's package, `message` = why it failed (last line of the installer log), `at` = last
+change of `state`, `packageSha256` = SHA-256 of this machine's own installed package (null when the install has none).
+
+The release package is the tarball `deploy.sh` installs. `deploy.sh` and the update both keep it as `<install dir>/release.tgz`
+(the install dir is the parent of `dist/`), and `GET /v1/update/package` streams it.
+
+`POST /v1/machine/update` (body: a release package, at most 20 MB (20,000,000 B), content-length required; header
+`X-Fardesk-Package-Sha256` = its SHA-256, 64 hex characters):
+- 400 `invalid_request` for a missing or wrong hash, or a body that is no fardeskd release (tar must unpack it, `package.json` with name `fardeskd`, `install-local.sh`);
+- 409 `conflict` while an update is running (a `running` state older than 15 minutes counts as failed);
+- 501 `unsupported` when the daemon does not know its service label (`FARDESK_LABEL`, set in the plist and the unit by `install-local.sh`);
+- otherwise it stores the package in `<stateDir>/update/`, unpacks it, writes `update.state = running` (file `<stateDir>/update/state.json`),
+  answers `{ ok: true, state: "running" }` and runs the installer in the background.
+
+The installer (`/bin/sh -c`, copies the unpacked package over the install dir, saves it as `release.tgz`, runs `install-local.sh <machine name>`)
+is started detached (new session, `unref`), output in `<stateDir>/update/installer.log`, its exit code in `installer-exit-code`. It restarts
+the service, which ends the daemon that started it, so the install must outlive its parent: the launchd plist sets `AbandonProcessGroup`
+(launchd would kill the rest of the job's process group), the systemd unit sets `KillMode=process` (systemd would kill the whole cgroup).
+The next daemon process reads `state.json`: a `running` update whose version equals its own is `done`; a non-zero exit code is `failed`
+with the last log line as `message`. A failed install leaves the old files and the old version running as far as the installer got.
+
+`POST /v1/hub/update-all` (hub only, master or paired device token): reads `GET /v1/machine` of this machine and every linked peer, takes
+the newest version (`src/core/semver.ts`), fetches that machine's package (`GET /v1/update/package`, with the peer token the hub holds)
+and posts it to every older machine, the hub itself last. Answer:
+
+```
+{ source: "<machine whose package was used>", version: "<newest>", machines: [{ name, from: "<version before> | null", result: "started" | "current" | "failed", message }] }
+```
+
+Unreadable or unlinked machines are `failed` with `from: null`; the package of the newest machine missing is 404 `not_found`.
+Through the hub, `/m/<machine>/v1/machine/update` (20 MB, content-length required) and `/m/<machine>/v1/update/package` use the long (120 s) timeout.
+The coordinator tool `update_machines` (no arguments) runs the same code against its own backend and reports each machine in plain words.
 
 ## Permission mode and /clear
 
@@ -323,14 +390,88 @@ that mode is passed to the SDK together with `allowDangerouslySkipPermissions: t
   2 + 618 + 425,703 = 426,323.
 - `SessionSummary.cacheExpiresAt` = that line's `timestamp` + 1 h when `usage.cache_creation.ephemeral_1h_input_tokens > 0`, else
   + 5 min (also when there is no `cache_creation` breakdown). Both fields are null when no assistant line has usage.
+- `SessionSummary.lastTurnAt` = that line's `timestamp`: when the last turn ended.
+- A `compact_boundary` system line after that assistant line wins: `contextTokens` = its `compactMetadata.postTokens` (null when
+  missing), `cacheExpiresAt` = null and `lastTurnAt` = null, right after the user chose the summary. The next answer with usage
+  counts again.
+- The fields are facts for display only. The app decides nothing from them: a message is sent at once, and when Claude Code
+  asks "Resume this conversation?" itself, the daemon passes that dialog on (`dialog` request, feature `claude-dialogs`).
 - `POST /v1/sessions/:id/compact` -> `ActionResult { sessionId }` (the same id):
   - Owned session: `/compact` is pushed into the running SDK session and the route resolves when the SDK stream emits the
     `system` message with `subtype: "compact_boundary"` (the transcript gets the same `system` line); 180 s timeout, then 409 `conflict`
     ("/compact did not finish within 180000 ms").
-  - Terminal session in tmux or Ghostty: `/compact` + Enter is typed and the route returns at once.
+  - Terminal session in tmux or Ghostty: `/compact` + Enter is typed and the route resolves when the transcript gains the
+    `compact_boundary` line; 180 s timeout, then 500 `internal`. (It used to return at once: a message the app sent right
+    after then reached Claude Code during the summary and timed out as not taken.) The app waits 300 s for this route.
   - Ended session: resumed as owned (last permission mode), then compacted.
   - Terminal outside tmux and Ghostty: 501 `unsupported` ("... Use Take Over first.").
   - `POST /v1/sessions/:id/message` with the text exactly `/compact` is refused with 400 `invalid_request`.
+
+## Claude Code dialogs (`src/permissions/dialogs.ts`, `src/owned/opener.ts`; feature `claude-dialogs`)
+
+Fardesk has no rule of its own for when to ask "resume or start new?". Claude Code decides: it sends a blocking dialog
+to its SDK host as a `request_user_dialog` control request, and only for kinds the host declared. The daemon declares
+`supportedDialogKinds: ["cold_resume_quota"]` and an `onUserDialog` handler for every owned (SDK) session and passes the
+dialog through; it computes nothing from the payload and never starts a dialog itself.
+
+- The dialog becomes a broker request like a permission request or a question: it is listed in the session feed, sent as an
+  `activity` stream event, makes the session `waiting` with `waitingFor: "dialog"` (summary "Claude Code asks"), and is pushed
+  to the phone as a question (category `QUESTION`, body "Claude Code asks for your decision"). It never times out on the
+  daemon side: Claude Code owns the deadline and withdraws the dialog itself (the request then ends `expired`). A stopped
+  session expires it too.
+- Activity (new `kind`, shown wherever permission requests and questions are listed; `state` is `pending`, `answered` or `expired`):
+
+  ```
+  { "id": "req-<requestId>", "ts": "...", "kind": "dialog", "requestId": "...", "dialogKind": "cold_resume_quota",
+    "payload": { ... as Claude Code sent it ... }, "choices": ["resume", "new_conversation", "compact", "dismiss"], "state": "pending" }
+  ```
+
+- `POST /v1/sessions/:id/dialog/:requestId` with `{ "answer": "<one of choices>" }`: 200 `{ ok: true }` and Claude Code receives
+  `{ behavior: "completed", result: "<answer>" }`. An answer outside `choices` is 400 `invalid_request`; an unknown, already answered
+  or withdrawn request is 404 `not_found`. The hub relays the route like any other session route.
+- `cold_resume_quota` (Claude Code 2.1.330) payload: `{ inactiveSince (ms epoch), contextTokens, percentOfFiveHourLimit,
+  trigger: "resume" | "idle", focusedAction: "resume" | "new_conversation" | "none", offersLookUp, offersSummary }`. Answers:
+  `resume`, `new_conversation`, `compact` (only in `choices` when `offersSummary` is true), `dismiss`. The apps render the payload;
+  the daemon only lists the valid answers.
+- A dialog kind the daemon does not know is not declared, and if one arrives anyway it is answered `{ behavior: "cancelled" }` at
+  once (Claude Code then applies its default) and never shown. The same happens when the phone does not answer before Claude Code
+  withdraws it.
+- Coordinator: `pending_requests` lists dialogs (`kind: "dialog"`, `options` = the choices); `answer_request` takes `answer` for one.
+  Terminal sessions (not owned by the daemon) have no SDK channel, so they get no dialog request: their dialog stays at the computer
+  (`waitingFor: "terminal"`).
+
+## Plan approval (`src/permissions/plan.ts`, `describe.ts`, `hookReply.ts`; feature `plan-approval`)
+
+A session in plan mode ends its plan with the `ExitPlanMode` tool. Claude Code's terminal shows the plan ("Ready to code?")
+with three choices; the phone offers the same.
+
+- The request stays `kind: "permission"` (older apps show it with Allow and Deny), with optional additions: `title` is
+  `"Ready to code?"`, `summary` the first line of the plan, `plan` the whole plan Markdown from the tool input (never cut),
+  `planChoices` the decisions valid for this request, in display order. `approve_bypass` is listed only where
+  `owned.allowBypass` is on. An `ExitPlanMode` call without plan text is an ordinary permission request.
+
+  ```
+  { "id": "req-<requestId>", "ts": "...", "kind": "permission", "requestId": "...", "tool": "ExitPlanMode",
+    "title": "Ready to code?", "summary": "Soften the brush smear", "plan": "# Soften the brush smear\n\n1. ...",
+    "cwd": "/Users/dev/smear-studio", "destructive": false, "state": "pending",
+    "planChoices": ["approve_bypass", "approve_manual", "revise"] }
+  ```
+
+- `POST /v1/sessions/:id/permission/:requestId` takes three more `decision` values and an optional `message`:
+  `{ "decision": "approve_bypass" }`, `{ "decision": "approve_manual" }`, `{ "decision": "revise", "message": "add a line saying bye" }`.
+  400 `invalid_request` for: a plan decision on a request that is not a plan request, a decision missing from `planChoices`
+  (`approve_bypass` without `owned.allowBypass`), `revise` without a non-empty `message`. `allow` and `deny` keep working on a plan
+  request. The activity ends `allowed` for both approvals and `denied` for `revise`.
+- Effect, the same in a terminal session (PermissionRequest hook reply) and an owned session (`canUseTool`):
+  - `approve_bypass`: allow with `updatedPermissions: [{ "type": "setMode", "mode": "bypassPermissions", "destination": "session" }]`.
+  - `approve_manual`: allow with `setMode` `default` (edits are approved one by one).
+  - `revise`: deny with the message `The user does not approve this plan yet and asks for changes: <message>`. Claude stays in plan mode,
+    reads the message as the tool result and calls `ExitPlanMode` again with a revised plan, which arrives as a new request.
+  - Owned sessions started on a machine with `owned.allowBypass` get `allowDangerouslySkipPermissions`, so `setMode bypassPermissions` can take effect.
+- Handed-off plan requests (no answer in time, the dialog now waits at the computer) are never typed into the terminal: the plan
+  dialog is not one of the recognised dialog shapes, so `typable` stays false and the phone's answer is 409 `conflict` ("answer it at the computer").
+- Coordinator: `pending_requests` shows the plan (`what` = title and plan, `plan`, `options` = `planChoices`); `answer_request` takes
+  `decision` `approve_bypass`, `approve_manual` or `revise` plus `message`. Without `coordinator.mayApprove` only `deny` and `revise` pass.
 
 ## Tests
 
@@ -355,20 +496,26 @@ Every default below is the safe one; each is a key in `config.json` and can be t
 | `push.content` | `"generic"` | APNs payload says "Fardesk" and "A session on <machine> needs you / is done / has ended". `"full"` adds titles, summaries and assistant text. |
 | `pairing.allowedUsers` | `[]` | Tailnet login names (other than this computer's user) whose devices may pair. Advanced, for families and teams. |
 | `pairing.allowedTags` | `[]` | Tags (e.g. `tag:ci`) whose devices may pair; tagged devices are refused otherwise. |
-| `bind.allowNonTailnet` | `false` | Start only on `tailscale`, loopback or 100.64.0.0/10. Any other address needs `tls` and this flag. |
+
+Transport security: Tailscale (WireGuard) encrypts and authenticates every connection, so the daemon serves plain HTTP and listens only on its tailnet address (loopback only inside `FARDESK_TEST_SANDBOX`): Tailscale only, no other way. The daemon has no certificate and no pin, and a config that still has `tls` is refused ("remove tls: Fardesk 4 uses Tailscale for encryption"). The apps and the CLI talk only to `http://` addresses in 100.64.0.0/10. Why no own certificate: since iOS 17, Apple's App Transport Security blocks connections to IP addresses and refuses a self-signed certificate even with pinning; the apps carry one exception for exactly 100.64.0.0/10 ([`NSExceptionDomains`](https://developer.apple.com/tutorials/data/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsexceptiondomains.json)). `scripts/check-ats.sh` proves that a CLI carrying the apps' ATS dictionary pairs over plain HTTP.
+
+Identity (#108, #107): identity is the Tailscale node. The peer address of every connection is read when the connection opens (`server/peerAddress.ts`; Node forgets it once a client has reset), and a request without one is refused. `auth/nodeIdentity.ts` asks `tailscale whois --json <address>` through the deadline-bound command runner and keeps the answer 60 seconds per address; the source must be in 100.64.0.0/10 and listed in `Node.Addresses` (`::ffff:` prefixes are normalised), else 401 `unauthorized`; whois failing, hanging or unreadable, or tailscaled down: 503 `tailscale_unavailable` ("Tailscale on this computer is not running"). Pairing stores the node of the caller in the device registry (`stableId` plus sorted `tags`, never the user id, which all tagged nodes share). Every authenticated request and every WebSocket upgrade checks that the token comes from its node, else 401 `device_moved` ("This device was paired from another Tailscale device. Pair again."); an open stream is checked again every cache lifetime and closed with 1008 and reason `device_moved` (or the code of the refusal). The master token counts only from loopback, from this computer's own node, or from the node of `hubAddress` (the hub, written on every member by the hub link step); else 401 `master_token_wrong_node`. A device paired from loopback (a test daemon) is bound to the loopback pseudo node. There is no legacy: a registry entry without `stableId` and `tags` makes the file corrupt, devices pair again in 4.0.0.
 
 Pairing: `fardeskd pair` opens a pairing window in the running daemon (`POST /v1/auth/pair-code`, master token only): one open code at a time (32 random
 bytes, held hashed in memory, compared in constant time), valid 2 minutes, single use; a new window cancels the open one. The window stays open only while
 `fardeskd pair` runs (it polls `GET /v1/auth/pair-window`; no poll for 10 seconds, Ctrl-C or the end of the command closes it, `POST /v1/auth/pair-window/close`).
 Five wrong codes close it, write a `pairing_locked` audit line and make the command exit non-zero; with no window open every pairing request is refused. When a device
 pairs, the command prints its name, its tailnet device name and the `fardeskd revoke` command. The fifth wrong code writes two audit lines:
-`login_failed` from the rate limiter (429) and `pairing_locked`. When a hub forwards a pairing to a peer, the peer sees the hub as the caller, so
+`pairing_failed` from the rate limiter (429) and `pairing_locked`. When a hub forwards a pairing to a peer, the peer sees the hub as the caller, so
 the command on the peer prints the hub's tailnet device. The link carries `{v, name, url, code, hub}`, never the master token.
+`fardeskd pair --show` does the same, but prints neither the link nor the QR code: it renders the QR code as a PNG in a private temporary folder
+(mode 0700, file 0600), opens it with the system viewer (`open`, or `xdg-open` when `DISPLAY` or `WAYLAND_DISPLAY` is set) and deletes the folder when
+the window ends. Use it when an agent runs the command, so the code never enters its output; it refuses on a machine with no screen.
 The app exchanges it at `POST /v1/auth/pair` (no bearer, rate limited like login) for a device token of its own. Before the code
 is looked at, the daemon asks the local Tailscale (`tailscale whois --json <caller address>`, and the same for its own address)
 and accepts only a device of the same tailnet and the same tailnet user as this computer. Another user, a device shared in from
 another tailnet, a tagged device, or a `whois` that fails all answer 403 `forbidden` with a fixed text (fail closed) and write an
-audit line with the caller's tailnet device name in `peer`. The same check runs on `POST /v1/auth/login` and on a pairing request a hub forwards to a peer (the peer only sees the hub's address, so the hub checks the real caller first). A caller on this computer (loopback) needs no check; a reverse proxy on this computer would make every caller look like loopback, so do not put one in front of the daemon. Advanced:
+audit line with the caller's tailnet device name in `peer`. The same check runs on a pairing request a hub forwards to a peer (the peer only sees the hub's address, so the hub checks the real caller first). A caller on this computer (loopback) needs no check; a reverse proxy on this computer would make every caller look like loopback, so do not put one in front of the daemon. Advanced:
 `pairing.allowedUsers` (tailnet login names, empty by default) and `pairing.allowedTags` (e.g. `tag:ci`, empty by default) admit
 those users and tags too (an allowed login is admitted from any tailnet, shared-in devices included; `allowedTags` applies only to
 devices of this computer's own tailnet, a tag name from another tailnet means nothing here). If this computer is itself a tagged node it
@@ -383,5 +530,5 @@ login or pairing, with time, device id, method, route pattern, session id, resul
 bearer (rejected logins, pairings and tokens) go to `audit-unauthenticated.jsonl`, rotated the same way, so a flood of them cannot rotate the
 authenticated trail away. `fardeskd audit [--since 2h]` prints both, merged in time order.
 
-Hooks and passwords: `install-hooks --dry-run` prints the diff of each `settings.json` and writes nothing; `install-hooks` refuses a state
-directory that group or others can read. The minimum password length is 12.
+Hooks: `install-hooks --dry-run` prints the diff of each `settings.json` and writes nothing; `install-hooks` refuses a state
+directory that group or others can read.

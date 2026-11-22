@@ -29,7 +29,7 @@ function bigTranscript(path: string, pairs: number): void {
 
 function refOf(path: string): TranscriptRef {
   const stats = statSync(path);
-  return { sessionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", path, mtimeMs: stats.mtimeMs, sizeBytes: stats.size, projectDir: join(path, "..") };
+  return { sessionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", path, mtimeMs: stats.mtimeMs, sizeBytes: stats.size, projectDir: join(path, ".."), home: join(path, "..", "..") };
 }
 
 function timed<T>(work: () => T): { value: T; ms: number } {

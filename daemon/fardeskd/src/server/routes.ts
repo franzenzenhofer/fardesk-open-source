@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { DeviceRequest } from "../contract/schema.js";
 import {
   answerRequestSchema,
+  dialogAnswerRequestSchema,
   coordinatorRequestSchema,
   deviceRequestSchema,
   messageRequestSchema,
@@ -18,7 +19,9 @@ import { DEFAULT_FOLDER_LIMIT, MAX_FOLDER_LIMIT } from "../folders/search.js";
 import type { Services } from "../service/types.js";
 import type { App } from "./context.js";
 import { registerAuthRoutes } from "./authRoutes.js";
+import { registerImageRoutes } from "./imageRoutes.js";
 import { registerIntakeRoutes } from "./intakeRoutes.js";
+import { registerUpdateRoutes } from "./updateRoutes.js";
 import { parseBody, parseOptionalBody, parseWith } from "./validate.js";
 
 /** Extra work a hub does after a route ran. deviceRegistered: a phone registered its APNs token here. */
@@ -44,6 +47,7 @@ function readRoutes(app: App, services: Services): void {
     const query = parseWith(sessionListQuerySchema, c.req.query(), "query");
     return c.json(query.scope === "all" ? services.allSessions() : services.sessions());
   });
+  app.get("/v1/sessions/hidden", (c) => c.json({ sessions: services.hiddenSessions() }));
   app.get("/v1/folders/recent", (c) => c.json(services.recentFolders()));
   app.get("/v1/folders/search", (c) => {
     const query = parseWith(folderSearchQuerySchema, c.req.query(), "query");
@@ -71,8 +75,20 @@ function commandRoutes(app: App, services: Services): void {
     const closed = await services.kill(c.req.param("id"), (await parseOptionalBody(c, killRequestSchema, { closeTab: false })).closeTab);
     return c.json({ ...OK, closed });
   });
+}
+
+/** What the user decides about a session on the phone: mute, hide, name and colour. */
+function preferenceRoutes(app: App, services: Services): void {
   app.post("/v1/sessions/:id/mute", async (c) => {
     services.mute(c.req.param("id"), (await parseBody(c, muteRequestSchema)).muted);
+    return c.json(OK);
+  });
+  app.post("/v1/sessions/:id/hide", (c) => {
+    services.hide(c.req.param("id"), true);
+    return c.json(OK);
+  });
+  app.post("/v1/sessions/:id/unhide", (c) => {
+    services.hide(c.req.param("id"), false);
     return c.json(OK);
   });
   app.post("/v1/sessions/:id/label", async (c) => {
@@ -83,11 +99,16 @@ function commandRoutes(app: App, services: Services): void {
 
 function decisionRoutes(app: App, services: Services, hooks: RouteHooks): void {
   app.post("/v1/sessions/:id/permission/:rid", async (c) => {
-    await services.decide(c.req.param("id"), c.req.param("rid"), (await parseBody(c, permissionRequestSchema)).decision);
+    const { decision, message } = await parseBody(c, permissionRequestSchema);
+    await services.decide(c.req.param("id"), c.req.param("rid"), decision, message);
     return c.json(OK);
   });
   app.post("/v1/sessions/:id/answer/:qid", async (c) => {
     await services.answer(c.req.param("id"), c.req.param("qid"), (await parseBody(c, answerRequestSchema)).option);
+    return c.json(OK);
+  });
+  app.post("/v1/sessions/:id/dialog/:rid", async (c) => {
+    await services.answerDialog(c.req.param("id"), c.req.param("rid"), (await parseBody(c, dialogAnswerRequestSchema)).answer);
     return c.json(OK);
   });
   app.post("/v1/devices", async (c) => {
@@ -112,9 +133,12 @@ function sessionActionRoutes(app: App, services: Services): void {
 export function registerRoutes(app: App, services: Services, hooks: RouteHooks = {}): void {
   readRoutes(app, services);
   commandRoutes(app, services);
+  preferenceRoutes(app, services);
   decisionRoutes(app, services, hooks);
   sessionActionRoutes(app, services);
   registerIntakeRoutes(app, services);
+  registerImageRoutes(app, services);
+  registerUpdateRoutes(app, services);
   registerAuthRoutes(app, services);
   app.post("/v1/homes/reload", (c) => {
     if (c.get("deviceId") !== MASTER_DEVICE_ID) throw new FardeskError("unauthorized", "only the master token can reload the Claude homes");

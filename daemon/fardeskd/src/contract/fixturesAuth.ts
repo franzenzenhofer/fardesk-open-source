@@ -5,10 +5,6 @@ const FAKE_DEVICE_TOKEN = "d0e1f2a3".repeat(8);
 const [firstMachine, secondMachine] = Object.values(machineFixtures);
 if (firstMachine === undefined || secondMachine === undefined) throw new Error("machine fixtures are empty");
 
-export const loginRequestFixtures: FixtureCases<"LoginRequest"> = {
-  phone: { password: "not-a-real-password", deviceName: "iPhone" },
-};
-
 export const pairRequestFixtures: FixtureCases<"PairRequest"> = {
   phone: { code: "Zk3vQ9mT2xLp7WcR5nYb8HdJ4sGfA1uEoIq6VtXzNaM", deviceName: "iPhone" },
 };
@@ -16,6 +12,7 @@ export const pairRequestFixtures: FixtureCases<"PairRequest"> = {
 export const pairCodeResultFixtures: FixtureCases<"PairCodeResult"> = {
   fresh: { code: "Zk3vQ9mT2xLp7WcR5nYb8HdJ4sGfA1uEoIq6VtXzNaM", expiresAt: "2026-11-17T09:10:00.000Z" },
 };
+
 
 export const loginResultFixtures: FixtureCases<"LoginResult"> = {
   withPeers: {
@@ -29,6 +26,9 @@ export const loginResultFixtures: FixtureCases<"LoginResult"> = {
   },
   deniedAutomation: { token: FAKE_DEVICE_TOKEN, deviceId: "dev_03", machine: deniedMachine, peers: [] },
   noPeers: { token: FAKE_DEVICE_TOKEN, deviceId: "dev_02", machine: secondMachine, peers: [] },
+  ...Object.fromEntries(
+    Object.entries(machineFixtures).filter(([name]) => /^(tailscale|update)/.test(name)).map(([name, machine]) => [`${name}Login`, { token: FAKE_DEVICE_TOKEN, deviceId: "dev_04", machine, peers: [] }]),
+  ),
 };
 
 export const logoutRequestFixtures: FixtureCases<"LogoutRequest"> = {
@@ -68,7 +68,3 @@ export const revokeRequestFixtures: FixtureCases<"RevokeRequest"> = {
 };
 
 export const revokeResultFixtures: FixtureCases<"RevokeResult"> = { two: { revoked: 2 } };
-
-export const passwordChangeRequestFixtures: FixtureCases<"PasswordChangeRequest"> = {
-  rotate: { current: "not-a-real-password", next: "another-fake-password" },
-};

@@ -1,11 +1,13 @@
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import { expectApiError } from "../../test/support/apiAssert.js";
 import { waitUntil } from "../../test/support/env.js";
 import { useRig } from "../../test/support/terminalRig.js";
 import { actionResultSchema } from "../contract/schema.js";
 import { CLEAR_WAIT_MS } from "../service/clear.js";
+import { COMPACT_SUBTYPE } from "../transcript/lineTypes.js";
 
 const TERMINAL_ID = "7C1F0E2A-1111-4000-8000-0000000000AA";
 const NEW_ID = "00000000-0000-4000-8000-00000000c1ea";
@@ -13,6 +15,24 @@ const rig = useRig();
 
 const collector = (file: string): string => `sh -c 'while IFS= read -r line; do printf "%s\\n" "$line" >> ${file}; done; true'`;
 const typedInto = (file: string): string => readFileSync(file, { encoding: "utf8", flag: "a+" });
+
+const POST_TOKENS = 27_005;
+/** Long enough that an early answer would have arrived (the route used to answer right after typing). */
+const SUMMARY_PENDING_MS = 600;
+
+/** What Claude Code writes when the summary is done. */
+function appendCompactBoundary(path: string): void {
+  const line = {
+    type: "system",
+    subtype: COMPACT_SUBTYPE,
+    content: "Conversation compacted",
+    uuid: `b-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    isSidechain: false,
+    compactMetadata: { trigger: "manual", preTokens: 400_000, postTokens: POST_TOKENS },
+  };
+  appendFileSync(path, `${JSON.stringify(line)}\n`);
+}
 
 /** What Claude Code does after /clear: the same process registers under a new session id. */
 function registerNewSession(pid: number): void {
@@ -66,24 +86,43 @@ describe("POST /v1/sessions/:id/clear outside tmux", () => {
 });
 
 describe("POST /v1/sessions/:id/compact in a terminal", () => {
-  it("types /compact into a tmux pane and answers the same session id", async () => {
+  it("types /compact into a tmux pane and answers the same session id only once the summary is written", async () => {
     const file = join(rig.daemon.config.stateDir, "typed.txt");
-    const { id } = await rig.seed(rig.sandbox.start(collector(file)).panePid);
-    const answered = await rig.daemon.call("POST", `/v1/sessions/${id}/compact`);
+    const { id, transcript } = await rig.seed(rig.sandbox.start(collector(file)).panePid);
+    let settled = false;
+    const response = rig.daemon.call("POST", `/v1/sessions/${id}/compact`).finally(() => { settled = true; });
+    await waitUntil(() => typedInto(file) === "/compact\n");
+    await sleep(SUMMARY_PENDING_MS);
+    expect(settled).toBe(false);
+    appendCompactBoundary(transcript);
+    const answered = await response;
     expect(answered.status).toBe(200);
     expect(actionResultSchema.parse(answered.json)).toEqual({ sessionId: id });
-    await waitUntil(() => typedInto(file) === "/compact\n");
     expect(rig.inbox.received).toEqual([]);
   });
 
   it("types /compact into the matched Ghostty terminal", async () => {
     const tab = await rig.tab("ghostty");
     rig.osascript.setTerminals([{ id: TERMINAL_ID, tty: "/dev/ttys779", pid: tab.claudePid, cwd: "/ours" }]);
-    const { id } = await rig.seed(tab.claudePid, { messagingSocketPath: null });
+    const { id, transcript } = await rig.seed(tab.claudePid, { messagingSocketPath: null });
     await waitUntil(() => rig.daemon.services.sessions().find((session) => session.id === id)?.replyMode === "composer");
-    const answered = await rig.daemon.call("POST", `/v1/sessions/${id}/compact`);
-    expect(actionResultSchema.parse(answered.json)).toEqual({ sessionId: id });
+    const response = rig.daemon.call("POST", `/v1/sessions/${id}/compact`);
+    await waitUntil(() => rig.osascript.typed().length === 1);
+    appendCompactBoundary(transcript);
+    expect(actionResultSchema.parse((await response).json)).toEqual({ sessionId: id });
     expect(rig.osascript.typed()).toEqual([["/compact", TERMINAL_ID]]);
+  });
+
+  it("after the summary the session is not cold any more: its context is the summary's size and no cache expiry", async () => {
+    const file = join(rig.daemon.config.stateDir, "typed.txt");
+    const { id, transcript } = await rig.seed(rig.sandbox.start(collector(file)).panePid);
+    const response = rig.daemon.call("POST", `/v1/sessions/${id}/compact`);
+    await waitUntil(() => typedInto(file) === "/compact\n");
+    appendCompactBoundary(transcript);
+    await response;
+    await waitUntil(() => rig.daemon.services.sessions().find((session) => session.id === id)?.contextTokens === POST_TOKENS);
+    expect(rig.daemon.services.sessions().find((session) => session.id === id)?.cacheExpiresAt).toBeNull();
+    expect(rig.daemon.services.sessions().find((session) => session.id === id)?.lastTurnAt).toBeNull();
   });
 });
 

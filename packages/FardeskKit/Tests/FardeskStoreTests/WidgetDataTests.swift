@@ -16,7 +16,7 @@ struct WaitingSnapshotTests {
     @Test func namesTheSessionThatWaitsLongest() throws {
         let linux = Fixtures.endpoint("Linux")
         let snapshot = WaitingSnapshot(state: try helloState(linux), now: t0)
-        #expect(snapshot.count == 2)
+        #expect(snapshot.count == 3)
         #expect(snapshot.oldestTitle == "Export dialog")
         #expect(snapshot.oldestMachine == "Linux")
     }

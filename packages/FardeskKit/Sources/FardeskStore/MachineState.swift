@@ -80,7 +80,7 @@ public struct MachineState: Equatable, Sendable, Identifiable {
             return self.machine != machine || self.sessions != sessions || connection != .online
         case .session(let session):
             return sessions.first { $0.id == session.id } != session
-        case .activity:
+        case .activity, .unknown:
             return false
         case .ping(let ts):
             return lastSeen.map { ts.timeIntervalSince($0) > Self.lastSeenResolution } ?? true
@@ -108,7 +108,7 @@ public struct MachineState: Equatable, Sendable, Identifiable {
             connection = .online
         case .session(let session):
             upsert(session)
-        case .activity:
+        case .activity, .unknown:
             break
         case .ping(let ts):
             lastSeen = ts

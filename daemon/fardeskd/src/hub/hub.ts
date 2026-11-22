@@ -26,9 +26,9 @@ function summarize(name: string, sessions: readonly { status: string }[]): Pick<
 }
 
 function peerEntry(monitor: PeerMonitor): HubMachine {
-  const { online, lastSeen, latencyMs, problem } = monitor.status();
+  const { online, lastSeen, latencyMs, problem, detail } = monitor.status();
   const os = monitor.cache.machine()?.os;
-  return { ...summarize(monitor.name, monitor.cache.sessions()), online, hub: false, lastSeen, latencyMs, problem, ...(os === undefined ? {} : { os }) };
+  return { ...summarize(monitor.name, monitor.cache.sessions()), online, hub: false, lastSeen, latencyMs, problem, detail, ...(os === undefined ? {} : { os }) };
 }
 
 export function createHub(config: Config, services: Services, log?: Logger): Hub {
@@ -42,7 +42,7 @@ export function createHub(config: Config, services: Services, log?: Logger): Hub
   return {
     name: config.name,
     state(): HubState {
-      const own: HubMachine = { ...summarize(config.name, services.sessions()), online: true, hub: true, lastSeen: new Date().toISOString(), latencyMs: 0, problem: null, os: services.machine().os };
+      const own: HubMachine = { ...summarize(config.name, services.sessions()), online: true, hub: true, lastSeen: new Date().toISOString(), latencyMs: 0, problem: null, detail: null, os: services.machine().os };
       return { hub: config.name, checkedAt: new Date().toISOString(), machines: [own, ...[...monitors.values()].map(peerEntry)] };
     },
     peer: (name) => monitors.get(name),

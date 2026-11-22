@@ -2,44 +2,7 @@ import FardeskModels
 import FardeskStore
 import Foundation
 
-/// `fardesk login`: one line per machine.
-public enum LoginRenderer {
-    private struct Row: Encodable {
-        let machine: String
-        let url: String
-        let status: String
-        let message: String?
-    }
-
-    public static func render(_ results: [MachineLoginResult], options: RenderOptions) throws -> String {
-        let rows = results.map(row)
-        switch options.format {
-        case .json: return try JSONOutput.compact(rows)
-        case .human:
-            return TextTable.render(
-                header: ["MACHINE", "RESULT"],
-                rows: rows.map { [$0.machine, $0.message ?? "logged in"] }
-            ).joined(separator: "\n")
-        }
-    }
-
-    private static func row(_ result: MachineLoginResult) -> Row {
-        let (status, message) = describe(result.status)
-        return Row(machine: result.endpoint.name, url: result.endpoint.url.absoluteString, status: status, message: message)
-    }
-
-    private static func describe(_ status: LoginStatus) -> (String, String?) {
-        switch status {
-        case .success: ("success", nil)
-        case .wrongPassword: ("wrong_password", "wrong password")
-        case .rateLimited: ("rate_limited", "too many attempts, try again later")
-        case .unreachable(let why): ("unreachable", "unreachable: \(why)")
-        case .failed(let why): ("failed", "failed: \(why)")
-        }
-    }
-}
-
-/// `fardesk logout` and `fardesk rotate-password`: one line per machine, with a problem when there was one.
+/// `fardesk logout`: one line per machine, with a problem when there was one.
 public enum PerMachineRenderer {
     public struct Line: Sendable, Equatable {
         public let machine: String

@@ -10,6 +10,7 @@ extension Activity {
         case .files(let a): a.ts
         case .question(let a): a.ts
         case .permission(let a): a.ts
+        case .dialog(let a): a.ts
         case .system(let a): a.ts
         }
     }
@@ -19,6 +20,7 @@ extension Activity {
         switch self {
         case .permission(let a): a.state == .pending
         case .question(let a): a.state == .pending
+        case .dialog(let a): a.isPending
         default: false
         }
     }

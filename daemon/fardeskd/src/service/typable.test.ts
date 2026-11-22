@@ -1,12 +1,11 @@
-import { NO_LABEL } from "./labelStore.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
 import type { ClaudeHome } from "../../test/support/claudeHome.js";
 import { waitUntil } from "../../test/support/env.js";
 import { createFakeOsascript } from "../../test/support/fakeOsascript.js";
+import { quietStoreDeps } from "../../test/support/storeDeps.js";
 import { writeWrapper } from "../../test/support/terminals.js";
 import { runCommand, runCommandWithInput } from "../config/bind.js";
-import { createBus } from "../core/bus.js";
 import { createLogger } from "../core/log.js";
 import { createGhostty } from "../foreign/ghostty.js";
 import { createSessionStore } from "../sessions/store.js";
@@ -30,21 +29,11 @@ function rig(): Rig {
     commands.push(command);
     return runCommand(command, args);
   };
-  const store = createSessionStore({
-    claudeHomes: [home.dir],
-    bus: createBus(),
+  const store = createSessionStore(quietStoreDeps(home.dir, {
     log,
     registryPollMs: 50,
-    transcriptPollMs: 20,
-    summaryMaxChars: 80,
     limits: { maxEnded: 100, maxEndedReadsPerRefresh: 100, maxFolders: 10 },
-    isOwned: () => false,
-    isBusy: () => false,
-    pendingKind: () => null,
-    isMuted: () => false,
-    labelOf: () => NO_LABEL,
-    onLeftWaiting: () => undefined,
-  });
+  }));
   const osascript = createFakeOsascript();
   const ghostty = createGhostty({ stateDir: home.dir, osascriptBinary: osascript.binary, run, log, cacheMs: 1_000, timeoutMs: 2_000, now: Date.now });
   const deps = { tmuxBinary: writeWrapper().binary, run, runWithInput: runCommandWithInput, ghostty, log };

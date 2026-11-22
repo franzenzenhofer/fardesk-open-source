@@ -61,6 +61,11 @@ public final class FeedStore {
         boxes = [:]
     }
 
+    /// Empties one session's rows (Reload chat); the box stays, so the open screen shows the fresh page in place.
+    public func clear(_ ref: SessionRef) {
+        boxes[ref]?.feed = SessionFeed()
+    }
+
     private func change(_ ref: SessionRef, _ mutation: (inout SessionFeed) -> Bool) -> Bool {
         let box = box(for: ref)
         var updated = box.feed

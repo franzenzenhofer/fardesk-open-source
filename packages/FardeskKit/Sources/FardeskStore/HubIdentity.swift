@@ -20,12 +20,12 @@ public enum HubIdentity {
         nameBasedID(tokenPrefix + hub.absoluteString)
     }
 
-    public static func endpoint(machine name: String, hub: URL) -> MachineEndpoint {
-        MachineEndpoint(id: machineID(name: name), name: name, url: machineURL(name: name, hub: hub))
+    public static func endpoint(machine name: String, hub: HubLink) -> MachineEndpoint {
+        MachineEndpoint(id: machineID(name: name), name: name, url: machineURL(name: name, hub: hub.url))
     }
 
     /// Hub machines in hub order (the hub itself first).
-    public static func endpoints(of state: HubState, hub: URL) -> [MachineEndpoint] {
+    public static func endpoints(of state: HubState, hub: HubLink) -> [MachineEndpoint] {
         state.machines.map { endpoint(machine: $0.name, hub: hub) }
     }
 

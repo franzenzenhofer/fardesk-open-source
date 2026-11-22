@@ -5,19 +5,6 @@ import FardeskTestDaemon
 import Foundation
 import Testing
 
-struct BootstrapMachinesTests {
-    @Test func parsesNamesAndUrls() {
-        let peers = BootstrapMachines.parse("Mac|http://100.1.1.1:4780; Linux |https://box.example:4780")
-        #expect(peers.map(\.name) == ["Mac", "Linux"])
-        #expect(peers.map(\.url.absoluteString) == ["http://100.1.1.1:4780", "https://box.example:4780"])
-    }
-
-    @Test(arguments: ["", "NoUrl", "|http://a:1", "Name|ftp://a:1", "Name|notaurl", "A|http://a:1|extra"])
-    func skipsBrokenEntries(text: String) {
-        #expect(BootstrapMachines.parse(text).isEmpty)
-    }
-}
-
 struct PushActionTests {
     private let base = ["machine": "Mac", "sessionId": "s1"]
     private let target = PushTarget(machine: "Mac", sessionID: "s1", requestID: nil)
@@ -95,12 +82,12 @@ struct PushHandlingTests {
             try await StoreSandbox.with { sandbox in
                 let model = AppModel(configuration: sandbox.configuration())
                 await model.start()
-                let json = #"{"v":1,"name":"paired","url":"\#(daemon.url.absoluteString)","token":"\#(TestDaemon.token)"}"#
-                await model.pair(link: "fardesk://pair?d=" + Base64URL.encode(Data(json.utf8)))
+                await model.pair(link: try await PairingLinks.make(for: daemon, name: "paired"))
                 #expect(model.phase == .ready)
                 #expect(model.machines.endpoints.map(\.name) == ["paired"])
                 let id = try #require(model.machines.endpoints.first?.id)
-                #expect(try sandbox.keychainTokens.load(id) == TestDaemon.token)
+                let stored = try #require(try sandbox.keychainTokens.load(id))
+                #expect(stored != TestDaemon.token, "a device token of its own, never the config token")
                 model.stop()
             }
         }

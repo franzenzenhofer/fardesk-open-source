@@ -4,7 +4,8 @@ import { errorCode } from "./processes.js";
 
 const TRANSCRIPT_FILE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
-export type TranscriptRef = { sessionId: string; path: string; mtimeMs: number; sizeBytes: number; projectDir: string };
+/** `home`: the Claude home folder the transcript was found in. */
+export type TranscriptRef = { sessionId: string; path: string; mtimeMs: number; sizeBytes: number; projectDir: string; home: string };
 
 function readdirIfPresent(dir: string): Dirent[] {
   try {
@@ -15,7 +16,7 @@ function readdirIfPresent(dir: string): Dirent[] {
   }
 }
 
-function describeFile(projectDir: string, name: string): TranscriptRef | null {
+function describeFile(home: string, projectDir: string, name: string): TranscriptRef | null {
   const match = TRANSCRIPT_FILE.exec(name);
   const sessionId = match?.[1];
   if (sessionId === undefined) return null;
@@ -23,17 +24,17 @@ function describeFile(projectDir: string, name: string): TranscriptRef | null {
   try {
     const stats = statSync(path);
     if (!stats.isFile()) return null;
-    return { sessionId, path, mtimeMs: stats.mtimeMs, sizeBytes: stats.size, projectDir };
+    return { sessionId, path, mtimeMs: stats.mtimeMs, sizeBytes: stats.size, projectDir, home };
   } catch (error) {
     if (errorCode(error) === "ENOENT") return null;
     throw error;
   }
 }
 
-function transcriptsInProject(projectDir: string): TranscriptRef[] {
+function transcriptsInProject(home: string, projectDir: string): TranscriptRef[] {
   return readdirIfPresent(projectDir)
     .filter((entry) => !entry.isDirectory())
-    .map((entry) => describeFile(projectDir, entry.name))
+    .map((entry) => describeFile(home, projectDir, entry.name))
     .filter((ref): ref is TranscriptRef => ref !== null);
 }
 
@@ -41,7 +42,7 @@ export function findTranscripts(claudeHome: string): TranscriptRef[] {
   const projectsDir = join(claudeHome, "projects");
   return readdirIfPresent(projectsDir)
     .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => transcriptsInProject(join(projectsDir, entry.name)))
+    .flatMap((entry) => transcriptsInProject(claudeHome, join(projectsDir, entry.name)))
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 

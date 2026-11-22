@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { RunCommand } from "../config/bind.js";
 import type { Config } from "../config/config.js";
 import type { Machine } from "../contract/schema.js";
+import { FEATURES } from "../contract/features.js";
 import { CONTRACT_VERSION } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import type { Logger } from "../core/log.js";
@@ -13,7 +14,7 @@ const OS_BY_PLATFORM: Partial<Record<NodeJS.Platform, Machine["os"]>> = { darwin
 const PACKAGE_JSON = new URL("../../package.json", import.meta.url);
 const packageSchema = z.looseObject({ version: z.string().min(1) });
 
-export type MachineFacts = Omit<Machine, "sessionsCount" | "ghosttyAutomation">;
+export type MachineFacts = Omit<Machine, "sessionsCount" | "ghosttyAutomation" | "homes" | "tailscale" | "update">;
 
 export function readDaemonVersion(): string {
   return packageSchema.parse(JSON.parse(readFileSync(PACKAGE_JSON, "utf8"))).version;
@@ -47,5 +48,6 @@ export async function collectMachineFacts(config: Config, run: RunCommand, log: 
     models: config.models,
     allowBypass: config.owned.allowBypass,
     coordinatorEnabled: config.coordinator.enabled,
+    features: [...FEATURES],
   };
 }

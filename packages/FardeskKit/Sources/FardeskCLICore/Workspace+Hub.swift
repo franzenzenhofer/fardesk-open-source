@@ -19,7 +19,7 @@ extension Workspace {
     /// What the hub says about every machine; the one source of "who is online".
     func hubState() async throws -> HubState {
         guard let endpoint = access.hubEndpoint else {
-            throw CLIError.usage("No hub is set. Run `fardesk hub --set http://host:4780`.")
+            throw CLIError.usage("No hub is set. Run `fardesk hub --set http://100.64.0.x:4780`.")
         }
         return try await call(endpoint, quick: true) { try await $0.hub() }
     }

@@ -21,6 +21,20 @@ public struct SystemActivity: Codable, Sendable, Hashable, Identifiable {
     public let text: String
 }
 
+extension SystemActivity {
+    private enum KnownKeys: String, CodingKey {
+        case id, ts
+    }
+
+    /// An activity of a kind a newer daemon added: shown as a neutral system line.
+    init(unknownKindFrom decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: KnownKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        ts = try c.decode(Date.self, forKey: .ts)
+        text = unknownStateText
+    }
+}
+
 public struct ToolActivity: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let ts: Date
@@ -89,4 +103,9 @@ public struct PermissionActivity: Codable, Sendable, Hashable, Identifiable {
     public let state: PermissionState
     /// With state `.terminal`: Allow or Deny types the matching key into the dialog at the computer. Absent otherwise.
     public let typable: Bool?
+    /// ExitPlanMode only: the whole plan as markdown. Absent for every other tool.
+    public let plan: String?
+    /// ExitPlanMode only: the choices the machine offers, a subset of "approve_bypass", "approve_manual", "revise".
+    /// Absent from a daemon without the "plan-approval" feature.
+    public let planChoices: [String]?
 }

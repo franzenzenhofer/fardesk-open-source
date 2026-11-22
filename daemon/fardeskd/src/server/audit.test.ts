@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { OTHER_PASSWORD, authOverrides, loginAs } from "../../test/support/auth.js";
+import { pairAs } from "../../test/support/auth.js";
 import { startTestDaemon } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
 import { makeTempDir, waitUntil } from "../../test/support/env.js";
@@ -18,17 +18,17 @@ afterEach(async () => {
 const auditLines = (): AuditEntry[] => readAudit(daemon.config.stateDir, null);
 
 describe("audit log through the HTTP API", () => {
-  it("writes one line each for a message, a permission decision and a failed login, with the right device id and no message text", async () => {
-    daemon = await startTestDaemon(await authOverrides());
+  it("writes one line each for a message, a permission decision and a failed pairing, with the right device id and no message text", async () => {
+    daemon = await startTestDaemon();
     await seedHookSession(daemon);
-    const phone = await loginAs(daemon, "Test iPhone");
+    const phone = await pairAs(daemon, "Test iPhone");
     const hook = fireHook(daemon, "PermissionRequest-bash.json");
     const requestId = await pendingRequestId(daemon, "permission");
     const secret = "do-not-log-this-prompt-text";
     await daemon.call("POST", `/v1/sessions/${HOOK_SESSION_ID}/message`, { text: secret }, phone.token);
     expect((await daemon.call("POST", `/v1/sessions/${HOOK_SESSION_ID}/permission/${requestId}`, { decision: "allow" }, phone.token)).status).toBe(200);
     await hook;
-    const failed = await daemon.call("POST", "/v1/auth/login", { password: OTHER_PASSWORD, deviceName: "Intruder" }, null);
+    const failed = await daemon.call("POST", "/v1/auth/pair", { code: "x".repeat(43), deviceName: "Intruder" }, null);
     expect(failed.status).toBe(401);
 
     const lines = auditLines();
@@ -39,9 +39,9 @@ describe("audit log through the HTTP API", () => {
     const decisions = byRoute("/v1/sessions/:id/permission/:rid");
     expect(decisions).toHaveLength(1);
     expect(decisions[0]).toMatchObject({ event: "request", deviceId: phone.deviceId, sessionId: HOOK_SESSION_ID, result: 200 });
-    const logins = lines.filter((entry) => entry.event === "login_failed");
+    const logins = lines.filter((entry) => entry.event === "pairing_failed");
     expect(logins).toHaveLength(1);
-    expect(logins[0]).toMatchObject({ deviceId: null, route: "/v1/auth/login", result: 401, ip: "127.0.0.1" });
+    expect(logins[0]).toMatchObject({ deviceId: null, route: "/v1/auth/pair", result: 401, ip: "127.0.0.1" });
     expect(readFileSync(join(daemon.config.stateDir, AUDIT_FILE), "utf8")).not.toContain(secret);
     expect(statSync(join(daemon.config.stateDir, AUDIT_FILE)).mode & 0o777).toBe(0o600);
   });
@@ -83,13 +83,13 @@ describe("audit store", () => {
     log.record({ event: "request", deviceId: "dev_1", method: "POST", route: "/v1/sessions/:id/stop", sessionId: "s1", result: 200, ip: "100.64.0.9" });
     for (let index = 0; index < 200; index += 1) {
       now = new Date(now.getTime() + 1000);
-      log.record({ event: "login_failed", deviceId: null, method: "POST", route: "/v1/auth/login", sessionId: null, result: 401, ip: "100.64.0.66" });
+      log.record({ event: "pairing_failed", deviceId: null, method: "POST", route: "/v1/auth/pair", sessionId: null, result: 401, ip: "100.64.0.66" });
     }
     now = new Date(now.getTime() + 1000);
     log.record({ event: "request", deviceId: "dev_1", method: "POST", route: "/v1/sessions/:id/mute", sessionId: "s1", result: 200, ip: "100.64.0.9" });
     const all = readAudit(stateDir, null);
     expect(all.filter((entry) => entry.deviceId === "dev_1").map((entry) => entry.route)).toEqual(["/v1/sessions/:id/stop", "/v1/sessions/:id/mute"]);
-    expect(all.some((entry) => entry.event === "login_failed")).toBe(true);
+    expect(all.some((entry) => entry.event === "pairing_failed")).toBe(true);
     expect(all.map((entry) => entry.time)).toEqual([...all.map((entry) => entry.time)].sort());
     expect(statSync(join(stateDir, UNAUTHENTICATED_AUDIT_FILE)).mode & 0o777).toBe(0o600);
   });

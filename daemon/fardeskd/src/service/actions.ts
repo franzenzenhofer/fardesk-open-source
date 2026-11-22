@@ -1,6 +1,5 @@
 // message, stop and kill: owned sessions go through the runner; terminal sessions through their tmux pane,
 // inbox socket or process id.
-import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { composeText, imageBlocks } from "../attachments/compose.js";
 import type { AttachmentStore } from "../attachments/store.js";
 import type { RunCommand, RunWithInput } from "../config/bind.js";
@@ -20,6 +19,7 @@ import type { ClearTerminal } from "./clear.js";
 import { clearTerminalSession, compactTerminalSession, rejectClearMessage, rejectCompactMessage } from "./clear.js";
 import { closePlacement, locate, typeIntoPane } from "./terminal.js";
 import type { Placement, TerminalDeps } from "./terminal.js";
+import { readAppended, sizeOf } from "./transcriptTail.js";
 import type { ActionResult, Services } from "./types.js";
 
 export type ActionDeps = {
@@ -34,25 +34,6 @@ export type ActionDeps = {
 };
 
 export type Actions = Pick<Services, "message" | "stop" | "kill" | "clear" | "compact">;
-
-const NEWLINE = "\n";
-
-function sizeOf(path: string | null): number {
-  return path === null ? 0 : statSync(path).size;
-}
-
-// The lines appended to a transcript after `offset` bytes.
-function readAppended(path: string, offset: number): string[] {
-  const length = statSync(path).size - offset;
-  if (length <= 0) return [];
-  const buffer = Buffer.alloc(length);
-  const fd = openSync(path, "r");
-  try {
-    return buffer.subarray(0, readSync(fd, buffer, 0, length, offset)).toString("utf8").split(NEWLINE);
-  } finally {
-    closeSync(fd);
-  }
-}
 
 export function terminalDeps(deps: ActionDeps): TerminalDeps {
   return { tmuxBinary: deps.config.tmuxBinary, run: deps.run, runWithInput: deps.runWithInput, ghostty: deps.ghostty, log: deps.log };

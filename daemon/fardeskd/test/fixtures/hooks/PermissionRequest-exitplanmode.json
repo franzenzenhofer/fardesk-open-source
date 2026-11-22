@@ -1,0 +1,12 @@
+{
+  "session_id": "7d7456e7-072b-4806-8b62-9b9d858ba62a",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-fardesk-spike-c/7d7456e7-072b-4806-8b62-9b9d858ba62a.jsonl",
+  "cwd": "/home/dev/fardesk-spike/c",
+  "prompt_id": "ed7aa675-03af-47ad-b17b-0205b18cb8e0",
+  "permission_mode": "plan",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "ExitPlanMode",
+  "tool_input": {
+    "plan": "# Create notes\n\n1. Write notes.txt containing hi.\n2. Check the file."
+  }
+}

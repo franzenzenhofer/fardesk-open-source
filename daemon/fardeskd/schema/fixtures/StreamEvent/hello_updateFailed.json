@@ -1,0 +1,33 @@
+{
+  "type": "hello",
+  "machine": {
+    "contractVersion": 4,
+    "name": "Build Box",
+    "hostname": "build-box",
+    "os": "linux",
+    "version": "0.1.0",
+    "claudeVersion": null,
+    "sessionsCount": 0,
+    "models": [],
+    "ghosttyAutomation": "unknown",
+    "allowBypass": false,
+    "coordinatorEnabled": false,
+    "homes": [
+      ".claude"
+    ],
+    "tailscale": {
+      "state": "running"
+    },
+    "features": [
+      "chat-image"
+    ],
+    "update": {
+      "state": "failed",
+      "message": "npm ci failed: network unreachable",
+      "version": "4.3.0",
+      "packageSha256": null,
+      "at": "2026-11-22T11:02:00.000Z"
+    }
+  },
+  "sessions": []
+}

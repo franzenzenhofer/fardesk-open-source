@@ -28,7 +28,7 @@ struct CoordinatorCommandTests {
 
     @Test func askStartsTheCoordinatorAndOpenNamesTheSameSession() async throws {
         try await CLIHarness.withPairedDaemon { cli, daemon in
-            let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let api = daemon.api(token: TestDaemon.token, timeout: 5)
             #expect(try await api.coordinatorState().sessionId == nil)
 
             let result = await cli.run(["ask", "--machine", "bo", "What needs me?"])

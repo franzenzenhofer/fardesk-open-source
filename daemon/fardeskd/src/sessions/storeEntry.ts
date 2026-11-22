@@ -1,4 +1,6 @@
 // One tracked session inside the store, the store's dependencies, and the pure helpers on entries.
+import type { AutoColourStore } from "../colour/autoColourStore.js";
+import type { ClaudeHomeEntry } from "../config/claudeHomes.js";
 import type { Activity, SessionLabel, SessionSummary } from "../contract/schema.js";
 import type { Bus } from "../core/bus.js";
 import type { Logger } from "../core/log.js";
@@ -9,7 +11,8 @@ import type { PendingKind } from "./status.js";
 import type { TranscriptRef } from "./transcriptFiles.js";
 
 export type StoreDeps = {
-  claudeHomes: string[];
+  /** Read on every poll: the list is replaced in place when the config is reloaded. */
+  claudeHomes: ClaudeHomeEntry[];
   bus: Bus;
   log: Logger;
   registryPollMs: number;
@@ -21,6 +24,8 @@ export type StoreDeps = {
   pendingKind(sessionId: string): PendingKind | null;
   isMuted(sessionId: string): boolean;
   labelOf(sessionId: string): SessionLabel;
+  /** The daemon's automatic colour per session, assigned once and kept. */
+  autoColors: AutoColourStore;
   /** The terminal of this process can be typed into (tmux pane or Ghostty terminal): replies need no inbox. */
   isTypable?(pid: number): boolean;
   /** The session left its waiting state or its process ended: nothing the phone was asked is answerable any more. */
@@ -66,8 +71,10 @@ export const EMPTY_SUMMARY: TranscriptSummary = {
   startedAt: null,
   updatedAt: null,
   pendingToolUse: false,
+  backgroundTasks: 0,
   contextTokens: null,
   cacheExpiresAt: null,
+  lastTurnAt: null,
 };
 
 export function newEntry(id: string): StoreEntry {

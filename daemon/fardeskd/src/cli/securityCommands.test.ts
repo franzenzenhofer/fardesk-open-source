@@ -68,11 +68,11 @@ describe("audit command", () => {
     const log = createAuditLog({ stateDir, now: () => new Date("2026-11-17T09:00:00.000Z") });
     log.record({ event: "request", deviceId: "dev_1", method: "POST", route: "/v1/sessions/:id/message", sessionId: "s1", result: 200, ip: "100.64.0.9" });
     const later = createAuditLog({ stateDir, now: () => new Date("2026-11-17T11:45:00.000Z") });
-    later.record({ event: "login_failed", deviceId: null, method: "POST", route: "/v1/auth/login", sessionId: null, result: 401, ip: "100.64.0.77" });
+    later.record({ event: "pairing_failed", deviceId: null, method: "POST", route: "/v1/auth/pair", sessionId: null, result: 401, ip: "100.64.0.77" });
     const all = await run(["audit", "--config", path]);
     expect(all.out).toHaveLength(2);
     expect(all.out[0]).toContain("device=dev_1 POST /v1/sessions/:id/message session=s1 result=200");
-    expect(all.out[1]).toContain("login_failed device=- POST /v1/auth/login session=- result=401 ip=100.64.0.77");
+    expect(all.out[1]).toContain("pairing_failed device=- POST /v1/auth/pair session=- result=401 ip=100.64.0.77");
     expect((await run(["audit", "--since", "1h", "--config", path])).out).toHaveLength(1);
     expect((await run(["audit", "--since", "2026-11-17T09:00:00Z", "--config", path])).out).toHaveLength(2);
     expect((await run(["audit", "--since", "nonsense", "--config", path])).code).toBe(1);
@@ -130,14 +130,3 @@ describe("install-hooks consent", () => {
   });
 });
 
-describe("password minimum", () => {
-  it("is 12 in set-password: 11 characters fail, 12 pass", async () => {
-    const { path } = await offlineConfig();
-    const io = (password: string): ReturnType<typeof captureIo> => captureIo({}, password);
-    const short = io("a".repeat(11));
-    expect(await runCli(["set-password", "--config", path], short, { createOwned: createRealOwned })).toBe(1);
-    expect(short.err.join("\n")).toContain("at least 12 characters");
-    const fine = io("a".repeat(12));
-    expect(await runCli(["set-password", "--config", path], fine, { createOwned: createRealOwned })).toBe(0);
-  });
-});

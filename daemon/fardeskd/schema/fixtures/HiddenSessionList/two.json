@@ -1,0 +1,16 @@
+{
+  "sessions": [
+    {
+      "id": "sess_old1",
+      "title": "Fix the crawler retry",
+      "cwd": "/Users/dev/crawler",
+      "updatedAt": "2026-11-20T18:02:11.000Z"
+    },
+    {
+      "id": "sess_old2",
+      "title": "Release notes",
+      "cwd": "/Users/dev/site",
+      "updatedAt": "2026-11-18T09:40:00.000Z"
+    }
+  ]
+}

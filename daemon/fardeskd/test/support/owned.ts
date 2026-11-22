@@ -58,10 +58,10 @@ export function makeOwnedEnv(): OwnedEnv {
   const bus = createBus();
   const logs: string[] = [];
   const pending = collectPending(bus);
-  const broker = createBroker({ timeoutMs: BROKER_TIMEOUT_MS, bus, now: () => new Date(), newId: randomUUID });
+  const broker = createBroker({ timeoutMs: BROKER_TIMEOUT_MS, bus, now: () => new Date(), newId: randomUUID, allowBypass: true });
   const base: OwnedRunnerDeps = {
     claudeBinary: installedClaude(),
-    claudeHome: CLAUDE_HOME,
+    claudeHomes: [{ path: CLAUDE_HOME, name: "test" }],
     statePath: join(makeTempDir("fd-state-"), "owned.json"),
     permissionMode: "default",
     allowBypass: true,
@@ -72,6 +72,7 @@ export function makeOwnedEnv(): OwnedEnv {
     kill: KILL,
     broker,
     log: createLogger((line) => logs.push(line), () => new Date()),
+    findHome: (): string => CLAUDE_HOME,
     findCwd: (sessionId): string => {
       if (!findTranscripts(CLAUDE_HOME).some((ref) => ref.sessionId === sessionId)) {
         throw new FardeskError("not_found", `no transcript for ${sessionId}`);

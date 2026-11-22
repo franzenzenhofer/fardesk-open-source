@@ -8,8 +8,15 @@
       "enum": [
         "allow",
         "deny",
-        "allow_always"
+        "allow_always",
+        "approve_bypass",
+        "approve_manual",
+        "revise"
       ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [

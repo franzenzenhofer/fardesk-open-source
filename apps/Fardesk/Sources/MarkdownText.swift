@@ -5,6 +5,7 @@ import SwiftUI
 /// so it happens when a text is first drawn and the result is kept per text, never again in a view body.
 enum RenderedMarkdown {
     case prose(AttributedString)
+    case heading(level: Int, text: AttributedString)
     case table(header: [AttributedString], rows: [[AttributedString]])
 
     private final class Box {
@@ -23,6 +24,7 @@ enum RenderedMarkdown {
         let rendered = MarkdownBlocks.split(text).map { block -> RenderedMarkdown in
             switch block {
             case .prose(let prose): .prose(MarkdownText.inline(prose))
+            case .heading(let level, let text): .heading(level: level, text: MarkdownText.inline(text))
             case .table(let header, let rows): .table(header: header.map(MarkdownText.inline), rows: rows.map { $0.map(MarkdownText.inline) })
             }
         }
@@ -41,6 +43,7 @@ struct MarkdownText: View {
             ForEach(Array(RenderedMarkdown.blocks(for: text).enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .prose(let prose): Text(prose)
+                case .heading(let level, let text): Text(text).font(level <= 1 ? .title3.bold() : .headline).padding(.top, 4)
                 case .table(let header, let rows): MarkdownTable(header: header, rows: rows)
                 }
             }

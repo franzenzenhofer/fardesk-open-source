@@ -17,4 +17,15 @@ public struct MachineEndpoint: Codable, Equatable, Hashable, Identifiable, Senda
     public init(payload: PairingPayload, id: UUID = UUID()) {
         self.init(id: id, name: payload.name, url: payload.url)
     }
+
+    private enum CodingKeys: String, CodingKey { case id, name, url }
+
+    /// A saved machine obeys the same tailnet rule as a pairing link: a list entry written by an older build, by
+    /// hand or by another process can never point the app outside the tailnet.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        url = try MachineAddress.require(c.decode(URL.self, forKey: .url), otherwise: .address)
+    }
 }

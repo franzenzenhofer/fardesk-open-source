@@ -28,8 +28,8 @@ struct HelperTests {
     @Test func activityIdentityComesFromItsPayload() throws {
         let url = FixtureCatalog.fixturesDirectory.appending(path: "ActivityPage/everyActivityKind.json")
         let page = try FardeskJSON.makeDecoder().decode(ActivityPage.self, from: Data(contentsOf: url))
-        #expect(page.items.count == 18)
-        #expect(Set(page.items.map(\.id)).count == 18)
+        #expect(page.items.count >= 20, "one row per activity kind and state")
+        #expect(Set(page.items.map(\.id)).count == page.items.count, "every row has its own id")
     }
 
     @Test func timestampsKeepMillisecondPrecisionAsUTC() throws {

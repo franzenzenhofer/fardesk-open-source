@@ -7,7 +7,7 @@ import { CONFIG_DEFAULTS, type Config } from "./config.js";
 const TOKEN = "t".repeat(32);
 
 function configWith(address: string): Config {
-  return { ...CONFIG_DEFAULTS, name: "mac", token: TOKEN, bind: { address, port: 4780, allowNonTailnet: false } };
+  return { ...CONFIG_DEFAULTS, name: "mac", token: TOKEN, bind: { address, port: 4780 } };
 }
 
 async function runNodePrinting(text: string): Promise<string> {
@@ -118,30 +118,16 @@ describe("resolveBindAddress", () => {
 
 describe("bind guard", () => {
   const never = (): Promise<string> => Promise.reject(new Error("must not run"));
-  const tlsConfig = (address: string, allowNonTailnet: boolean): Config => ({
-    ...configWith(address),
-    tls: { cert: "c.pem", key: "k.pem" },
-    bind: { address, port: 4780, allowNonTailnet },
-  });
 
-  it.each(["127.0.0.1", "127.5.5.5", "::1", "localhost", "100.64.0.1", "100.127.255.254"])("starts on %s without any flag", async (address) => {
+  // Only the test sandbox (set by vitest.config.ts) lets a loopback address stand in for the tailnet.
+  it.each(["127.0.0.1", "127.5.5.5", "::1", "localhost"])("starts a test daemon on %s", async (address) => {
     expect(await resolveBindAddress(configWith(address), never)).toBe(address);
   });
 
-  it.each(["0.0.0.0", "192.168.1.20", "10.0.0.5", "100.63.0.1", "100.128.0.1", "::", "203.0.113.9"])("refuses %s without the flag and says why", async (address) => {
+  it.each(["0.0.0.0", "192.168.1.20", "10.0.0.5", "100.64.0.1", "100.63.0.1", "::", "203.0.113.9"])("refuses %s and says why", async (address) => {
     const error = await rejection(resolveBindAddress(configWith(address), never));
     expect(error).toBeInstanceOf(FardeskError);
-    expect((error as FardeskError).message).toContain("outside the tailnet");
-    expect((error as FardeskError).message).toContain("bind.allowNonTailnet");
+    expect((error as FardeskError).message).toContain("Tailscale only, no other way");
   });
 
-  it("still refuses 0.0.0.0 with the flag but without tls, and with tls but without the flag", async () => {
-    await expect(resolveBindAddress(configWith("0.0.0.0"), never)).rejects.toThrow("outside the tailnet");
-    await expect(resolveBindAddress({ ...configWith("0.0.0.0"), bind: { address: "0.0.0.0", port: 4780, allowNonTailnet: true } }, never)).rejects.toThrow("outside the tailnet");
-    await expect(resolveBindAddress(tlsConfig("0.0.0.0", false), never)).rejects.toThrow("outside the tailnet");
-  });
-
-  it("starts on 0.0.0.0 with tls and bind.allowNonTailnet: true", async () => {
-    expect(await resolveBindAddress(tlsConfig("0.0.0.0", true), never)).toBe("0.0.0.0");
-  });
 });

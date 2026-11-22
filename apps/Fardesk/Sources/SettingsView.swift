@@ -2,81 +2,73 @@ import FardeskModels
 import FardeskStore
 import SwiftUI
 
+/// Settings, laid out like the iOS Settings app: a short grouped list, every row opens one screen (Settings/*.swift).
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(DemoMode.self) private var demo
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(AppServices.requireFaceIDKey) private var requiresFaceID = false
-    @State private var confirmsLogout = false
-    @State private var showsAddMachine = false
-
-    private var version: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(short) (\(build))"
-    }
 
     var body: some View {
         NavigationStack {
-            Form {
-                machinesSection
-                NotificationsSection()
-                Section("Voice") { ReadAloudRow(); VoiceAttachRow() }
-                Section("Security") { Toggle("Require Face ID", isOn: $requiresFaceID) }
-                DevicesSection()
+            List {
+                if model.isDemo { Section { DemoNoticeLine() } }
                 Section {
-                    Button("Log Out", role: .destructive) { confirmsLogout = true }
-                } footer: {
-                    Text("Fardesk \(version)").font(.footnote).frame(maxWidth: .infinity)
+                    link("Machines", "desktopcomputer", .machines, detail: "\(model.state.machines.count)")
+                    link("Order in list", "arrow.up.arrow.down", .machineOrder)
+                    link("This device", "iphone", .thisDevice)
                 }
+                Section {
+                    link("Notifications", "bell", .notifications)
+                    link("Appearance", "paintpalette", .appearance)
+                    link("Hidden chats", "eye.slash", .hiddenChats)
+                }
+                Section {
+                    link("Voice", "mic", .voice)
+                    link("Security", "lock", .security)
+                    link("Data", "externaldrive", .data)
+                }
+                demoSection
+                Section { link("About", "info.circle", .about) }
+                DangerZone()
             }
-            .formStyle(.grouped)
             .navigationTitle("Settings")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-            }
-            .confirmationDialog("Log out of all machines?", isPresented: $confirmsLogout, titleVisibility: .visible) {
-                Button("Log Out", role: .destructive) { logout() }
-                Button("Cancel", role: .cancel) {}
-            }
-            .sheet(isPresented: $showsAddMachine) { AddMachineSheet() }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .navigationDestination(for: SettingsPage.self) { $0.destination() }
         }
         #if os(macOS)
-        .frame(minWidth: 520, idealWidth: 560, minHeight: 760, idealHeight: 820)
+        .frame(minWidth: 520, idealWidth: 560, minHeight: 640, idealHeight: 760)
         #endif
     }
 
-    private var machinesSection: some View {
-        Section("Machines") {
-            ForEach(model.state.machines) { machine in
-                let presentation = MachinePresentation(machine: machine, now: Date())
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(presentation.name)
-                        Spacer()
-                        MachineStatusBadge(presentation: presentation)
-                    }
-                    if machine.machine?.ghosttyAutomation == .denied {
-                        Text("Allow Fardesk to control Ghostty: System Settings > Privacy & Security > Automation.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .swipeActions {
-                    if !model.isHubMode {
-                        Button("Delete", role: .destructive) { model.removeMachine(id: machine.id) }
-                    }
-                }
-            }
-            if !model.isHubMode { Button("Add Machine", systemImage: "plus") { showsAddMachine = true } }
-        }
+    private func link(_ title: String, _ symbol: String, _ page: SettingsPage, detail: String? = nil) -> some View {
+        NavigationLink(value: page) { SettingsRow(title: title, symbol: symbol, detail: detail) }
+            .accessibilityIdentifier("settings-\(title.lowercased().replacingOccurrences(of: " ", with: "-"))")
     }
 
-    private func logout() {
-        let token = AppServices.shared.apnsToken
-        Task { await model.logout(apnsToken: token) }
+    /// In the demo: the way out. Otherwise: the way in (sample sessions on pretend machines, no computer needed).
+    @ViewBuilder
+    private var demoSection: some View {
+        if model.isDemo {
+            Section {
+                Button("Leave demo") { demo.leave() }.accessibilityIdentifier("settings-demo-leave")
+            } header: {
+                Text("Demo")
+            } footer: {
+                SettingsFooter("This is sample data. Nothing leaves this device.")
+            }
+        } else {
+            Section {
+                Button("See a demo") {
+                    dismiss()
+                    demo.enter()
+                }
+                .accessibilityIdentifier("settings-demo")
+            } footer: {
+                SettingsFooter("Sample sessions on pretend machines, without a computer.")
+            }
+        }
     }
 }

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The bell in the Machines toolbar: pause every machine's pushes for an hour, until 8:00, or resume.
 struct PauseMenu: View {
-    private static let morningHour = 8
+    static let morningHour = 8
 
     @Environment(AppModel.self) private var model
     @Environment(SharedClock.self) private var clock

@@ -6,6 +6,7 @@ public enum PairingError: Error, Equatable, Sendable, LocalizedError {
     case missingPayload
     case invalidBase64
     case invalidPayload
+    case outsideTailnet
 
     public var errorDescription: String? {
         switch self {
@@ -13,6 +14,7 @@ public enum PairingError: Error, Equatable, Sendable, LocalizedError {
         case .missingPayload: "The pairing link has no payload (d=...)"
         case .invalidBase64: "The pairing payload is not valid base64url"
         case .invalidPayload: "The pairing payload is not a valid Fardesk pairing"
+        case .outsideTailnet: MachineAddressError.link.errorDescription
         }
     }
 }
@@ -31,10 +33,13 @@ public enum PairingLink {
         let encoded = components.queryItems?.first { $0.name == queryName }?.value ?? ""
         guard !encoded.isEmpty else { throw PairingError.missingPayload }
         guard let data = Base64URL.decode(encoded) else { throw PairingError.invalidBase64 }
-        guard let payload = try? FardeskJSON.makeDecoder().decode(PairingPayload.self, from: data) else {
+        do {
+            return try FardeskJSON.makeDecoder().decode(PairingPayload.self, from: data)
+        } catch is MachineAddressError {
+            throw PairingError.outsideTailnet
+        } catch {
             throw PairingError.invalidPayload
         }
-        return payload
     }
 
     public static func make(_ payload: PairingPayload) throws -> String {

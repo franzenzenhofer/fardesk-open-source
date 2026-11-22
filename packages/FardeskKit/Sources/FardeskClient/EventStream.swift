@@ -11,9 +11,9 @@ public struct EventStream: Sendable {
     private let session: URLSession
     private let idleTimeout: TimeInterval
 
-    public init(api: FardeskAPI, session: URLSession = FardeskSessions.stream, idleTimeout: TimeInterval = defaultIdleTimeout) {
+    public init(api: FardeskAPI, idleTimeout: TimeInterval = defaultIdleTimeout) {
         self.api = api
-        self.session = session
+        session = FardeskSessions.stream
         self.idleTimeout = idleTimeout
     }
 
@@ -44,7 +44,7 @@ public struct EventStream: Sendable {
 
     func makeRequest() -> URLRequest {
         var components = URLComponents(url: api.baseURL, resolvingAgainstBaseURL: false)
-        components?.scheme = api.baseURL.scheme == "https" ? "wss" : "ws"
+        components?.scheme = "ws"
         components?.percentEncodedPath = api.pathPrefix + "/v1/stream"
         var request = URLRequest(url: components?.url ?? api.baseURL, timeoutInterval: max(api.timeout, FardeskSessions.streamTimeout))
         if let token = api.token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
@@ -70,7 +70,9 @@ public struct EventStream: Sendable {
     private func classify(_ error: any Error, task: URLSessionWebSocketTask) async -> any Error {
         if (task.response as? HTTPURLResponse)?.statusCode == 401 { return await rejection() }
         if let apiError = error as? FardeskAPIError { return apiError }
-        if let urlError = error as? URLError { return FardeskAPIError.transport(urlError) }
+        if let urlError = error as? URLError {
+            return FardeskAPIError.transport(urlError)
+        }
         return error
     }
 

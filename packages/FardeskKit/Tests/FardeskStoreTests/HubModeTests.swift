@@ -9,14 +9,14 @@ import Testing
 /// Hub mode of the app model against a REAL hub daemon with a live and a dead peer.
 @MainActor
 struct HubModeTests {
-    private func configuration(_ sandbox: StoreSandbox, hub: URL, tokens: TokenStore? = nil) -> AppModelConfiguration {
-        sandbox.configuration(tokens: tokens, hubURL: hub)
+    private func configuration(_ sandbox: StoreSandbox, hub: HubLink, tokens: TokenStore? = nil) -> AppModelConfiguration {
+        sandbox.configuration(tokens: tokens, hub: hub)
     }
 
     /// A model logged in to the hub with the config token, started, with the hub's machines in place.
     private func hubModel(_ rig: HubRig, _ sandbox: StoreSandbox) async throws -> AppModel {
         try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: rig.hub.url))
-        let model = AppModel(configuration: configuration(sandbox, hub: rig.hub.url))
+        let model = AppModel(configuration: configuration(sandbox, hub: rig.hub.link))
         await model.start()
         let ready = try await waitUntil {
             await MainActor.run { model.machines.endpoints.count == 3 && (try? model.state.machine(id: HubIdentity.machineID(name: HubRig.peerName)))?.isOnline == true }
@@ -25,9 +25,9 @@ struct HubModeTests {
         return model
     }
 
-    /// The hub token is the config token and the live peer comes online through the hub; stops the model.
+    /// The hub holds one token and the live peer comes online through the hub with it; stops the model.
     private func expectHubTokenBringsPeerOnline(_ model: AppModel, _ rig: HubRig, _ sandbox: StoreSandbox) async throws {
-        #expect(try sandbox.keychainTokens.load(HubIdentity.tokenID(hub: rig.hub.url)) == TestDaemon.token)
+        #expect(try sandbox.keychainTokens.load(HubIdentity.tokenID(hub: rig.hub.url)) != nil)
         let online = try await waitUntil {
             await MainActor.run { (try? model.state.machine(id: HubIdentity.machineID(name: HubRig.peerName)))?.isOnline == true }
         }
@@ -40,11 +40,9 @@ struct HubModeTests {
 
     /// Starts a model in hub mode and pairs it with a real link for the rig's hub.
     private func pairedModel(_ rig: HubRig, _ sandbox: StoreSandbox, tokens: TokenStore? = nil) async throws -> AppModel {
-        let model = AppModel(configuration: configuration(sandbox, hub: rig.hub.url, tokens: tokens))
+        let model = AppModel(configuration: configuration(sandbox, hub: rig.hub.link, tokens: tokens))
         await model.start()
-        let json = #"{"v":1,"name":"\#(HubRig.hubName)","url":"\#(rig.hub.url.absoluteString)","token":"\#(TestDaemon.token)"}"#
-        let payload = try FardeskJSON.makeDecoder().decode(PairingPayload.self, from: Data(json.utf8))
-        await model.pair(link: try PairingLink.make(payload))
+        await model.pair(link: try await PairingLinks.make(for: rig.hub, name: HubRig.hubName, hub: true))
         return model
     }
 
@@ -77,20 +75,6 @@ struct HubModeTests {
         }
     }
 
-    @Test func aDirectLoginToTheHubsMachineFromAnOlderBuildBecomesTheHubToken() async throws {
-        try await HubRig.with { rig in
-            try await StoreSandbox.with { sandbox in
-                let direct = MachineEndpoint(name: HubRig.hubName, url: rig.hub.url)
-                try sandbox.machinesFile.save(MachineList(endpoints: [direct]))
-                try sandbox.keychainTokens.save(TestDaemon.token, direct.id)
-                let model = AppModel(configuration: configuration(sandbox, hub: rig.hub.url))
-                await model.start()
-                #expect(model.isLoggedIn, "no new login after the update")
-                try await expectHubTokenBringsPeerOnline(model, rig, sandbox)
-            }
-        }
-    }
-
     @Test func machineListIsTheHubsListWithStableIDsAndOneToken() async throws {
         try await HubRig.with { rig in
             try await StoreSandbox.with { sandbox in
@@ -103,7 +87,8 @@ struct HubModeTests {
                 #expect(machine.machine?.name == HubRig.peerName, "the stream through the hub delivered the peer's hello")
                 #expect(machine.sessions.count == SeedSession.standard.count)
                 #expect(try sandbox.keychainTokens.load(peerID) == nil, "only the hub holds a token")
-                #expect(try sandbox.machinesFile.load().hub == rig.hub.url)
+                model.cacheWriter.flush()
+                #expect(try sandbox.machinesFile.load().hub == rig.hub.link)
                 model.stop()
             }
         }
@@ -155,7 +140,7 @@ struct HubModeTests {
             #expect(cached.activities.map(\.id) == shown.snapshot().activities.map(\.id))
             model.stop()
 
-            let second = AppModel(configuration: configuration(sandbox, hub: open.rig.hub.url))
+            let second = AppModel(configuration: configuration(sandbox, hub: open.rig.hub.link))
             await second.start()
             await second.restoreCachedFeed(ref)
             let instant = second.feeds.feed(for: ref)
@@ -183,8 +168,8 @@ struct HubModeTests {
                 await model.openSession(ref)
                 model.stop()
             }
-            let gone = URL(string: "http://127.0.0.1:\(try freePort())")!
-            try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: gone))
+            let gone = HubLink(url: URL(string: "http://127.0.0.1:\(try freePort())")!)
+            try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: gone.url))
             var list = try sandbox.machinesFile.load()
             list.setHub(gone)
             list.replaceEndpoints([HubIdentity.endpoint(machine: HubRig.peerName, hub: gone)])
@@ -201,13 +186,13 @@ struct HubModeTests {
 
     @Test func aHubThatDoesNotAnswerShowsEveryMachineOffline() async throws {
         try await StoreSandbox.with { sandbox in
-            let gone = URL(string: "http://127.0.0.1:\(try freePort())")!
-            try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: gone))
+            let gone = HubLink(url: URL(string: "http://127.0.0.1:\(try freePort())")!)
+            try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: gone.url))
             var list = MachineList()
             list.setHub(gone)
             list.replaceEndpoints([HubIdentity.endpoint(machine: "Linux", hub: gone)])
             try sandbox.machinesFile.save(list)
-            let model = AppModel(configuration: sandbox.configuration(hubURL: gone, tailscaleIsOn: { false }))
+            let model = AppModel(configuration: sandbox.configuration(hub: gone, tailscaleIsOn: { false }))
             await model.start()
             let offline = try await waitUntil {
                 await MainActor.run { model.state.machines.allSatisfy { if case .offline = $0.connection { true } else { false } } }
@@ -234,20 +219,19 @@ struct HubModeTests {
     }
 
     @Test(.enabled(if: DaemonCapabilities.hasAuth, DaemonCapabilities.authSkipReason))
-    func oneLoginToTheHubCoversEveryMachine() async throws {
+    func onePairingWithTheHubCoversEveryMachine() async throws {
         try await HubRig.with { rig in
-            try await rig.hub.setPassword("hub-password")
             try await StoreSandbox.with { sandbox in
-                let hub = rig.hub.url
+                let hub = rig.hub.link
                 var list = MachineList()
                 list.setHub(hub)
                 try sandbox.machinesFile.save(list)
                 let model = AppModel(configuration: configuration(sandbox, hub: hub))
                 await model.start()
                 #expect(model.phase == .loggedOut)
-                await model.login(password: "hub-password")
+                await model.pair(link: try await PairingLinks.make(for: rig.hub, name: HubRig.hubName, hub: true))
                 #expect(model.phase == .ready)
-                #expect(try sandbox.keychainTokens.load(HubIdentity.tokenID(hub: hub)) != nil)
+                #expect(try sandbox.keychainTokens.load(HubIdentity.tokenID(hub: hub.url)) != nil)
                 let came = try await waitUntil { await MainActor.run { model.machines.endpoints.count == 3 } }
                 #expect(came)
                 #expect(try model.machines.endpoints.allSatisfy { try sandbox.keychainTokens.load($0.id) == nil })

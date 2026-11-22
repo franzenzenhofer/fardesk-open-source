@@ -16,6 +16,8 @@ export type ListRules = {
   endedWithinDays: number;
   maxEnded: number;
   hiddenRoots: readonly string[];
+  /** Ids the user removed from the list: an ended session of them is left out, also when pinned; a session that runs again is shown. */
+  hiddenIds?: ReadonlySet<string>;
   /** Defaults to the real file system; a parameter so a test can count the lookups. */
   folderExists?: (path: string) => boolean;
 };
@@ -29,11 +31,12 @@ function worthListing(session: SessionSummary, rules: ListRules): boolean {
 }
 
 export function visibleSessions(sessions: SessionSummary[], rules: ListRules): SessionSummary[] {
-  const newestEnded = sessions.filter((session) => session.status === "ended").toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const isHidden = (session: SessionSummary): boolean => session.status === "ended" && rules.hiddenIds?.has(session.id) === true;
+  const newestEnded = sessions.filter((session) => session.status === "ended" && !isHidden(session)).toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const kept = new Set<string>();
   for (const session of newestEnded) {
     if (kept.size >= rules.maxEnded) break;
     if (worthListing(session, rules)) kept.add(session.id);
   }
-  return sessions.filter((session) => session.status !== "ended" || session.label.pinned || kept.has(session.id));
+  return sessions.filter((session) => !isHidden(session) && (session.status !== "ended" || session.label.pinned || kept.has(session.id)));
 }

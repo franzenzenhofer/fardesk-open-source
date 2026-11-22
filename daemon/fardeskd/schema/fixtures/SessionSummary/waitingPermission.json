@@ -5,20 +5,26 @@
   "status": "waiting",
   "waitingFor": "permission",
   "owned": true,
+  "agent": "claude",
+  "background": 0,
   "replyMode": "composer",
   "canStop": true,
   "summary": "Wants to run swift test",
   "model": "claude-sonnet-5-5",
   "pid": 50377,
+  "home": null,
   "muted": false,
   "label": {
     "name": "Crawler",
-    "color": "purple",
-    "pinned": false
+    "color": "#8F36C5",
+    "pinned": false,
+    "image": null
   },
+  "autoColor": "#487BA9",
   "permissionMode": "default",
   "contextTokens": null,
   "cacheExpiresAt": null,
+  "lastTurnAt": null,
   "startedAt": "2026-11-14T08:30:00.000Z",
   "updatedAt": "2026-11-14T09:10:41.000Z"
 }

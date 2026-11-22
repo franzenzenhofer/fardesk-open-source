@@ -5,6 +5,8 @@ import { apnsEnvironmentSchema } from "../contract/schema.js";
 import type { AuthDevice } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import { readJsonState, writeJsonState } from "../core/jsonState.js";
+import { UNKNOWN_ADDRESS } from "../server/peerAddress.js";
+import type { NodeBinding } from "./nodeBinding.js";
 
 export const REGISTRY_FILE = "auth-devices.json";
 export const MASTER_DEVICE_ID = "master";
@@ -19,6 +21,9 @@ const entrySchema = z.strictObject({
   createdAt: z.iso.datetime(),
   lastSeenAt: z.iso.datetime().nullable(),
   lastIp: z.string().min(1).nullable(),
+  /** The Tailscale node the device paired from (StableID plus sorted tags, never the user id): its token counts only from there. */
+  stableId: z.string().min(1),
+  tags: z.array(z.string().min(1)),
   revokedAt: z.iso.datetime().nullable(),
   apnsToken: z.string().min(1).nullable(),
   apnsEnvironment: apnsEnvironmentSchema.nullable(),
@@ -36,8 +41,11 @@ export type DeviceRegistryOptions = {
 };
 
 export type DeviceRegistry = {
-  issue: (name: string, ip: string) => { token: string; device: DeviceEntry };
-  authenticate: (token: string, ip: string) => AuthenticateResult;
+  issue: (name: string, ip: string, node: NodeBinding) => { token: string; device: DeviceEntry };
+  /** The device a token belongs to, without recording a visit (the node check comes between this and `seen`). */
+  find: (token: string) => AuthenticateResult;
+  /** Records a visit: last seen now, from this address; an unknown address never replaces a known one. */
+  seen: (deviceId: string, ip: string) => void;
   list: (currentId: string | null) => AuthDevice[];
   entries: () => DeviceEntry[];
   /** Revokes the active entries matching an id or an exact case-insensitive name; null revokes all. */
@@ -74,7 +82,7 @@ function openStore({ path, now }: DeviceRegistryOptions): Store {
   };
 }
 
-function newDevice(name: string, ip: string, createdAt: string): { token: string; device: DeviceEntry } {
+function newDevice(name: string, ip: string, node: NodeBinding, createdAt: string): { token: string; device: DeviceEntry } {
   const token = randomBytes(TOKEN_BYTES).toString("hex");
   const device: DeviceEntry = {
     id: randomUUID(),
@@ -83,6 +91,8 @@ function newDevice(name: string, ip: string, createdAt: string): { token: string
     createdAt,
     lastSeenAt: createdAt,
     lastIp: ip,
+    stableId: node.stableId,
+    tags: node.tags,
     revokedAt: null,
     apnsToken: null,
     apnsEnvironment: null,
@@ -90,31 +100,31 @@ function newDevice(name: string, ip: string, createdAt: string): { token: string
   return { token, device };
 }
 
-function createCredentials(store: Store, options: DeviceRegistryOptions): Pick<DeviceRegistry, "issue" | "authenticate"> {
+function createCredentials(store: Store, options: DeviceRegistryOptions): Pick<DeviceRegistry, "issue" | "find" | "seen"> {
   const writeIntervalMs = options.lastSeenWriteIntervalMs ?? LAST_SEEN_WRITE_INTERVAL_MS;
   const stamp = (): string => options.now().toISOString();
   const lastWritten = new Map<string, number>();
-  const touch = (entry: DeviceEntry, ip: string): DeviceEntry => {
-    const updated = { ...entry, lastSeenAt: stamp(), lastIp: ip };
-    store.update(updated);
-    if (options.now().getTime() - (lastWritten.get(entry.id) ?? 0) >= writeIntervalMs) {
-      lastWritten.set(entry.id, options.now().getTime());
-      store.persist();
-    }
-    return updated;
-  };
   return {
-    issue(name, ip): { token: string; device: DeviceEntry } {
-      const { token, device } = newDevice(name, ip, stamp());
+    issue(name, ip, node): { token: string; device: DeviceEntry } {
+      const { token, device } = newDevice(name, ip, node, stamp());
       lastWritten.set(device.id, options.now().getTime());
       store.add(device);
       return { token, device };
     },
-    authenticate(token, ip): AuthenticateResult {
+    find(token): AuthenticateResult {
       const hash = hashToken(token);
       const entry = store.all().find((candidate) => candidate.tokenHash === hash);
       if (entry === undefined) return { state: "unknown" };
-      return isActive(entry) ? { state: "ok", device: touch(entry, ip) } : { state: "revoked" };
+      return isActive(entry) ? { state: "ok", device: entry } : { state: "revoked" };
+    },
+    seen(deviceId, ip): void {
+      const entry = store.all().find((candidate) => candidate.id === deviceId);
+      if (entry === undefined) return;
+      store.update({ ...entry, lastSeenAt: stamp(), lastIp: ip === UNKNOWN_ADDRESS ? entry.lastIp : ip });
+      if (options.now().getTime() - (lastWritten.get(deviceId) ?? 0) >= writeIntervalMs) {
+        lastWritten.set(deviceId, options.now().getTime());
+        store.persist();
+      }
     },
   };
 }

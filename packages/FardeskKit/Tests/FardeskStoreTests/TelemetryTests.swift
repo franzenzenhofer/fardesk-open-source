@@ -76,7 +76,7 @@ struct TelemetryQueueTests {
 @MainActor
 struct TelemetryFlowTests {
     private func api(_ daemon: TestDaemon) -> FardeskAPI {
-        FardeskAPI(baseURL: daemon.url, token: TestDaemon.token)
+        daemon.api(token: TestDaemon.token)
     }
 
     @Test func aFailedActionIsQueuedWithMachineAndActionAndFlushedToTheDaemon() async throws {

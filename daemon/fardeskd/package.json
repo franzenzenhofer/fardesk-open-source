@@ -1,6 +1,6 @@
 {
   "name": "fardeskd",
-  "version": "2.1.0",
+  "version": "4.4.1",
   "private": true,
   "description": "Fardesk daemon: observes and controls Claude Code sessions on one machine",
   "type": "module",

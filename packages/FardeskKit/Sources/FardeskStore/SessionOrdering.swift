@@ -25,7 +25,7 @@ public enum SessionOrdering {
     private static func listGroup(_ status: SessionStatus) -> Int {
         switch status {
         case .waiting: 0
-        case .working, .idle: 1
+        case .working, .idle, .unknown: 1
         case .ended: 2
         }
     }
@@ -36,6 +36,7 @@ public enum SessionOrdering {
         case .working: 1
         case .idle: 2
         case .ended: 3
+        case .unknown: 4
         }
     }
 

@@ -8,7 +8,7 @@ struct HubCommand: AsyncParsableCommand {
         commandName: "hub", abstract: "Show, set or clear the hub (the machine all calls go through)."
     )
     @OptionGroup var output: OutputOptions
-    @Option(name: .long, help: "Go through the hub at this address, e.g. http://100.64.0.10:4780.")
+    @Option(name: .long, help: "Go through the hub at this http address on your tailnet, e.g. http://100.64.0.10:4780.")
     var set: String?
     @Flag(name: .long, help: "Stop using a hub and talk to every machine itself.")
     var clear = false
@@ -21,16 +21,16 @@ struct HubCommand: AsyncParsableCommand {
         let workspace = try Workspace(context: context, format: output.format)
         guard set != nil || clear else { return try await show(workspace) }
         var list = workspace.machines
-        list.setHub(try set.map(Self.parse))
+        list.setHub(try set.map { HubLink(url: try Self.parse($0)) })
         try workspace.machinesFile.save(list)
         workspace.print(try describe(list.hub, workspace))
     }
 
     private static func parse(_ text: String) throws -> URL {
-        guard let url = URL(string: text), ["http", "https"].contains(url.scheme), url.host() != nil else {
-            throw CLIError.usage("--set must look like http://host:4780")
+        guard let url = URL(string: text), url.scheme == "http", url.host() != nil else {
+            throw CLIError.usage("--set must look like http://100.64.0.1:4780 (the hub's tailnet address)")
         }
-        return url
+        return try MachineAddress.require(url, otherwise: .address)
     }
 
     /// `hub` shows the hub; with --json it is the hub's own answer (`GET /v1/hub`, the HubState).
@@ -39,9 +39,9 @@ struct HubCommand: AsyncParsableCommand {
         workspace.print(try HubMachinesRenderer.render(try await workspace.hubState(), options: workspace.options))
     }
 
-    private func describe(_ hub: URL?, _ workspace: Workspace) throws -> String {
-        if output.format == .json { return try JSONOutput.compact(HubShown(hub: hub?.absoluteString)) }
-        return hub.map { "Hub: \($0.absoluteString). Run `fardesk login` once, then `fardesk machines`." }
+    private func describe(_ hub: HubLink?, _ workspace: Workspace) throws -> String {
+        if output.format == .json { return try JSONOutput.compact(HubShown(hub: hub?.url.absoluteString)) }
+        return hub.map { "Hub: \($0.url.absoluteString). Run `fardesk pair <link>` once, then `fardesk machines`." }
             ?? "No hub: every machine is asked directly"
     }
 

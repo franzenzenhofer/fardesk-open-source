@@ -34,6 +34,7 @@ struct TerminalRequestCard: View {
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: .rect(cornerRadius: 20))
+        .disabledInDemo(.sessionActions)
     }
 
     private func label(_ choice: TerminalRequestPresentation.Choice) -> String {

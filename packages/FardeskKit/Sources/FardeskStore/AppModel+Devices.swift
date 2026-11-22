@@ -18,7 +18,7 @@ extension AppModel {
     /// delivered the moment it answers; a machine that does not answer arrives as "Unreachable".
     public func deviceUpdates(timeout: TimeInterval = MachineDevices.defaultTimeout) -> AsyncStream<MachineDevices> {
         let access = MachineAccess(tokens: configuration.tokens, timeout: timeout, hub: access.hub, cache: access.tokenCache, transport: access.transport)
-        let endpoints = machines.endpoints
+        let endpoints = demo == nil ? machines.endpoints : []
         return AsyncStream { continuation in
             let reading = Task {
                 await withTaskGroup(of: MachineDevices.self) { group in

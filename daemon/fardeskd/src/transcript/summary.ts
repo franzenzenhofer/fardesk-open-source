@@ -1,5 +1,6 @@
 // The one-line session summary and header facts for the session list.
 import type { Activity, ToolActivity } from "../contract/schema.js";
+import { countOpenBackgroundTasks } from "./background.js";
 import { isConversationLine } from "./lineTypes.js";
 import type { ConversationLine, TranscriptLine } from "./lineTypes.js";
 import { buildRows } from "./rows.js";
@@ -15,8 +16,11 @@ export type TranscriptSummary = {
   startedAt: string | null;
   updatedAt: string | null;
   pendingToolUse: boolean;
+  /** Background tasks (run_in_background Bash, background agents, Monitors) launched and not yet finished. */
+  backgroundTasks: number;
   contextTokens: number | null;
   cacheExpiresAt: string | null;
+  lastTurnAt: string | null;
 };
 
 const SENTENCE_BREAK = /(?<=[.!?])\s+|\n+/;
@@ -69,7 +73,9 @@ export function summarise(lines: readonly TranscriptLine[], maxChars: number, pr
     startedAt: conversation.at(0)?.timestamp ?? null,
     updatedAt: conversation.at(-1)?.timestamp ?? null,
     pendingToolUse: running,
+    backgroundTasks: countOpenBackgroundTasks(main),
     contextTokens: usage?.contextTokens ?? null,
     cacheExpiresAt: usage?.cacheExpiresAt ?? null,
+    lastTurnAt: usage?.lastTurnAt ?? null,
   };
 }

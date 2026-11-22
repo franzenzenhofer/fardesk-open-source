@@ -30,10 +30,11 @@ function withFirstKeyWrongType(value: Record<string, unknown>): Record<string, u
 /** Patch bodies: every key is optional, so leaving one out is valid by design. */
 const PATCH_CONTRACTS: readonly ContractName[] = ["LabelRequest"];
 
+
+
 function invalidValues(name: ContractName): readonly unknown[] {
   const base = firstFixture(name);
   return [
-    { ...base, unknownKey: 1 },
     ...(PATCH_CONTRACTS.includes(name) ? [] : [withoutFirstKey(base)]),
     withFirstKeyWrongType(base),
     "not an object",
@@ -85,10 +86,21 @@ describe("fixtures against the generated JSON Schema", () => {
 
 describe("invalid values are rejected by zod and ajv", () => {
   for (const name of contractNames()) {
-    it(`${name} rejects unknown key, missing field, wrong type, non-object`, () => {
+    it(`${name} rejects a missing field, a wrong type and a non-object`, () => {
       for (const value of invalidValues(name)) {
         expect(contractSchemas[name].safeParse(value).success).toBe(false);
         expect(ajvAccepts(name, value)).toBe(false);
+      }
+    });
+  }
+
+  for (const name of contractNames().filter((each) => !Array.isArray(firstFixture(each)))) {
+    // Every contract is read tolerantly: a field a newer 4.x adds is dropped, never an error (VERSIONING.md, section 3).
+    it(`${name} accepts an unknown extra field and drops it`, () => {
+      for (const value of Object.values(contractFixtures[name])) {
+        const parsed = contractSchemas[name].safeParse({ ...(value as Record<string, unknown>), fieldFromANewerApp: { nested: true } });
+        expect(parsed.success).toBe(true);
+        expect(parsed.data).toEqual(value);
       }
     });
   }

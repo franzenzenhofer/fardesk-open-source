@@ -20,8 +20,12 @@ final class SessionCoordinator {
     var killTarget: SessionRef?
     /// A session waiting for the Rename prompt.
     var renameTarget: SessionRef?
+    /// A session whose full colour picker ("More colours") is open.
+    var colourTarget: SessionRef?
     var terminalTarget: SessionRef?
     var showsNewSession = false
+    /// What the New Session sheet starts with ("Start fresh here" fills it from the stopped chat); nil = empty.
+    var newSessionPreset: NewSessionDraft?
     var showsSettings = false
 
     /// The open session (or the one being started), as most callers think of it.
@@ -42,8 +46,10 @@ final class SessionCoordinator {
         route = nil
         killTarget = nil
         renameTarget = nil
+        colourTarget = nil
         terminalTarget = nil
         showsNewSession = false
+        newSessionPreset = nil
         showsSettings = false
     }
 }

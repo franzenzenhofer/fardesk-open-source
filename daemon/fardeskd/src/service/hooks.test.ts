@@ -60,7 +60,7 @@ async function setup(deviceKinds: ("permission" | "question")[]): Promise<{
     content: "full",
     log,
   });
-  const broker = createBroker({ timeoutMs: TIMEOUT_MS, bus, now: () => new Date(NOW), newId: () => "req-1" });
+  const broker = createBroker({ timeoutMs: TIMEOUT_MS, bus, now: () => new Date(NOW), newId: () => "req-1", allowBypass: true });
   resources.push({ server, client, notifier, broker });
   const handle = createHookHandler({ broker, owned: { isOwned: () => false }, store: { refresh: () => undefined }, notifier, log });
   return { handle, broker, server };
@@ -76,7 +76,7 @@ const categories = (server: ApnsTestServer): string[] =>
   server.requests.map((request) => (JSON.parse(request.body) as { aps: { category: string } }).aps.category);
 
 describe("a hook connection that closed before the request was asked", () => {
-  it("drops the request at once and sends no hand-off push (only the first PERMISSION push went out)", async () => {
+  it("drops the request at once and sends no hand-off push (the PERMISSION push is only withdrawn by a RESOLVED one)", async () => {
     const { handle, broker, server } = await setup(["permission"]);
     const event = eventOf("PermissionRequest-bash.json");
     const closed = AbortSignal.abort();
@@ -85,7 +85,7 @@ describe("a hook connection that closed before the request was asked", () => {
     expect(broker.pendingKind(event.sessionId)).toBeNull();
     expect(broker.activities(event.sessionId)[0]).toMatchObject({ state: "expired" });
     await sleep(TIMEOUT_MS * 2);
-    expect(categories(server)).toEqual(["PERMISSION"]);
+    expect(categories(server)).toEqual(["PERMISSION", "RESOLVED"]);
   });
 });
 

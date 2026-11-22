@@ -1,10 +1,13 @@
 /// The one table of SF Symbol names used by the app (the CLI uses ASCII markers instead).
 public enum FardeskSymbol {
-    // Session status (mockup 01)
+    // Session status (docs/design/STATES.md): working, needs you, your turn, stopped
     public static let waiting = "exclamationmark.circle.fill"
-    public static let working = "circle.dotted"
-    public static let idle = "pause.circle.fill"
-    public static let ended = "checkmark.circle"
+    public static let waitingAtComputer = "laptopcomputer"
+    public static let working = "ellipsis.circle.fill"
+    public static let workingInBackground = "ellipsis.circle"
+    public static let idle = "arrowshape.turn.up.left.circle"
+    public static let ended = "stop.circle.fill"
+    public static let unknown = "questionmark.circle"
 
     // Tool rows (SPEC 4.2)
     public static let edit = "pencil"

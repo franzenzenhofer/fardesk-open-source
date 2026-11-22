@@ -39,7 +39,7 @@ struct MachineStateReducerTests {
         var state = try helloState()
         #expect(state.isOnline)
         #expect(state.machine?.name == "Studio Mac")
-        #expect(state.sessions.count == 8)
+        #expect(state.sessions.count == 11)
         state.apply(try Fixtures.event("helloEmpty"))
         #expect(state.sessions.isEmpty)
         #expect(state.isOnline)
@@ -83,7 +83,7 @@ struct MachineStateReducerTests {
         pinged.apply(.ping(ts: t0))
         pinged.markOffline(now: t0.addingTimeInterval(100))
         #expect(pinged.connection == .offline(lastSeen: t0))
-        #expect(pinged.sessions.count == 8)
+        #expect(pinged.sessions.count == 11)
 
         var silent = try helloState()
         silent.markOffline(now: t0)
@@ -107,8 +107,8 @@ struct MachineStateReducerTests {
 }
 
 struct AppStateReducerTests {
-    private let linux = Fixtures.endpoint("Linux", host: "192.0.2.1")
-    private let mac = Fixtures.endpoint("Mac", host: "192.0.2.2")
+    private let linux = Fixtures.endpoint("Linux", host: "100.64.0.1")
+    private let mac = Fixtures.endpoint("Mac", host: "100.64.0.2")
 
     @Test func eventsReachOnlyTheNamedMachine() throws {
         var state = AppState(endpoints: [linux, mac])
@@ -154,12 +154,12 @@ struct AppStateReducerTests {
         #expect(state.needsYouCount == 0)
         try state.apply(try Fixtures.event("helloWithSessions"), from: linux.id)
         try state.apply(try Fixtures.event("helloWithSessions"), from: mac.id)
-        #expect(state.needsYouCount == 4)
-        #expect(state.needsYouSessions.map(\.machineName) == ["Linux", "Linux", "Mac", "Mac"])
+        #expect(state.needsYouCount == 6)
+        #expect(state.needsYouSessions.map(\.machineName) == ["Linux", "Linux", "Linux", "Mac", "Mac", "Mac"])
         #expect(state.needsYouSessions.first?.session.status == .waiting)
         #expect(state.needsYouSessions.first?.machineID == linux.id)
         try state.markOffline(machineID: mac.id, now: t0)
-        #expect(state.needsYouCount == 2)
+        #expect(state.needsYouCount == 3)
         try state.markConnecting(machineID: linux.id)
         #expect(state.needsYouCount == 0)
     }

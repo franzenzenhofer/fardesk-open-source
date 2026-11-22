@@ -112,6 +112,9 @@ public enum FeedBlock: Equatable, Sendable, Identifiable {
         case .question(let question):
             let line = ResolvedRequestPresentation(question: question)
             return .note(id: question.id, symbolName: line.symbolName, text: line.text)
+        case .dialog(let dialog):
+            let line = ResolvedRequestPresentation(dialog: dialog)
+            return .note(id: dialog.id, symbolName: line.symbolName, text: line.text)
         case .tool(let tool): return .steps(id: tool.id, steps: FeedSteps(count: 1, latest: FeedToolRow(tool: tool)))
         case .files(let files): return .steps(id: files.id, steps: FeedSteps(count: 1, latest: FeedToolRow(files: files)))
         }
@@ -120,24 +123,18 @@ public enum FeedBlock: Equatable, Sendable, Identifiable {
 
 /// The three-part line under the session title (mockups 02 to 04).
 public struct SessionHeaderLine: Equatable, Sendable {
-    public enum Tone: Equatable, Sendable { case working, attention, quiet }
-
     public let leadText: String
     public let statusLabel: String
-    public let tone: Tone
+    public let tone: StateTone
     /// How this session asks for permissions ("Bypass permissions", "Ask", ...); nil when unknown.
     public let modeLabel: String?
 
-    public init(session: SessionSummary, machineName: String) {
+    public init(session: SessionSummary, machineName: String, homeTag: String?) {
         modeLabel = session.permissionMode?.label
         let presentation = SessionPresentation(session: session, now: .now)
-        leadText = presentation.headerLeadParts(machineName: machineName).joined(separator: FeedSymbol.separator)
+        leadText = presentation.headerLeadParts(machineName: machineName, homeTag: homeTag).joined(separator: FeedSymbol.separator)
         statusLabel = presentation.statusLabel
-        tone = switch session.status {
-        case .working: .working
-        case .waiting: .attention
-        case .idle, .ended: .quiet
-        }
+        tone = SessionRowGlyph(session: session).tint
     }
 }
 

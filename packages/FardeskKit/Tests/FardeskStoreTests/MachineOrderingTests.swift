@@ -32,12 +32,6 @@ struct MachineOrderingTests {
         #expect(names == ["Studio", "Laptop", "Alpha", "Linux"])
     }
 
-    @Test("The build setting is a list of names separated by semicolons")
-    func parsesTheBuildSetting() {
-        #expect(MachineOrdering.parse(" Studio ; ;Laptop;Build server") == ["Studio", "Laptop", "Build server"])
-        #expect(MachineOrdering.parse("").isEmpty)
-    }
-
     @Test("Two machines with the same name keep a stable order by id")
     func sameNameTiesById() {
         let one = state("Studio", os: nil)
@@ -80,7 +74,7 @@ struct MachineOrderingTests {
     @Test("Pinned sessions come first, and a pinned ended one stays listed past the ended cap")
     func pinnedFirst() throws {
         var machine = MachineState(endpoint: Fixtures.endpoint("Studio"))
-        let pin: [String: any Sendable] = ["label": ["name": "Mine", "color": "blue", "pinned": true] as [String: any Sendable]]
+        let pin: [String: any Sendable] = ["label": ["name": "Mine", "color": "#8E0443", "pinned": true] as [String: any Sendable]]
         let live = try (0..<3).map { try session("live\($0)", "working", ago: Double($0)) }
         let pinnedLive = try session("live-pinned", "idle", ago: 50, extra: pin)
         let ended = try (0..<15).map { try session("done\($0)", "ended", ago: Double(100 + $0)) }

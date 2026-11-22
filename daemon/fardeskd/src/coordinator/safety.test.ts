@@ -80,16 +80,17 @@ describe("coordinator system prompt", () => {
 });
 
 describe("answer_request without coordinator.mayApprove", () => {
-  it("refuses allow and allow_always, but lets deny through to the broker", async () => {
+  it("refuses allow, allow_always and the plan approvals, but lets deny and revise through to the broker", async () => {
     const daemon = await startTestDaemon();
     try {
       const closed = createCoordinatorBackend(daemon.config, daemon.services, () => null);
-      for (const decision of ["allow", "allow_always"] as const) {
-        await expect(closed.decidePermission(daemon.config.name, "s1", "r1", decision)).rejects.toMatchObject({ code: "unsupported" });
+      await expect(closed.decidePermission(daemon.config.name, "s1", "r1", { decision: "revise", message: "shorter" })).rejects.toMatchObject({ code: "not_found" });
+      for (const decision of ["allow", "allow_always", "approve_bypass", "approve_manual"] as const) {
+        await expect(closed.decidePermission(daemon.config.name, "s1", "r1", { decision })).rejects.toMatchObject({ code: "unsupported" });
       }
-      await expect(closed.decidePermission(daemon.config.name, "s1", "r1", "deny")).rejects.toMatchObject({ code: "not_found" });
+      await expect(closed.decidePermission(daemon.config.name, "s1", "r1", { decision: "deny" })).rejects.toMatchObject({ code: "not_found" });
       const open = createCoordinatorBackend({ ...daemon.config, coordinator: { ...daemon.config.coordinator, mayApprove: true } }, daemon.services, () => null);
-      await expect(open.decidePermission(daemon.config.name, "s1", "r1", "allow")).rejects.toMatchObject({ code: "not_found" });
+      await expect(open.decidePermission(daemon.config.name, "s1", "r1", { decision: "allow" })).rejects.toMatchObject({ code: "not_found" });
     } finally {
       await daemon.close();
     }
@@ -99,7 +100,7 @@ describe("answer_request without coordinator.mayApprove", () => {
     const daemon = await startTestDaemon();
     try {
       const backend = createCoordinatorBackend(daemon.config, daemon.services, () => null);
-      await expect(backend.decidePermission(daemon.config.name, "s1", "r1", "allow")).rejects.toThrow("coordinator.mayApprove");
+      await expect(backend.decidePermission(daemon.config.name, "s1", "r1", { decision: "allow" })).rejects.toThrow("coordinator.mayApprove");
     } finally {
       await daemon.close();
     }

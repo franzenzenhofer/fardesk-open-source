@@ -64,7 +64,7 @@ function upsert(feed: Feed, activity: Activity): void {
 // transcript row of the same tool call (its own `toolu_` id) is the one record. The stream still carries the
 // resolved request, so the cache must drop it, or an answered question shows twice (F5, 2026-11-16).
 function isResolvedRequest(activity: Activity): boolean {
-  const isRequest = activity.kind === "permission" || activity.kind === "question";
+  const isRequest = activity.kind === "permission" || activity.kind === "question" || activity.kind === "dialog";
   return isRequest && activity.id.startsWith(BROKER_ID_PREFIX) && activity.state !== "pending";
 }
 

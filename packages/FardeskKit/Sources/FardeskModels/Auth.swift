@@ -11,16 +11,6 @@ public struct Peer: Codable, Sendable, Hashable {
     }
 }
 
-public struct LoginRequest: Codable, Sendable, Hashable {
-    public let password: String
-    public let deviceName: String
-
-    public init(password: String, deviceName: String) {
-        self.password = password
-        self.deviceName = deviceName
-    }
-}
-
 /// `POST /v1/auth/pair` (no bearer): the one-time code of a pairing link in exchange for a device token.
 public struct PairRequest: Codable, Sendable, Hashable {
     public let code: String
@@ -138,14 +128,4 @@ public struct RevokeRequest: Codable, Sendable, Hashable {
 
 public struct RevokeResult: Codable, Sendable, Hashable {
     public let revoked: Int
-}
-
-public struct PasswordChangeRequest: Codable, Sendable, Hashable {
-    public let current: String
-    public let next: String
-
-    public init(current: String, next: String) {
-        self.current = current
-        self.next = next
-    }
 }

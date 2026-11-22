@@ -54,6 +54,14 @@ export async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export async function waitUntilAsync(check: () => Promise<boolean>, timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error(`waitUntilAsync timed out after ${timeoutMs} ms`);
+    await sleep(WAIT_STEP_MS);
+  }
+}
+
 export async function waitUntil(check: () => boolean, timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!check()) {

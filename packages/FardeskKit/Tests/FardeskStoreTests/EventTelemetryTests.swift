@@ -37,14 +37,14 @@ struct EventTelemetryTests {
                 await model.openSession(ref)
                 _ = await model.stop(ref)
                 await model.flushTelemetry()
-                let events = try await FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5).telemetry(kind: .event).reports
+                let events = try await daemon.api(token: TestDaemon.token, timeout: 5).telemetry(kind: .event).reports
                 let areas = Set(events.map(\.area))
                 #expect(areas.isSuperset(of: ["app", "stream", "session.open", "action"]))
                 let opens = events.filter { $0.area == "session.open" }
                 #expect(opens.contains { $0.message.contains("cache miss") })
                 #expect(opens.contains { $0.message.contains("cache hit") })
                 #expect(opens.allSatisfy { $0.durationMs != nil && $0.sessionId == ref.sessionID })
-                #expect(try await FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5).telemetry(kind: .error).reports.allSatisfy { $0.kind != .event })
+                #expect(try await daemon.api(token: TestDaemon.token, timeout: 5).telemetry(kind: .error).reports.allSatisfy { $0.kind != .event })
                 model.stop()
             }
         }
@@ -54,7 +54,7 @@ struct EventTelemetryTests {
         try await HubRig.with { rig in
             try await StoreSandbox.with { sandbox in
                 try sandbox.keychainTokens.save(TestDaemon.token, HubIdentity.tokenID(hub: rig.hub.url))
-                let model = AppModel(configuration: sandbox.configuration(hubURL: rig.hub.url))
+                let model = AppModel(configuration: sandbox.configuration(hub: rig.hub.link))
                 await model.start()
                 _ = try await waitUntil { await MainActor.run { model.machines.endpoints.count == 3 } }
                 await rig.peer.stop()

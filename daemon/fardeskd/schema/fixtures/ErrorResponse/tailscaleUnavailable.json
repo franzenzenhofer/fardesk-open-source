@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "tailscale_unavailable",
+    "message": "Tailscale on this computer is not running"
+  }
+}

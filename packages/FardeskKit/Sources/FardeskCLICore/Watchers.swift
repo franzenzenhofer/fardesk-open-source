@@ -32,7 +32,7 @@ struct SessionWatcher {
             try state.apply(event, from: id)
             switch event {
             case .hello, .session: return true
-            case .activity, .ping: return false
+            case .activity, .ping, .unknown: return false
             }
         case .disconnected:
             try state.markOffline(machineID: id, now: workspace.context.now())

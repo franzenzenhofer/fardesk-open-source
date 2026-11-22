@@ -3,14 +3,20 @@ import { pairingPayloadSchema } from "../contract/schema.js";
 import { buildPairingPayload, daemonUrl, pairingLink, renderQr } from "./index.js";
 
 const CODE = "c".repeat(43);
-const base = { name: "mac-mini", tls: null, bind: { address: "tailscale", port: 4780, allowNonTailnet: false }, hub: { enabled: false, probeMs: 5000 } };
+const base: Parameters<typeof buildPairingPayload>[0] = { name: "mac-mini", bind: { address: "tailscale", port: 4780 }, hub: { enabled: false, probeMs: 5000 } };
 
 describe("pairing", () => {
-  it("builds a contract payload with an http URL, or https when TLS is configured", () => {
-    const plain = buildPairingPayload(base, "100.64.0.7", CODE);
-    expect(pairingPayloadSchema.parse(plain)).toEqual({ v: 1, name: "mac-mini", url: "http://100.64.0.7:4780", code: CODE, hub: false });
-    const secure = buildPairingPayload({ ...base, tls: { cert: "c", key: "k" } }, "100.64.0.7", CODE);
-    expect(secure.url).toBe("https://100.64.0.7:4780");
+  it("builds a contract payload with an http URL and no certificate pin", () => {
+    const payload = buildPairingPayload(base, "100.64.0.7", CODE);
+    expect(pairingPayloadSchema.parse(payload)).toEqual({ v: 4, name: "mac-mini", url: "http://100.64.0.7:4780", code: CODE, hub: false });
+    expect(payload).not.toHaveProperty("pin");
+  });
+
+  it("refuses an https URL and drops a pin: Fardesk has no own TLS", () => {
+    const payload = buildPairingPayload(base, "100.64.0.7", CODE);
+    expect(pairingPayloadSchema.safeParse({ ...payload, url: "https://100.64.0.7:4780" }).success).toBe(false);
+    const pinned = pairingPayloadSchema.parse({ ...payload, pin: `sha256/${"A".repeat(43)}=` });
+    expect(pinned).not.toHaveProperty("pin");
   });
 
   it("tells the app that a hub machine is a hub", () => {

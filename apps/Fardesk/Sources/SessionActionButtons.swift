@@ -3,7 +3,8 @@ import FardeskStore
 import SwiftUI
 
 /// Every action on a session, used by the "Actions" menu and the row's context menu. Every item has its words:
-/// the three that matter most first (Clear, Compact, End session), the rest below, the rarely used ones in "More".
+/// Fix it and the three that matter most first (Clear, Compact, End session), the rest below, the rarely used ones in
+/// "More". In the demo the whole set is greyed: nothing in it reaches a real computer.
 struct SessionActionButtons: View {
     @Environment(AppModel.self) private var model
     @Environment(SessionCoordinator.self) private var coordinator
@@ -11,7 +12,14 @@ struct SessionActionButtons: View {
     let session: SessionSummary
 
     var body: some View {
+        Group { actions }.disabledInDemo(.sessionActions)
+    }
+
+    @ViewBuilder
+    private var actions: some View {
         Section {
+            Button("Fix it", systemImage: "wrench.and.screwdriver") { move(model.fixIt) }
+                .accessibilityIdentifier("action-fix-it")
             if session.status != .ended {
                 Button("Clear", systemImage: "eraser") { move(model.clear) }
                 Button("Compact", systemImage: "rectangle.compress.vertical") { move(model.compact) }
@@ -24,15 +32,17 @@ struct SessionActionButtons: View {
                 Button("Stop", systemImage: FardeskSymbol.stop) { Task { await model.stop(ref) } }
             }
             switch session.replyMode {
-            case .composer: EmptyView()
+            case .composer, .unknown: EmptyView()
             case .takeover: Button("Take over", systemImage: "arrow.down.right.and.arrow.up.left") { move(model.takeover) }
-            case .resume: Button("Resume", systemImage: "play.circle") { move(model.beginResume) }
+            case .resume: Button("Resume", systemImage: "play.circle") { move(model.resume) }
             }
-            Button("Fork", systemImage: "arrow.triangle.branch") { move(model.fork) }
             Button(session.muted ? "Unmute" : "Mute", systemImage: session.muted ? "bell" : "bell.slash") {
                 Task { await model.mute(!session.muted, ref) }
             }
             Menu("More", systemImage: "ellipsis.circle") {
+                Button("Fork", systemImage: "arrow.triangle.branch") { move(model.fork) }
+                Button("Reload chat", systemImage: "arrow.clockwise") { Task { await model.reloadChat(ref) } }
+                    .accessibilityIdentifier("action-reload-chat")
                 Button("Open in terminal", systemImage: "terminal") { coordinator.terminalTarget = ref }
                 PinLiveActivityButton(ref: ref)
                 VoiceMenuItems()
@@ -44,20 +54,6 @@ struct SessionActionButtons: View {
 
     private func move(_ action: @escaping (SessionRef) async -> SessionRef?) {
         Task { coordinator.selection = await action(ref) ?? coordinator.selection }
-    }
-}
-
-/// Stop and End session, for the row's swipe.
-struct StopKillButtons: View {
-    @Environment(AppModel.self) private var model
-    let ref: SessionRef
-    let session: SessionSummary
-
-    var body: some View {
-        if session.canStop {
-            Button("Stop", systemImage: FardeskSymbol.stop) { Task { await model.stop(ref) } }
-        }
-        EndSessionButton(ref: ref, session: session)
     }
 }
 

@@ -1,5 +1,5 @@
 {
-  "contractVersion": 1,
+  "contractVersion": 4,
   "name": "Build Box",
   "hostname": "build-box",
   "os": "linux",
@@ -9,5 +9,21 @@
   "models": [],
   "ghosttyAutomation": "unknown",
   "allowBypass": false,
-  "coordinatorEnabled": false
+  "coordinatorEnabled": false,
+  "homes": [
+    ".claude"
+  ],
+  "tailscale": {
+    "state": "running"
+  },
+  "features": [
+    "chat-image"
+  ],
+  "update": {
+    "state": "idle",
+    "message": null,
+    "version": null,
+    "packageSha256": null,
+    "at": null
+  }
 }

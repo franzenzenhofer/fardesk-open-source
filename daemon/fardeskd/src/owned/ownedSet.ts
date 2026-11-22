@@ -2,7 +2,8 @@ import { FardeskError } from "../core/errors.js";
 import type { RunningSession } from "./session.js";
 import type { OwnedEntry, StateFile } from "./stateFile.js";
 
-export type Owned = { session: RunningSession; cwd: string; model: string | null };
+/** `home`: the Claude home folder the session runs in; resuming, stopping and restoring all use it. */
+export type Owned = { session: RunningSession; cwd: string; model: string | null; home: string };
 
 export type OwnedSet = {
   add(sessionId: string, entry: Owned): void;

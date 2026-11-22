@@ -1,3 +1,5 @@
+import Foundation
+
 public struct ActionResult: Codable, Sendable, Hashable {
     public let sessionId: String
 }
@@ -71,4 +73,24 @@ public struct ErrorResponse: Codable, Sendable, Hashable {
     public init(error: ErrorBody) {
         self.error = error
     }
+}
+
+/// A stopped chat the user removed from the list (Settings, Hidden chats): enough to recognise it and bring it back.
+public struct HiddenSession: Codable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let title: String
+    public let cwd: String
+    public let updatedAt: Date
+
+    public init(id: String, title: String, cwd: String, updatedAt: Date) {
+        self.id = id
+        self.title = title
+        self.cwd = cwd
+        self.updatedAt = updatedAt
+    }
+}
+
+/// `GET /v1/sessions/hidden`.
+public struct HiddenSessionList: Codable, Sendable, Hashable {
+    public let sessions: [HiddenSession]
 }

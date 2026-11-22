@@ -123,7 +123,7 @@ struct ActionCommandTests {
 
     @Test func replyToASessionTheDaemonCannotReachIsAnError() async throws {
         try await CLIHarness.withPairedDaemon { cli, _ in
-            let result = await cli.run(["reply", shortID(SeedSession.endedSessionID), "hello", "there", "--resume", "full"])
+            let result = await cli.run(["reply", shortID(SeedSession.endedSessionID), "hello", "there"])
             #expect(result.status == 1)
             #expect(result.errText.hasPrefix("error: "))
         }
@@ -149,10 +149,10 @@ struct ActionCommandTests {
             ["approve", "abc", "rid", "--always", "--yes"], ["deny", "abc"], ["answer", "abc", "opt", "rid"],
             ["stop", "abc"], ["kill", "abc", "--yes"], ["reply", "abc", "a", "b", "c"],
             ["activity", "abc", "--follow", "--limit", "5"], ["detail", "abc", "aid"], ["sessions", "--watch"],
-            ["login", "--machine-url", "http://h:1", "--name", "n"], ["revoke", "--all", "--all-machines"],
-            ["revoke", "phone", "--machine", "m"], ["rotate-password"], ["devices", "--machine", "m"], ["logout"],
+            ["pair", "fardesk://pair?d=x"], ["revoke", "--all", "--all-machines"],
+            ["revoke", "phone", "--machine", "m"], ["devices", "--machine", "m"], ["logout"],
         ]
-        for line in [["compact", "abc"], ["reply", "abc", "hi", "--resume", "summary"], ["reply", "abc", "hi", "--resume", "new"]] { _ = try FardeskCommand.parseAsRoot(line) }
+        for line in [["compact", "abc"], ["reply", "abc", "hi"]] { _ = try FardeskCommand.parseAsRoot(line) }
         for line in lines { _ = try FardeskCommand.parseAsRoot(line) }
     }
 }

@@ -1,0 +1,33 @@
+{
+  "type": "hello",
+  "machine": {
+    "contractVersion": 4,
+    "name": "Build Box",
+    "hostname": "build-box",
+    "os": "linux",
+    "version": "0.1.0",
+    "claudeVersion": null,
+    "sessionsCount": 0,
+    "models": [],
+    "ghosttyAutomation": "unknown",
+    "allowBypass": false,
+    "coordinatorEnabled": false,
+    "homes": [
+      ".claude"
+    ],
+    "tailscale": {
+      "state": "needs-login"
+    },
+    "features": [
+      "chat-image"
+    ],
+    "update": {
+      "state": "idle",
+      "message": null,
+      "version": null,
+      "packageSha256": null,
+      "at": null
+    }
+  },
+  "sessions": []
+}

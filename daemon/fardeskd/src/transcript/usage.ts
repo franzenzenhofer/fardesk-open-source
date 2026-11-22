@@ -1,6 +1,7 @@
 // Token usage of an assistant line and the prompt-cache lifetime derived from it.
 import { z } from "zod";
-import type { AssistantLine, TranscriptLine } from "./lineTypes.js";
+import { COMPACT_SUBTYPE } from "./lineTypes.js";
+import type { AssistantLine, SystemLine, TranscriptLine } from "./lineTypes.js";
 
 export const FIVE_MINUTES_MS = 5 * 60_000;
 export const ONE_HOUR_MS = 60 * 60_000;
@@ -37,15 +38,29 @@ export function parseUsage(value: unknown): LineUsage | null {
   return { contextTokens, cacheTtlMs: usedOneHour ? ONE_HOUR_MS : FIVE_MINUTES_MS };
 }
 
-export type ContextUsage = { contextTokens: number; cacheExpiresAt: string };
+/** `cacheExpiresAt` null = no cache question to ask (the session was just compacted). */
+export type ContextUsage = { contextTokens: number | null; cacheExpiresAt: string | null; lastTurnAt: string | null };
 
 const hasUsage = (line: TranscriptLine): line is AssistantLine & { usage: LineUsage } =>
   line.type === "assistant" && !line.isSidechain && line.usage !== null;
 
-/** The context size and cache expiry of the last main-chain assistant line that carries usage; null without one. */
+const isCompactBoundary = (line: TranscriptLine): line is SystemLine => line.type === "system" && line.subtype === COMPACT_SUBTYPE;
+
+/**
+ * The context size and cache expiry of the last main-chain assistant line that carries usage; null without one.
+ * A compaction after that line wins: the size is the one after the summary, and there is no cache expiry, because
+ * the user (or Claude Code) just chose to continue from the summary and the app must not ask "resume?" again.
+ */
 export function lastContextUsage(lines: readonly TranscriptLine[]): ContextUsage | null {
-  const last = lines.findLast(hasUsage);
+  const lastIndex = lines.findLastIndex((line) => hasUsage(line) || isCompactBoundary(line));
+  const last = lines[lastIndex];
   if (last === undefined) return null;
+  if (isCompactBoundary(last)) return { contextTokens: last.compactPostTokens, cacheExpiresAt: null, lastTurnAt: null };
+  if (!hasUsage(last)) return null;
   const expiresAtMs = Date.parse(last.timestamp) + last.usage.cacheTtlMs;
-  return { contextTokens: last.usage.contextTokens, cacheExpiresAt: new Date(expiresAtMs).toISOString() };
+  return {
+    contextTokens: last.usage.contextTokens,
+    cacheExpiresAt: new Date(expiresAtMs).toISOString(),
+    lastTurnAt: new Date(Date.parse(last.timestamp)).toISOString(),
+  };
 }

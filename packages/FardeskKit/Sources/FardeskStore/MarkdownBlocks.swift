@@ -1,8 +1,11 @@
 import Foundation
 
-/// Splits assistant markdown into prose and pipe tables, so tables render as a grid, not raw pipes.
+/// Splits assistant markdown into prose, headings and pipe tables, so tables render as a grid and headings as headings,
+/// not raw pipes and hashes.
 public enum MarkdownBlock: Equatable, Sendable {
     case prose(String)
+    /// `# Title` (level 1) to `###### Note` (level 6).
+    case heading(level: Int, text: String)
     case table(header: [String], rows: [[String]])
 }
 
@@ -26,11 +29,28 @@ public enum MarkdownBlocks {
             table = []
         }
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            if isTableLine(line) { table.append(line) } else { flushTable(); prose.append(line) }
+            if isTableLine(line) {
+                table.append(line)
+            } else if let heading = heading(line) {
+                flushTable()
+                flushProse()
+                blocks.append(heading)
+            } else {
+                flushTable()
+                prose.append(line)
+            }
         }
         flushTable()
         flushProse()
         return blocks
+    }
+
+    /// A line of one to six `#` and a space, then the text.
+    static func heading(_ line: Substring) -> MarkdownBlock? {
+        let hashes = line.prefix { $0 == "#" }.count
+        guard (1...6).contains(hashes), line.dropFirst(hashes).first == " " else { return nil }
+        let text = line.dropFirst(hashes + 1).trimmingCharacters(in: .whitespaces)
+        return text.isEmpty ? nil : .heading(level: hashes, text: text)
     }
 
     static func isTableLine(_ line: Substring) -> Bool {

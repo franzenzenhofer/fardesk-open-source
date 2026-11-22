@@ -11,6 +11,7 @@ public struct StoreSandbox: Sendable {
     public let keychainService: String
 
     public var machinesFile: MachineListFile { MachineListFile(url: root.appending(path: "machines.json")) }
+    public var machineOrderFile: MachineOrderFile { MachineOrderFile(url: root.appending(path: "machine-order.json")) }
     public var cache: OfflineCache { OfflineCache(directory: root.appending(path: "cache", directoryHint: .isDirectory)) }
     public var tokenFileURL: URL { root.appending(path: "tokens.json") }
     public var keychainTokens: TokenStore { .keychain(service: keychainService) }
@@ -54,29 +55,30 @@ public struct StoreSandbox: Sendable {
 
     public func configuration(
         tokens: TokenStore? = nil,
-        seedMachines: [Peer] = [],
         deviceName: String = "Test Device",
         telemetryInterval: TimeInterval = 60,
-        hubURL: URL? = nil,
+        hub: HubLink? = nil,
         tailscaleIsOn: (@Sendable () -> Bool)? = nil,
-        treatsEverySessionAsCold: Bool = false
+        updatePollInterval: TimeInterval = 0.1,
+        updateGiveUpAfter: TimeInterval = 3
     ) -> AppModelConfiguration {
         AppModelConfiguration(
             machinesFile: machinesFile,
             tokens: tokens ?? keychainTokens,
             cache: cache,
             deviceName: deviceName,
-            seedMachines: seedMachines,
             requestTimeout: 5,
             backoff: BackoffPolicy(initial: 0.05, maximum: 0.2, jitter: 0),
-            tailscaleIsOn: tailscaleIsOn ?? TailscaleInterface.isUp,
+            tailscaleIsOn: tailscaleIsOn ?? { true },
             telemetryFile: telemetryFile,
             telemetryIdentity: TelemetryIdentity(appVersion: "9.9", build: "99", platform: "test"),
             telemetryInterval: telemetryInterval,
-            hub: hubURL,
+            hub: hub,
             hubPollInterval: 0.2,
-            treatsEverySessionAsCold: treatsEverySessionAsCold,
-            cacheWriteDelay: 0.02
+            cacheWriteDelay: 0.02,
+            machineOrderFile: machineOrderFile,
+            updatePollInterval: updatePollInterval,
+            updateGiveUpAfter: updateGiveUpAfter
         )
     }
 }

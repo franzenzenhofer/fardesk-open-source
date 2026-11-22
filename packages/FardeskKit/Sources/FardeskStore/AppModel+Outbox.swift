@@ -16,13 +16,8 @@ extension AppModel {
     public func submit(_ message: OutgoingMessage, to ref: SessionRef) async -> SubmitResult {
         guard !message.isClearCommand else { return await clear(ref).map(SubmitResult.cleared) ?? .failed }
         guard !message.isCompactCommand else { return await compact(ref).map(SubmitResult.cleared) ?? .failed }
-        if isCold(ref) { cancelCold(for: ref) }
         let id = outbox.add(message, to: ref, kind: .reply, at: Date(), knownRows: userRowIDs(in: ref))
         sendSignal += 1
-        if isCold(ref) {
-            hold(id, for: ref)
-            return .sent
-        }
         Task { await deliver(id) }
         return .sent
     }
@@ -78,9 +73,9 @@ extension AppModel {
         let started = Date()
         outbox.set(id, .sending)
         do {
-            let target = try await transmit(pending)
+            let (target, waitsForTurn) = try await transmit(pending)
             if let target { outbox.move(id, to: target) }
-            outbox.set(id, .sent)
+            outbox.set(id, waitsForTurn ? .sent : .delivered)
             recordEvent("action", "send the message: done", machineID: pending.ref.machineID, since: started)
         } catch {
             let machine = machineName(pending.ref.machineID)
@@ -92,21 +87,22 @@ extension AppModel {
     }
 
     /// Does the HTTP work. A coordinator message answers with the session it started.
-    private func transmit(_ pending: PendingMessage) async throws -> SessionRef? {
+    /// `waitsForTurn`: the daemon answered `queued` (the session is busy and reads it after its current turn).
+    private func transmit(_ pending: PendingMessage) async throws -> (target: SessionRef?, waitsForTurn: Bool) {
         switch pending.kind {
         case .reply:
             guard let endpoint = machines.endpoints.first(where: { $0.id == pending.ref.machineID }) else {
                 throw AppStateError.unknownMachine(pending.ref.machineID)
             }
-            _ = try await upload(pending.message, with: access.api(for: endpoint), to: pending.ref.sessionID)
-            return nil
+            let result = try await upload(pending.message, with: service(for: endpoint), to: pending.ref.sessionID)
+            return (nil, result.isQueued)
         case .coordinator:
             let real = try await runStart(
                 origin: pending.ref, action: "ask the coordinator", intro: "Starting the coordinator"
             ) { try await $0.askCoordinator(prompt: pending.text) }.get()
             startedSessions[pending.ref] = real
             setCoordinatorSession(real.sessionID)
-            return real
+            return (real, false)
         }
     }
 

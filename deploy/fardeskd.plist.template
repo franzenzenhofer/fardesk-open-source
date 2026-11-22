@@ -15,11 +15,16 @@
   <dict>
     <key>PATH</key>
     <string>__PATH__</string>
+    <key>FARDESK_LABEL</key>
+    <string>__LABEL__</string>
     <key>HOME</key>
     <string>__HOME__</string>
   </dict>
   <key>WorkingDirectory</key>
   <string>__INSTALL_DIR__</string>
+  <!-- An update runs the installer from inside the daemon; the installer restarts this job and must survive it. -->
+  <key>AbandonProcessGroup</key>
+  <true/>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>

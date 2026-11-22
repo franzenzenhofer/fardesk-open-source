@@ -5,8 +5,8 @@ import Testing
 struct HubModelTests {
     private let hubJSON = """
     {"hub":"Linux","checkedAt":"2026-11-16T09:30:00.000Z","machines":[
-      {"name":"Linux","online":true,"hub":true,"lastSeen":"2026-11-16T09:29:59.000Z","latencyMs":1,"problem":null,"sessions":2,"waiting":1,"working":0},
-      {"name":"Mac mini Pro","online":false,"hub":false,"lastSeen":null,"latencyMs":null,"problem":"Tailscale is stopped on it","sessions":0,"waiting":0,"working":0}
+      {"name":"Linux","online":true,"hub":true,"lastSeen":"2026-11-16T09:29:59.000Z","latencyMs":1,"problem":null,"detail":null,"sessions":2,"waiting":1,"working":0},
+      {"name":"Mac mini Pro","online":false,"hub":false,"lastSeen":null,"latencyMs":null,"problem":"Tailscale is stopped on it","detail":"cannot connect (EHOSTUNREACH)","sessions":0,"waiting":0,"working":0}
     ]}
     """
 

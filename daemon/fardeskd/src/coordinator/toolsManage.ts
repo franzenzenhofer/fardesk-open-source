@@ -4,8 +4,10 @@ import { z } from "zod";
 import { permissionDecisionSchema } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import type { CoordinatorBackend } from "./types.js";
+import { readImageFile } from "./imageFile.js";
 import { answer, machine, sessionId } from "./toolKit.js";
 import type { ToolFactory } from "./toolKit.js";
+import { updateMachines } from "./toolsUpdate.js";
 
 const DEFAULT_SEARCH_LIMIT = 20;
 const MAX_SEARCH_LIMIT = 100;
@@ -37,15 +39,19 @@ const pendingRequests: ToolFactory = (backend) =>
 const answerRequest: ToolFactory = (backend) =>
   tool(
     "answer_request",
-    "Answer an open request of a session, as the user would on the phone: for a permission request decision allow, deny or allow_always; for a question one of its options as option.",
-    { machine, sessionId, requestId: z.string().min(1), decision: permissionDecisionSchema.optional(), option: z.string().min(1).optional() },
+    "Answer an open request of a session, as the user would on the phone: for a permission request decision allow, deny or allow_always; for a plan request (pending_requests shows the plan) decision approve_bypass, approve_manual or revise, revise with message telling Claude what to change; for a question one of its options as option; for a Claude Code dialog one of its choices as answer.",
+    { machine, sessionId, requestId: z.string().min(1), decision: permissionDecisionSchema.optional(), message: z.string().min(1).optional(), option: z.string().min(1).optional(), answer: z.string().min(1).optional() },
     async (args) =>
       answer(async () => {
+        if (args.answer !== undefined) {
+          await backend.answerDialog(args.machine, args.sessionId, args.requestId, args.answer);
+          return `answered "${args.answer}"`;
+        }
         if (args.decision !== undefined) {
-          await backend.decidePermission(args.machine, args.sessionId, args.requestId, args.decision);
+          await backend.decidePermission(args.machine, args.sessionId, args.requestId, args.message === undefined ? { decision: args.decision } : { decision: args.decision, message: args.message });
           return `permission ${args.decision}`;
         }
-        if (args.option === undefined) throw new FardeskError("invalid_request", "give decision (permission) or option (question)");
+        if (args.option === undefined) throw new FardeskError("invalid_request", "give decision (permission), option (question) or answer (dialog)");
         await backend.answerQuestion(args.machine, args.sessionId, args.requestId, args.option);
         return `answered "${args.option}"`;
       }),
@@ -83,4 +89,24 @@ const endSession = moveTool(
   "ended",
 );
 
-export const manageTools: ToolFactory[] = [searchSessions, pendingRequests, answerRequest, resumeSession, clearSession, compactSession, endSession];
+const setSessionImage: ToolFactory = (backend) =>
+  tool(
+    "set_session_image",
+    "Set the picture of a chat: the phone list shows it instead of the agent avatar. path is an absolute path of a JPEG or PNG file on THIS machine (an image you made or downloaded), at most 2 MB; scale a bigger one down first, e.g. `sips -Z 512 <file>` on macOS or ImageMagick `convert -resize 512x512 <file> <out>`. Works on a session of any machine.",
+    { machine, sessionId, path: z.string().min(1).describe("Absolute path of the JPEG or PNG file") },
+    async (args) => answer(async () => `image set (${await backend.setSessionImage(args.machine, args.sessionId, readImageFile(args.path))})`),
+  );
+
+const clearSessionImage: ToolFactory = (backend) =>
+  tool(
+    "clear_session_image",
+    "Remove the picture of a chat: the phone list shows the agent avatar again.",
+    { machine, sessionId },
+    async (args) =>
+      answer(async () => {
+        await backend.clearSessionImage(args.machine, args.sessionId);
+        return "image cleared";
+      }),
+  );
+
+export const manageTools: ToolFactory[] = [searchSessions, pendingRequests, answerRequest, resumeSession, clearSession, compactSession, endSession, setSessionImage, clearSessionImage, updateMachines];

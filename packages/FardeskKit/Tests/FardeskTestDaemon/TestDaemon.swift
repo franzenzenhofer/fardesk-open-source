@@ -1,3 +1,5 @@
+import FardeskClient
+import FardeskModels
 import Foundation
 
 public enum TestDaemonError: Error, CustomStringConvertible {
@@ -33,6 +35,15 @@ public final class TestDaemon: @unchecked Sendable {
 
     public var url: URL { URL(string: "http://127.0.0.1:\(port)")! }
 
+
+    /// This daemon as a hub: its address.
+    public var link: HubLink { HubLink(url: url) }
+
+    /// A client for this daemon.
+    public func api(token: String? = TestDaemon.token, timeout: TimeInterval = 5) -> FardeskAPI {
+        FardeskAPI(baseURL: url, token: token, timeout: timeout)
+    }
+
     /// The daemon runs inside the test sandbox (FARDESK_TEST_SANDBOX, as in the daemon's own tests): it never looks at
     /// or types into a real tmux server, session inbox or terminal. Without it, a kill with --close-tab walked the
     /// seeded process's ancestors up to the tmux pane the test runner itself ran in, and closed it.
@@ -53,10 +64,9 @@ public final class TestDaemon: @unchecked Sendable {
         isolation: isolated (any Actor)? = #isolation,
         sessions: [SeedSession] = SeedSession.standard,
         configOverrides: [String: any Sendable] = [:],
-        password: String? = nil,
         _ body: (TestDaemon) async throws -> Result
     ) async throws -> Result {
-        let daemon = try await start(sessions: sessions, configOverrides: configOverrides, password: password)
+        let daemon = try await start(sessions: sessions, configOverrides: configOverrides)
         do {
             let result = try await body(daemon)
             await daemon.stop()
@@ -69,8 +79,7 @@ public final class TestDaemon: @unchecked Sendable {
 
     public static func start(
         sessions: [SeedSession] = SeedSession.standard,
-        configOverrides: [String: any Sendable] = [:],
-        password: String? = nil
+        configOverrides: [String: any Sendable] = [:]
     ) async throws -> TestDaemon {
         guard FileManager.default.fileExists(atPath: RepoPaths.daemonMain.path) else {
             throw TestDaemonError.notBuilt(RepoPaths.daemonMain.path)
@@ -83,7 +92,6 @@ public final class TestDaemon: @unchecked Sendable {
         let configURL = root.appending(path: "config.json")
         let daemon = TestDaemon(port: port, root: root, home: home, configURL: configURL, stateDirectory: state)
         try daemon.writeConfig(overrides: configOverrides)
-        if let password { try await daemon.setPassword(password) }
         try await daemon.launch()
         return daemon
     }
@@ -142,11 +150,6 @@ public final class TestDaemon: @unchecked Sendable {
         try await RunningProcess.run("node", [RepoPaths.daemonMain.path] + arguments + ["--config", configURL.path], stdin: stdin, environment: daemonEnvironment)
     }
 
-    /// Sets the login password with the daemon's own `set-password` command (password on stdin).
-    public func setPassword(_ password: String) async throws {
-        let result = try await runCommand(["set-password"], stdin: password + "\n")
-        guard result.status == 0 else { throw TestDaemonError.commandFailed(result.error) }
-    }
 
     // MARK: Private
 
@@ -169,11 +172,8 @@ public final class TestDaemon: @unchecked Sendable {
     }
 
     private func waitUntilAnswering(_ server: RunningProcess) async throws {
-        var request = URLRequest(url: url.appending(path: "v1/machine"), timeoutInterval: 2)
-        request.setValue("Bearer \(Self.token)", forHTTPHeaderField: "Authorization")
         for _ in 0..<200 {
-            if let (_, response) = try? await URLSession.shared.data(for: request),
-               (response as? HTTPURLResponse)?.statusCode == 200 { return }
+            if let machine = try? await api(timeout: 2).machine(), !machine.name.isEmpty { return }
             guard server.isRunning else { break }
             try await Task.sleep(for: .milliseconds(100))
         }

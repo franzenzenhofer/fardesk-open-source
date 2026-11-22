@@ -1,4 +1,4 @@
-// A whole real daemon for tests: temp Claude home, real services, real HTTP server on 127.0.0.1.
+// A whole real daemon for tests: temp Claude home, real services, real plain HTTP server on 127.0.0.1.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { WebSocket } from "ws";
@@ -29,6 +29,10 @@ export type TestDaemon = {
   services: Services;
   server: RunningServer;
   url: string;
+  /** A request to the daemon (path starts with /). */
+  fetch(path: string, init?: RequestInit): Promise<Response>;
+  /** A WebSocket to `path` (starts with /); the caller attaches the listeners. */
+  connectStream(path: string, headers: Record<string, string>): WebSocket;
   call(method: string, path: string, body?: unknown, token?: string | null): Promise<{ status: number; json: unknown }>;
   openStream(token?: string): Promise<TestStream>;
   close(): Promise<void>;
@@ -104,6 +108,28 @@ function testServiceDefaults(config: Config): ServiceOptions {
   return { createOwned: createRealOwned, configPath: writeConfigFile(config), log: createLogger(() => undefined, () => new Date()) };
 }
 
+// The client side of a test daemon: call, fetch, connectStream and openStream.
+function testClient(url: string): { api: Pick<TestDaemon, "call" | "fetch" | "connectStream" | "openStream">; closeStreams(): void } {
+  const streams = trackStreams(url);
+  // A test may start a call, wait for something else and only then await it. If that wait times out, the call is
+  // never awaited and fails later against the closed daemon as an unhandled rejection that breaks the whole run.
+  // The extra catch marks the promise as observed; whoever awaits it still gets the failure.
+  const call: TestDaemon["call"] = (method, path, body, token = TEST_TOKEN) => {
+    const pending = callApi({ url, method, path, body, token });
+    pending.catch(() => undefined);
+    return pending;
+  };
+  return {
+    closeStreams: (): void => { streams.closeAll(); },
+    api: {
+      call,
+      fetch: async (path, init) => fetch(`${url}${path}`, init),
+      connectStream: (path, headers) => new WebSocket(`${url.replace("http", "ws")}${path}`, { headers }),
+      openStream: async (token) => streams.open(token),
+    },
+  };
+}
+
 export async function startTestDaemon(
   overrides: ConfigOverrides = {},
   options: Partial<ServiceOptions> = {},
@@ -115,26 +141,18 @@ export async function startTestDaemon(
   const services = await createServices(config, { ...testServiceDefaults(config), ...options });
   const hub = startHub(config, services);
   const streamRouter = hub === null ? {} : { streamRouter: createStreamRouter(hub) };
-  const listen = { address: "127.0.0.1", port, tls: null, pingMs: 60_000, ...streamRouter, ...listenOverrides };
+  const listen = { address: "127.0.0.1", port, pingMs: 60_000, ...streamRouter, ...listenOverrides };
   const server = await startServer(createApp(services, undefined, hub === null ? null : { hub, config }), listen, services.bus, services);
   const url = `http://127.0.0.1:${port}`;
-  const streams = trackStreams(url);
+  const client = testClient(url);
   const close = async (): Promise<void> => {
-    streams.closeAll();
+    client.closeStreams();
     hub?.close();
     await server.close();
     await services.close();
     home.dispose();
   };
-  // A test may start a call, wait for something else and only then await it. If that wait times out, the call is
-  // never awaited and fails later against the closed daemon as an unhandled rejection that breaks the whole run.
-  // The extra catch marks the promise as observed; whoever awaits it still gets the failure.
-  const call: TestDaemon["call"] = (method, path, body, token = TEST_TOKEN) => {
-    const pending = callApi({ url, method, path, body, token });
-    pending.catch(() => undefined);
-    return pending;
-  };
-  return { home, config, services, server, url, call, openStream: async (token) => streams.open(token), close };
+  return { home, config, services, server, url, ...client.api, close };
 }
 
 export const hookSocket = (daemon: TestDaemon): string => join(daemon.config.stateDir, "hook.sock");

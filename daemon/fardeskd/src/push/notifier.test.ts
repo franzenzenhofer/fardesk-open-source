@@ -4,6 +4,8 @@ import { APNS_TEST_CERT, startApnsServer } from "../../test/support/apnsServer.j
 import type { ApnsTestServer } from "../../test/support/apnsServer.js";
 import { makeTempDir, sleep, waitUntil } from "../../test/support/env.js";
 import type { PushContent } from "../config/config.js";
+import { sessionSummaryFixtures } from "../contract/fixturesSessions.js";
+import { sessionSummarySchema } from "../contract/schema.js";
 import type { Activity, NotificationType, SessionSummary } from "../contract/schema.js";
 import { createBus } from "../core/bus.js";
 import { createLogger } from "../core/log.js";
@@ -37,7 +39,7 @@ type Setup = {
   notifier: Notifier;
   logs: string[];
   muted: Set<string>;
-  state: { paused: boolean; working: Set<string>; unknown: Set<string> };
+  state: { paused: boolean; working: Set<string>; unknown: Set<string>; settled: Set<string> };
 };
 
 type Options = { enabled?: NotificationType[]; withApns?: boolean; doneDelayMs?: number; content?: PushContent };
@@ -56,7 +58,7 @@ async function setup(options: Options = {}): Promise<Setup> {
   const bus = createBus();
   const logs: string[] = [];
   const muted = new Set<string>();
-  const state = { paused: false, working: new Set<string>(), unknown: new Set<string>() };
+  const state = { paused: false, working: new Set<string>(), unknown: new Set<string>(), settled: new Set<string>() };
   const devices = createDeviceStore(join(makeTempDir(), "devices.json"), () => new Date(NOW));
   const notifier = createNotifier({
     bus,
@@ -70,6 +72,7 @@ async function setup(options: Options = {}): Promise<Setup> {
     isPaused: () => state.paused,
     isWorking: (id) => state.working.has(id),
     isKnown: (id) => !state.unknown.has(id),
+    stillWaiting: (_id, requestId) => !state.settled.has(requestId),
     doneDelayMs: options.doneDelayMs ?? 0,
     log: createLogger((line) => logs.push(line), () => new Date(NOW)),
   });
@@ -95,27 +98,7 @@ const permission = (state: "pending" | "allowed" = "pending"): Extract<Activity,
 });
 
 const question: Extract<Activity, { kind: "question" }> = { id: "req-q1", ts: NOW, kind: "question", requestId: "q1", text: "Tea or coffee?", options: ["Tea", "Coffee"], state: "pending" };
-
-const session = (status: SessionSummary["status"], id = "s1", summary = "All fine"): SessionSummary => ({
-  id,
-  title: "t",
-  cwd: "/work",
-  status,
-  waitingFor: null,
-  owned: false,
-  replyMode: "composer",
-  canStop: false,
-  summary,
-  model: null,
-  pid: null,
-  muted: false,
-  label: { name: null, color: null, pinned: false },
-  permissionMode: null,
-  contextTokens: null,
-  cacheExpiresAt: null,
-  startedAt: NOW,
-  updatedAt: NOW,
-});
+const session = (status: SessionSummary["status"], id = "s1", summary = "All fine"): SessionSummary => ({ ...sessionSummarySchema.parse(sessionSummaryFixtures.working), id, title: "t", cwd: "/work", status, waitingFor: null, summary, startedAt: NOW, updatedAt: NOW });
 
 function payload(server: ApnsTestServer, index = 0): { aps: Record<string, unknown> } & Record<string, string> {
   return JSON.parse(server.requests[index]?.body ?? "{}") as { aps: Record<string, unknown> } & Record<string, string>;
@@ -276,6 +259,16 @@ describe("hand-off to the terminal (#87)", () => {
     expect(sandbox.requests.slice(2).map((recorded) => recorded.headers["apns-collapse-id"])).toEqual(["s1:QUESTION", "s1:QUESTION"]);
   });
 
+  it("pushes nothing when the request no longer waits at the computer", async () => {
+    const { sandbox, devices, notifier, state, logs } = await setup();
+    register(devices, TOKEN_A, ALL);
+    state.settled.add("r1");
+    notifier.handOff("s1", permission());
+    await sleep(150);
+    expect(sandbox.requests).toHaveLength(0);
+    expect(logs.join("\n")).toContain("nothing waits");
+  });
+
   it("says only that a session needs you in generic mode, and respects mute and pause", async () => {
     const generic = await setup({ content: "generic" });
     register(generic.devices, TOKEN_A, ALL);
@@ -290,6 +283,57 @@ describe("hand-off to the terminal (#87)", () => {
     quiet.notifier.handOff("s2", permission());
     await sleep(150);
     expect(quiet.sandbox.requests).toHaveLength(0);
+  });
+});
+
+describe("withdrawing a request push once it is handled", () => {
+  it("sends a passive notice with the request's collapse id, its request id and kind resolved", async () => {
+    const { bus, sandbox, devices } = await setup();
+    register(devices, TOKEN_A, ALL);
+    bus.publish({ type: "activity", sessionId: "s1", activity: permission() });
+    await waitUntil(() => sandbox.requests.length === 1);
+    bus.publish({ type: "activity", sessionId: "s1", activity: permission("allowed") });
+    await waitUntil(() => sandbox.requests.length === 2);
+    const [request, notice] = sandbox.requests;
+    expect(notice?.headers["apns-collapse-id"]).toBe(request?.headers["apns-collapse-id"]);
+    expect(notice?.headers["apns-priority"]).toBe("5");
+    expect(payload(sandbox, 1)).toMatchObject({
+      aps: { alert: { title: "Answered", body: "Title of s1" }, category: "RESOLVED", "interruption-level": "passive" },
+      kind: "resolved",
+      requestId: "r1",
+      sessionId: "s1",
+    });
+    expect(payload(sandbox, 1).aps).not.toHaveProperty("sound");
+  });
+
+  it("withdraws a question too, and a request that was handed off to the terminal and then finished there", async () => {
+    const { bus, sandbox, devices } = await setup();
+    register(devices, TOKEN_A, ALL);
+    bus.publish({ type: "activity", sessionId: "s1", activity: question });
+    bus.publish({ type: "activity", sessionId: "s1", activity: { ...question, state: "terminal" } });
+    await waitUntil(() => sandbox.requests.length === 1);
+    await sleep(100);
+    expect(sandbox.requests).toHaveLength(1);
+    bus.publish({ type: "activity", sessionId: "s1", activity: { ...question, state: "expired" } });
+    await waitUntil(() => sandbox.requests.length === 2);
+    expect(sandbox.requests[1]?.headers["apns-collapse-id"]).toBe("s1:QUESTION");
+    expect(payload(sandbox, 1)["kind"]).toBe("resolved");
+  });
+
+  it("sends the withdrawal once, only for a request that had a push, and keeps generic mode generic", async () => {
+    const { bus, sandbox, devices, muted } = await setup({ content: "generic" });
+    register(devices, TOKEN_A, ALL);
+    muted.add("s-muted");
+    bus.publish({ type: "activity", sessionId: "s-muted", activity: permission() });
+    bus.publish({ type: "activity", sessionId: "s-muted", activity: permission("allowed") });
+    bus.publish({ type: "activity", sessionId: "s1", activity: question });
+    await waitUntil(() => sandbox.requests.length === 1);
+    bus.publish({ type: "activity", sessionId: "s1", activity: { ...question, state: "answered" } });
+    bus.publish({ type: "activity", sessionId: "s1", activity: { ...question, state: "answered" } });
+    await waitUntil(() => sandbox.requests.length === 2);
+    await sleep(100);
+    expect(sandbox.requests).toHaveLength(2);
+    expect(payload(sandbox, 1).aps["alert"]).toEqual({ title: "Fardesk", body: "A request was handled" });
   });
 });
 

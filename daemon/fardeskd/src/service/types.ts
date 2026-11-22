@@ -1,4 +1,5 @@
 // The facade the HTTP server and the CLI talk to, and what it needs from the outside.
+import type { StoredImage } from "./imageStore.js";
 import type { RunCommand, RunWithInput } from "../config/bind.js";
 import type { Config } from "../config/config.js";
 import type { MessageOutcome } from "../foreign/delivery.js";
@@ -13,6 +14,7 @@ import type {
   DeviceRequest,
   FolderSearch,
   GhosttyAutomation,
+  HiddenSession,
   LabelRequest,
   Machine,
   PermissionDecision,
@@ -28,12 +30,14 @@ import type { Logger } from "../core/log.js";
 import type { OwnedRunner } from "../owned/types.js";
 import type { Broker } from "../permissions/broker.js";
 import type { ApnsClient } from "../push/apns.js";
+import type { UpdaterOptions } from "../update/updater.js";
 
 export type OwnedContext = {
   config: Config;
   broker: Broker;
   log: Logger;
   findCwd: (sessionId: string) => string;
+  findHome: (sessionId: string) => string;
   findMode: (sessionId: string) => PermissionMode | null;
 };
 export type OwnedFactory = (context: OwnedContext) => OwnedRunner;
@@ -47,10 +51,18 @@ export type ServiceOptions = {
   run?: RunCommand;
   /** Tailscale commands to try for `whois` on a pairing request (default: `tailscale`, plus the macOS app's CLI). */
   tailscaleCommands?: string[];
+  /** How often the Tailscale state in `GET /v1/machine` is read again (default 30 s); tests shorten it. */
+  tailscalePollMs?: number;
+  /** How long a `whois` answer is trusted (default 60 s); tests shorten it. */
+  whoisCacheMs?: number;
   runWithInput?: RunWithInput;
   log?: Logger;
-  /** The config file this daemon was started from: where a password change is written. */
+  /** The config file this daemon was started from: where a master-token rotation is written. */
   configPath: string;
+  /** Replaces the daemon's own version number; tests run a fleet of different versions. */
+  version?: string;
+  /** Self-update settings; tests inject the installer and the install folder. */
+  update?: Partial<Pick<UpdaterOptions, "installDir" | "installer" | "now" | "staleMs">>;
 };
 
 export type ActionResult = { sessionId: string };
@@ -58,7 +70,17 @@ export type AttachmentUpload = { mediaType: string; filename: string | null; byt
 export type TelemetryQuery = { since?: string | undefined; limit?: number | undefined; kind?: "error" | "event" | undefined };
 export type ActivityQuery = { before?: string | undefined; limit?: number | undefined };
 
-export type Services = {
+/** The answers to what a session waits for: a permission, a question, a Claude Code dialog. */
+export type RequestAnswers = {
+  /** Allow or deny a request. After a hand-off to the terminal this types the matching key into the dialog (typable ones only). */
+  decide(sessionId: string, requestId: string, decision: PermissionDecision, message?: string): Promise<void>;
+  /** Answers a question. After a hand-off to the terminal this types the option number into the dialog (single choice only). */
+  answer(sessionId: string, requestId: string, option: string): Promise<void>;
+  /** Answers a Claude Code dialog with one of its choices. */
+  answerDialog(sessionId: string, requestId: string, answer: string): Promise<void>;
+};
+
+export type Services = RequestAnswers & {
   bus: Bus;
   auth: AuthService;
   audit: AuditLog;
@@ -81,6 +103,11 @@ export type Services = {
   saveAttachment(sessionId: string, upload: AttachmentUpload): AttachmentResult;
   /** The stored bytes of an attachment of this session, found by its exact stored path. */
   readAttachment(sessionId: string, path: string): { mediaType: string; bytes: Uint8Array<ArrayBuffer> };
+  /** Stores the chat image (JPEG or PNG, at most 2 MB, magic bytes checked) and answers its hash. */
+  setSessionImage(sessionId: string, upload: { mediaType: string; bytes: Uint8Array }): string;
+  clearSessionImage(sessionId: string): void;
+  /** `not_found` when the session has no image. */
+  readSessionImage(sessionId: string): StoredImage;
   reportTelemetry(reports: TelemetryReport[]): { accepted: number; duplicates: number };
   telemetry(query: TelemetryQuery): TelemetryReport[];
   notificationState(): NotificationState;
@@ -99,14 +126,18 @@ export type Services = {
   coordinatorState(): CoordinatorState;
   /** Lists Ghostty terminals once so macOS asks for the Automation consent; answers the resulting status. */
   ghosttyProbe(): Promise<GhosttyAutomation>;
-  /** Allow or deny a request. After a hand-off to the terminal this types the matching key into the dialog (typable ones only). */
-  decide(sessionId: string, requestId: string, decision: PermissionDecision): Promise<void>;
-  /** Answers a question. After a hand-off to the terminal this types the option number into the dialog (single choice only). */
-  answer(sessionId: string, requestId: string, option: string): Promise<void>;
+  /** Stopped sessions the user removed from the list, so Settings can bring them back. */
+  hiddenSessions(): HiddenSession[];
+  /** Removes a stopped session from the list (`conflict` when it is not stopped) or brings it back. A session that runs again is listed again. */
+  hide(sessionId: string, hidden: boolean): void;
   mute(sessionId: string, muted: boolean): void;
   label(sessionId: string, request: LabelRequest): void;
   registerDevice(request: DeviceRequest): void;
   /** Re-reads claudeHomes from the config file: sessions of an added home show up without a restart. */
   reloadHomes(): { homes: string[] };
+  /** The release package this machine is installed from (GET /v1/update/package); `not_found` when it has none. */
+  updatePackage(): Buffer<ArrayBuffer>;
+  /** Installs a release package in the background (POST /v1/machine/update): `invalid_request` for a bad hash or package, `conflict` while an update runs. */
+  startUpdate(bytes: Uint8Array, sha256: string): Promise<void>;
   close(): Promise<void>;
 };

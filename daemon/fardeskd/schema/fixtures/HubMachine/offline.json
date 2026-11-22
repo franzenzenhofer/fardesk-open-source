@@ -4,7 +4,8 @@
   "hub": false,
   "lastSeen": "2026-11-16T07:18:00.000Z",
   "latencyMs": null,
-  "problem": "no answer within 5 s",
+  "problem": "This computer did not answer in time (it may be asleep, or Tailscale is off there).",
+  "detail": "no answer within 5 s",
   "sessions": 3,
   "waiting": 0,
   "working": 0

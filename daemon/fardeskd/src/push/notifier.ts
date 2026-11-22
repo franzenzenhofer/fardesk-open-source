@@ -40,6 +40,8 @@ export type NotifierDeps = {
   isWorking?: (sessionId: string) => boolean;
   /** Quiet period after a Stop before "done" is pushed; a newer Stop restarts it. */
   doneDelayMs?: number;
+  /** True while the request still waits at the computer: the hand-off push is only for a dialog that really is open. */
+  stillWaiting?: (sessionId: string, requestId: string) => boolean;
 };
 
 export const DEFAULT_DONE_DELAY_MS = 20_000;
@@ -55,7 +57,7 @@ export type Notifier = {
   close(): void;
 };
 
-type Pending = Extract<Activity, { kind: "permission" | "question" }>;
+type Pending = Extract<Activity, { kind: "permission" | "question" | "dialog" }>;
 export type PendingRequest = Pending;
 type Outgoing = {
   type: NotificationType;
@@ -65,16 +67,31 @@ type Outgoing = {
   requestId: string | null;
   /** The category whose delivered notification this push replaces (same collapse id), when it is not its own. */
   replaces?: ApnsCategory;
+  /** The quiet "handled" notice that withdraws an earlier request push (passive, same collapse id, `kind: "resolved"`). */
+  resolved?: true;
 };
 
 const isPendingRequest = (activity: Activity): activity is Pending =>
-  (activity.kind === "permission" || activity.kind === "question") && activity.state === "pending";
+  (activity.kind === "permission" || activity.kind === "question" || activity.kind === "dialog") && activity.state === "pending";
 
-const requestCategory = (kind: Pending["kind"]): ApnsCategory => (kind === "question" ? "QUESTION" : "PERMISSION");
+/** A request that no longer waits anywhere: answered, denied, or expired (a hand-off to the terminal, state "terminal", still waits). */
+const isSettledRequest = (activity: Activity): activity is Pending =>
+  (activity.kind === "permission" || activity.kind === "question" || activity.kind === "dialog") && activity.state !== "pending" && activity.state !== "terminal";
+
+type SentRequests = Map<string, ApnsCategory>;
+
+export const RESOLVED_TITLE = "Answered";
+export const RESOLVED_GENERIC_BODY = "A request was handled";
+const DIALOG_BODY = "Claude Code asks for your decision";
+
+/** A dialog is pushed as a question: the same notification category and type setting. */
+const requestType = (kind: Pending["kind"]): NotificationType => (kind === "permission" ? "permission" : "question");
+const requestCategory = (kind: Pending["kind"]): ApnsCategory => (kind === "permission" ? "PERMISSION" : "QUESTION");
 
 /** What the request is about: the (first) question, or the tool with a short summary of its input. */
 function requestBody(activity: Pending): string {
   if (activity.kind === "question") return truncate(activity.text, REQUEST_BODY_MAX_CHARS);
+  if (activity.kind === "dialog") return DIALOG_BODY;
   return activity.summary === "" ? activity.title : truncate(`${activity.tool}: ${activity.summary}`, REQUEST_BODY_MAX_CHARS);
 }
 
@@ -100,6 +117,9 @@ const GENERIC_WORDING: Record<NotificationType, string> = { permission: "needs y
 
 /** What the push shows: the real texts with `full`, else only the machine name and the kind of event. */
 function visibleText(deps: NotifierDeps, outgoing: Outgoing, title: string): { title: string; body: string } {
+  if (outgoing.resolved === true) {
+    return deps.content === "full" ? { title: RESOLVED_TITLE, body: title } : { title: GENERIC_TITLE, body: RESOLVED_GENERIC_BODY };
+  }
   if (deps.content === "full") return { title, body: outgoing.body };
   return { title: GENERIC_TITLE, body: `A session on ${deps.machineName} ${GENERIC_WORDING[outgoing.type]}` };
 }
@@ -107,23 +127,27 @@ function visibleText(deps: NotifierDeps, outgoing: Outgoing, title: string): { t
 function buildNotification(deps: NotifierDeps, outgoing: Outgoing, title: string): ApnsNotification {
   const data: Record<string, string> = { sessionId: outgoing.sessionId, machine: deps.machineName };
   if (outgoing.requestId !== null) data["requestId"] = outgoing.requestId;
+  if (outgoing.resolved === true) data["kind"] = "resolved";
   return { ...visibleText(deps, outgoing, title), category: outgoing.category, threadId: outgoing.sessionId, data };
 }
 
-/** Why this push must not go out (logged), or null to send it. */
+/** Why this push must not go out (logged), or null to send it. A withdrawal always goes out: the stale request must not stay. */
 function skipReason(deps: NotifierDeps, outgoing: Outgoing): string | null {
+  if (outgoing.resolved === true) return null;
   if (deps.isPaused?.() === true) return "paused";
   if (deps.isKnown !== undefined && !deps.isKnown(outgoing.sessionId)) return "unknown session";
   return null;
 }
 
-function push(deps: NotifierDeps, outgoing: Outgoing): void {
+/** True when the push was handed to APNs for the registered devices (not skipped, not switched off). */
+function push(deps: NotifierDeps, outgoing: Outgoing): boolean {
   const { apns } = deps;
-  if (apns === null || !deps.notificationsEnabled.includes(outgoing.type) || deps.isMuted(outgoing.sessionId)) return;
+  const withdrawal = outgoing.resolved === true;
+  if (apns === null || !deps.notificationsEnabled.includes(outgoing.type) || (!withdrawal && deps.isMuted(outgoing.sessionId))) return false;
   const reason = skipReason(deps, outgoing);
   if (reason !== null) {
     deps.log.info("push_skipped", { reason, type: outgoing.type, sessionId: outgoing.sessionId });
-    return;
+    return false;
   }
   // One notification per session and kind: a newer one replaces the older one on the device.
   const notification: ApnsNotification = {
@@ -134,6 +158,7 @@ function push(deps: NotifierDeps, outgoing: Outgoing): void {
   void Promise.all(targets.map(async (device) => deliver(deps, apns, device, notification))).then((results) => {
     deps.log.info("push_sent", { type: outgoing.type, sessionId: outgoing.sessionId, devices: results.filter(Boolean).length });
   });
+  return true;
 }
 
 /** Pushes a "done" notification with a chosen title to every registered device and counts the ones APNs accepted. */
@@ -155,9 +180,19 @@ function onSession(deps: NotifierDeps, lastStatus: Map<string, SessionStatus>, s
   push(deps, { type: "ended", category: "ENDED", sessionId: session.id, body, requestId: null });
 }
 
-function onRequest(deps: NotifierDeps, sessionId: string, activity: Pending): void {
+function onRequest(deps: NotifierDeps, sent: SentRequests, sessionId: string, activity: Pending): void {
   const category = requestCategory(activity.kind);
-  push(deps, { type: activity.kind, category, sessionId, body: requestBody(activity), requestId: activity.requestId });
+  if (push(deps, { type: requestType(activity.kind), category, sessionId, body: requestBody(activity), requestId: activity.requestId })) {
+    sent.set(activity.requestId, category);
+  }
+}
+
+/** The request is answered, denied or expired: a quiet notice with the request's collapse id replaces its pushes on the devices. */
+function onSettled(deps: NotifierDeps, sent: SentRequests, sessionId: string, activity: Pending): void {
+  const category = sent.get(activity.requestId);
+  if (category === undefined) return;
+  sent.delete(activity.requestId);
+  push(deps, { type: requestType(activity.kind), category: "RESOLVED", sessionId, body: "", requestId: activity.requestId, replaces: category, resolved: true });
 }
 
 function onDone(deps: NotifierDeps, { sessionId, lastAssistantMessage }: StopReport): void {
@@ -193,18 +228,25 @@ function createDoneQuiet(deps: NotifierDeps): { schedule(report: StopReport): vo
 export function createNotifier(deps: NotifierDeps): Notifier {
   const lastStatus = new Map<string, SessionStatus>();
   const quiet = createDoneQuiet(deps);
+  const sent: SentRequests = new Map();
   const unsubscribe = deps.bus.subscribe((event) => {
     if (event.type === "session") onSession(deps, lastStatus, event.session);
-    if (event.type === "activity" && isPendingRequest(event.activity)) onRequest(deps, event.sessionId, event.activity);
+    if (event.type !== "activity") return;
+    if (isPendingRequest(event.activity)) onRequest(deps, sent, event.sessionId, event.activity);
+    else if (isSettledRequest(event.activity)) onSettled(deps, sent, event.sessionId, event.activity);
   });
   return {
     done: (report): void => {
       quiet.schedule(report);
     },
     handOff: (sessionId, request): void => {
+      if (deps.stillWaiting?.(sessionId, request.requestId) === false) {
+        deps.log.info("push_skipped", { reason: "nothing waits", type: request.kind, sessionId });
+        return;
+      }
       // Same collapse id as the request push: the device swaps the stale Allow/Deny notification for this one.
       const body = `${HAND_OFF_LEAD}: ${requestBody(request)}`;
-      push(deps, { type: request.kind, category: "TERMINAL", sessionId, body, requestId: null, replaces: requestCategory(request.kind) });
+      push(deps, { type: requestType(request.kind), category: "TERMINAL", sessionId, body, requestId: null, replaces: requestCategory(request.kind) });
     },
     ping: async (sessionId, title, body) => ping(deps, sessionId, title, body),
     close: (): void => {

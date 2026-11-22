@@ -58,6 +58,10 @@ function alertOf(index: number): { body: string; category: string } {
   return { body: payload.aps.alert.body, category: payload.aps.category };
 }
 
+const pushes = (): NonNullable<typeof apnsServer>["requests"] => apnsServer?.requests ?? [];
+const categories = (): string[] => pushes().map((_, index) => alertOf(index).category);
+const collapseIds = (): (string | string[] | undefined)[] => pushes().map((recorded) => recorded.headers["apns-collapse-id"]);
+
 // A hook call the test can hang up on, like Claude Code killing the hook's curl when the dialog is answered in the terminal.
 function openHookCall(): { hangUp(): void } {
   const call = request({ socketPath: hookSocket(daemon), method: "POST", path: "/hook", headers: { "Content-Type": "application/json" } });
@@ -75,13 +79,13 @@ async function endSession(): Promise<void> {
 describe("a request that timed out hands off to the terminal", () => {
   it("pushes the hand-off once, shows the terminal state without a fake approval, refuses typed text, and clears with the registry", async () => {
     await boot({ permissionTimeoutSeconds: 1, push: { content: "full" } }, true);
+    setRegistryStatus("waiting");
     const run = await fireHook(daemon, "PermissionRequest-bash.json");
     expect(run).toMatchObject({ code: 0, stdout: "" });
     await waitUntil(() => (apnsServer?.requests.length ?? 0) === 2);
     expect(alertOf(0).category).toBe("PERMISSION");
     expect(alertOf(1)).toEqual({ category: "TERMINAL", body: `${HAND_OFF_LEAD}: Bash: touch a1.txt` });
 
-    setRegistryStatus("waiting");
     await waitUntil(() => summary()?.waitingFor === "terminal");
     expect(summary()).toMatchObject({ status: "waiting", summary: "Needs you at the computer" });
     expect(pendingCount()).toBe(0);
@@ -92,9 +96,11 @@ describe("a request that timed out hands off to the terminal", () => {
 
     setRegistryStatus("busy");
     await waitUntil(() => summary()?.waitingFor === null);
-    expect(summary()?.status).toBe("working");
+    await waitUntil(() => (apnsServer?.requests.length ?? 0) === 3);
     await sleep(300);
-    expect(apnsServer?.requests).toHaveLength(2);
+    expect(categories()).toEqual(["PERMISSION", "TERMINAL", "RESOLVED"]);
+    expect(new Set(collapseIds())).toEqual(new Set([`${HOOK_SESSION_ID}:PERMISSION`]));
+    expect(summary()?.status).toBe("working");
   });
 
   it("answers by phone before the timeout: no hand-off push", async () => {
@@ -104,7 +110,7 @@ describe("a request that timed out hands off to the terminal", () => {
     await daemon.call("POST", `/v1/sessions/${HOOK_SESSION_ID}/permission/${requestId}`, { decision: "allow" });
     await hook;
     await sleep(300);
-    expect(apnsServer?.requests).toHaveLength(1);
+    expect(categories()).toEqual(["PERMISSION", "RESOLVED"]);
     expect(alertOf(0).category).toBe("PERMISSION");
   });
 });
@@ -119,7 +125,7 @@ describe("a request resolved anywhere clears the approval at once", () => {
     await waitUntil(() => pendingCount() === 0);
     await waitUntil(() => summary()?.waitingFor === null);
     await sleep(300);
-    expect(apnsServer?.requests).toHaveLength(1);
+    expect(categories()).toEqual(["PERMISSION", "RESOLVED"]);
   });
 
   it("drops the request when the transcript shows that exact tool call finished (decided in the terminal)", async () => {

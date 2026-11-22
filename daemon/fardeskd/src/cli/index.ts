@@ -6,7 +6,7 @@ import { runCommand } from "../config/bind.js";
 import { MAC_APP_CLI, tailscaleCommandsFor } from "../config/tailscale.js";
 import { defaultConfigPath } from "../config/config.js";
 import { runAudit } from "./auditCommand.js";
-import { runDevices, runRevoke, runRotateToken, runSetPassword } from "./authCommands.js";
+import { runDevices, runRevoke, runRotateToken } from "./authCommands.js";
 import { runCrossSession } from "./crossSession.js";
 import { runInit, runServe, runStatus } from "./commands.js";
 import { runPair } from "./pairCommand.js";
@@ -20,14 +20,14 @@ export const USAGE = [
   "",
   "commands:",
   "  serve                  run the daemon",
-  "  init --name <name>     write the initial config",
+  "  init --name <name>     write the initial config (name and token)",
   "  install-hooks [--dry-run]  add the Fardesk hooks to every Claude home (--dry-run: print the diff, change nothing)",
   "  uninstall-hooks        remove them again",
   "  pair                   open a 2 minute pairing window: link + QR code, one device; stays open only while this command runs",
+  "  pair --show            same, but the QR code opens as an image on this computer's screen and nothing is printed (for runs by an agent)",
   "  rotate-token           replace the master token; device tokens stay valid",
   "  audit [--since <time>] print the audit log (ISO time or 30m, 2h, 7d)",
   "  status                 show config, bind address, daemon and hook state",
-  "  set-password           read a new password from stdin, revoke every device token",
   "  devices                list the logged-in devices",
   "  revoke <device|--all>  revoke one device (id or name) or all of them",
   "  cross-session <accept|unset>  set or remove crossSessionInbound in every Claude home settings.json",
@@ -44,7 +44,6 @@ const COMMANDS: Record<string, (context: CommandContext) => number | Promise<num
   "rotate-token": runRotateToken,
   audit: runAudit,
   status: runStatus,
-  "set-password": runSetPassword,
   devices: runDevices,
   revoke: runRevoke,
   "cross-session": runCrossSession,
@@ -60,6 +59,7 @@ type Parsed = {
   since: string | undefined;
   all: boolean;
   dryRun: boolean;
+  show: boolean;
   help: boolean;
 };
 
@@ -72,6 +72,7 @@ function parse(argv: string[]): Parsed {
       since: { type: "string" },
       all: { type: "boolean" },
       "dry-run": { type: "boolean" },
+      show: { type: "boolean" },
       help: { type: "boolean" },
     },
     allowPositionals: true,
@@ -86,6 +87,7 @@ function parse(argv: string[]): Parsed {
     since: values.since,
     all: values.all === true,
     dryRun: values["dry-run"] === true,
+    show: values.show === true,
     help: values.help === true,
   };
 }
@@ -104,6 +106,7 @@ function contextOf(parsed: Parsed, io: CliIo, deps: CliDeps): CommandContext {
     args: parsed.args,
     all: parsed.all,
     dryRun: parsed.dryRun,
+    show: parsed.show,
     since: parsed.since ?? null,
     io,
     deps,

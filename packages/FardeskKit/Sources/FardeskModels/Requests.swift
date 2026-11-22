@@ -14,9 +14,12 @@ public struct MessageRequest: Codable, Sendable, Hashable {
 /// Contract name `PermissionRequest`: the body that decides a pending permission.
 public struct PermissionDecisionRequest: Codable, Sendable, Hashable {
     public let decision: PermissionDecision
+    /// The feedback for `revise`; absent on the wire for every other decision.
+    public let message: String?
 
-    public init(decision: PermissionDecision) {
+    public init(decision: PermissionDecision, message: String? = nil) {
         self.decision = decision
+        self.message = message
     }
 }
 
@@ -75,17 +78,20 @@ public struct NewSessionRequest: Codable, Sendable, Hashable {
     public let model: String?
     /// Absent = the machine's default (config `owned.permissionMode`, "Ask" unless the owner changed it).
     public let permissionMode: PermissionMode?
+    /// The name of one of `Machine.homes`; absent = the machine's first home.
+    public let home: String?
 
-    public init(cwd: String, prompt: String, worktree: Bool, model: String?, permissionMode: PermissionMode? = nil) {
+    public init(cwd: String, prompt: String, worktree: Bool, model: String?, permissionMode: PermissionMode? = nil, home: String? = nil) {
         self.cwd = cwd
         self.prompt = prompt
         self.worktree = worktree
         self.model = model
         self.permissionMode = permissionMode
+        self.home = home
     }
 
     private enum CodingKeys: String, CodingKey {
-        case cwd, prompt, worktree, model, permissionMode
+        case cwd, prompt, worktree, model, permissionMode, home
     }
 
     public init(from decoder: any Decoder) throws {
@@ -95,6 +101,7 @@ public struct NewSessionRequest: Codable, Sendable, Hashable {
         worktree = try c.decode(Bool.self, forKey: .worktree)
         model = try c.decode(String?.self, forKey: .model)
         permissionMode = try c.decodeIfPresent(PermissionMode.self, forKey: .permissionMode)
+        home = try c.decodeIfPresent(String.self, forKey: .home)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -104,6 +111,7 @@ public struct NewSessionRequest: Codable, Sendable, Hashable {
         try c.encode(worktree, forKey: .worktree)
         try c.encode(model, forKey: .model)
         try c.encodeIfPresent(permissionMode, forKey: .permissionMode)
+        try c.encodeIfPresent(home, forKey: .home)
     }
 }
 

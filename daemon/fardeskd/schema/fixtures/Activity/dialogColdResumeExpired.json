@@ -1,0 +1,22 @@
+{
+  "id": "req-req_d3",
+  "ts": "2026-11-22T09:14:00.000Z",
+  "kind": "dialog",
+  "requestId": "req_d3",
+  "dialogKind": "cold_resume_quota",
+  "payload": {
+    "inactiveSince": 1795338000000,
+    "contextTokens": 120000,
+    "percentOfFiveHourLimit": 9,
+    "trigger": "resume",
+    "focusedAction": "new_conversation",
+    "offersLookUp": true,
+    "offersSummary": false
+  },
+  "choices": [
+    "resume",
+    "new_conversation",
+    "dismiss"
+  ],
+  "state": "expired"
+}

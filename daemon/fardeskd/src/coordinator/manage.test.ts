@@ -35,6 +35,20 @@ describe("pending_requests and answer_request", () => {
     expect((await runTool(suite.backend, "pending_requests", { machine: PEER_NAME, sessionId: HOOK_SESSION_ID })).text).toBe("no open requests");
   });
 
+  it("show a plan request with its whole plan and revise it with a message, which denies the waiting hook", async () => {
+    await seedHookSession(suite.pair.peer);
+    const hook = fireHook(suite.pair.peer, "PermissionRequest-exitplanmode.json");
+    const requestId = await pendingRequestId(suite.pair.peer, "permission");
+    const listed = JSON.parse((await runTool(suite.backend, "pending_requests", { machine: PEER_NAME, sessionId: HOOK_SESSION_ID })).text) as PendingRequest[];
+    expect(listed).toEqual([
+      expect.objectContaining({ requestId, kind: "permission", plan: "# Create notes\n\n1. Write notes.txt containing hi.\n2. Check the file.", options: ["approve_manual", "revise"] }) as PendingRequest,
+    ]);
+    expect(await runTool(suite.backend, "answer_request", { machine: PEER_NAME, sessionId: HOOK_SESSION_ID, requestId, decision: "revise" })).toMatchObject({ isError: true });
+    const answered = await runTool(suite.backend, "answer_request", { machine: PEER_NAME, sessionId: HOOK_SESSION_ID, requestId, decision: "revise", message: "add a line saying bye" });
+    expect(answered).toEqual({ text: "permission revise", isError: false });
+    expect((await hook).stdout).toContain("add a line saying bye");
+  });
+
   it("refuse an answer without decision or option, and a sessionId without machine", async () => {
     expect(await runTool(suite.backend, "answer_request", { machine: PEER_NAME, sessionId: "x", requestId: "y" })).toMatchObject({ isError: true });
     expect(await runTool(suite.backend, "pending_requests", { sessionId: "x" })).toMatchObject({ isError: true, text: expect.stringContaining("needs the machine") as string });

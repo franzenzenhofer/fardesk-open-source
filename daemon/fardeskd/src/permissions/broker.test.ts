@@ -197,6 +197,19 @@ describe("broker questions", () => {
     await permission.answer;
   });
 
+  it("a finished AskUserQuestion call expires the pending question and the handed-off one", async () => {
+    const { broker, events } = setup(SHORT_TIMEOUT_MS);
+    const handedOff = broker.ask(ask(QUESTION_INPUT));
+    await handedOff.answer;
+    expect(broker.pendingKind("s1")).toBeNull();
+    const call = { id: "toolu_q", tool: "AskUserQuestion", input: QUESTION_INPUT, startedAt: NOW.toISOString() };
+    broker.toolFinished("s1", { ...call, input: { questions: [] } });
+    expect(events.at(-1)).toMatchObject({ activity: { kind: "question", state: "terminal" } });
+    broker.toolFinished("s1", call);
+    expect(events.at(-1)).toMatchObject({ activity: { kind: "question", requestId: handedOff.requestId, state: "expired" } });
+    broker.close();
+  });
+
   it("expires a question on timeout", async () => {
     const { broker, events } = setup(SHORT_TIMEOUT_MS);
     expect(await broker.ask(ask(FREE_TEXT_INPUT)).answer).toEqual({ state: "expired", timedOut: true });

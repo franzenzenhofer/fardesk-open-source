@@ -7,7 +7,7 @@ const MAX_FUNCTION_LINES = 30;
 const MAX_PARAMS = 4;
 
 export default defineConfig(
-  { ignores: ["dist/", "coverage/", "node_modules/", "scripts/**/*.mjs", "test/fixtures/"] },
+  { ignores: ["dist/", "coverage/", "node_modules/", "scripts/**/*.mjs", "test/fixtures/", "test/support/*.mjs"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {

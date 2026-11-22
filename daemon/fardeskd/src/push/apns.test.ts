@@ -69,6 +69,20 @@ describe("apns client", () => {
     });
   });
 
+  it("sends a resolved notice passive, silent and at low priority, with the same collapse id", async () => {
+    const { sandbox, client } = await setup();
+    await client.send(DEVICE, "sandbox", { ...NOTIFICATION, category: "RESOLVED", collapseId: "s1:PERMISSION", data: { sessionId: "s1", requestId: "r1", kind: "resolved" } });
+    const [request] = sandbox.requests;
+    expect(request?.headers["apns-priority"]).toBe("5");
+    expect(request?.headers["apns-collapse-id"]).toBe("s1:PERMISSION");
+    expect(JSON.parse(request?.body ?? "")).toEqual({
+      aps: { alert: { title: "Needs permission", body: "Run npm test?" }, category: "RESOLVED", "thread-id": "session-1", "interruption-level": "passive" },
+      sessionId: "s1",
+      requestId: "r1",
+      kind: "resolved",
+    });
+  });
+
   it("uses the production host, omits the collapse id and sets interruption levels", async () => {
     const { sandbox, production, client } = await setup();
     await client.send(DEVICE, "production", { ...NOTIFICATION, category: "DONE" });

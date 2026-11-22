@@ -1,0 +1,16 @@
+{
+  "Node": {
+    "ID": 1000000000000007,
+    "StableID": "nSTABLEPHONE07CNTRL",
+    "Name": "phone.example.ts.net.",
+    "User": 100000000000001,
+    "Key": "nodekey:0000000000000000000000000000000000000000000000000000000000000007",
+    "Addresses": ["100.64.0.7/32", "fd7a:115c:a1e0::7/128"],
+    "AllowedIPs": ["100.64.0.7/32", "fd7a:115c:a1e0::7/128"],
+    "Hostinfo": { "OS": "iOS", "Hostname": "Phone" },
+    "Created": "2026-01-02T00:00:00Z",
+    "MachineAuthorized": true
+  },
+  "UserProfile": { "ID": 100000000000001, "LoginName": "owner@example.com", "DisplayName": "Owner" },
+  "CapMap": {}
+}

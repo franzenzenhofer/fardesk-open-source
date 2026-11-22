@@ -9,13 +9,22 @@ struct NewSessionView: View {
     @Environment(AppModel.self) private var model
     @Environment(SessionCoordinator.self) private var coordinator
     @Environment(\.dismiss) private var dismiss
-    @State private var draft = NewSessionDraft()
+    @State private var draft: NewSessionDraft
     @State private var folders: [RecentFolder] = []
     @State private var isStarting = false
+    /// Opened by "Start fresh here": everything is filled in, only the first message is left.
+    private let startsFresh: Bool
+
+    init(preset: NewSessionDraft? = nil) {
+        _draft = State(initialValue: preset ?? NewSessionDraft())
+        startsFresh = preset != nil
+    }
 
     /// Read from the one small list the model keeps, never from the whole state: activity rows must not rebuild this sheet.
     private var onlineMachines: [OnlineMachine] { model.onlineMachines }
     private var selected: OnlineMachine? { onlineMachines.first { $0.id == draft.machineID } }
+    /// The Claude homes to ask about: none while the machine has just one (the daemon then uses it).
+    private var homeChoices: [String] { HomeTag.newSessionChoices(for: selected) }
     private var canAsk: Bool {
         selected != nil && !isStarting && CoordinatorPresentation.newSessionPrompt(describing: draft.description) != nil
     }
@@ -27,6 +36,7 @@ struct NewSessionView: View {
                 draft: $draft,
                 machines: NewSessionPresentation.choices(onlineMachines.map { ($0.id, $0.name) }),
                 folders: folders.prefix(Self.maxFolders).map(\.path),
+                homes: homeChoices,
                 models: selected?.models ?? [],
                 permissionModes: NewSessionPresentation.permissionModes(for: selected),
                 coordinatorEnabled: selected?.coordinatorEnabled ?? true,
@@ -34,7 +44,7 @@ struct NewSessionView: View {
                 notice: NewSessionPresentation.noMachineNotice(onlineCount: onlineMachines.count, hubStatus: model.hubStatus),
                 askCoordinator: askCoordinator
             )
-            .navigationTitle("New Session")
+            .navigationTitle(startsFresh ? "Start fresh" : "New Session")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -84,10 +94,7 @@ struct NewSessionView: View {
     private func start() {
         guard let machineID = draft.machineID else { return }
         isStarting = true
-        let request = NewSessionRequest(
-            cwd: draft.cwd, prompt: draft.prompt, worktree: draft.usesWorktree, model: draft.modelName,
-            permissionMode: draft.permissionMode)
-        coordinator.selection = model.startNewSession(request, on: machineID)
+        coordinator.selection = model.startNewSession(draft.request(homeChoices: homeChoices), on: machineID)
         isStarting = false
         dismiss()
     }
@@ -95,9 +102,11 @@ struct NewSessionView: View {
 
 /// The sections of the sheet, driven only by the draft and the choices it is given.
 struct NewSessionForm: View {
+    @Environment(AppModel.self) private var model
     @Binding var draft: NewSessionDraft
     let machines: [MachineChoice]
     let folders: [String]
+    let homes: [String]
     let models: [String]
     let permissionModes: [PermissionMode]
     let coordinatorEnabled: Bool
@@ -107,6 +116,7 @@ struct NewSessionForm: View {
 
     var body: some View {
         Form {
+            if model.isDemo { Section { DemoNoticeLine() } }
             if let notice {
                 Section { Label(notice, systemImage: "hourglass").font(.body) }
             }
@@ -119,6 +129,7 @@ struct NewSessionForm: View {
                 }
             }
             machineSection
+            if !homes.isEmpty { homeSection }
             folderSection
             Section {
                 Toggle("New worktree", isOn: $draft.usesWorktree)
@@ -158,6 +169,18 @@ struct NewSessionForm: View {
             if let selectedMachine {
                 Text(selectedMachine.fullName).font(.footnote).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// Which Claude home (account) the session starts in; shown only when the machine has several.
+    private var homeSection: some View {
+        Section("Home") {
+            Picker("Home", selection: Binding(get: { draft.home(among: homes) }, set: { draft.homeName = $0 })) {
+                ForEach(homes, id: \.self) { Text($0).tag(Optional($0)).accessibilityIdentifier("new-session-home-\($0)") }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .accessibilityIdentifier("new-session-home-picker")
         }
     }
 

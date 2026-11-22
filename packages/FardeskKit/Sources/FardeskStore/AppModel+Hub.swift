@@ -21,17 +21,13 @@ extension Error {
 extension AppModel {
     public var isHubMode: Bool { machines.hub != nil }
 
-    /// Builds before hub mode logged in to every machine. The token of the machine at the hub's own
-    /// address was issued by the hub's daemon, so it becomes the hub token and no new login is needed.
-    func adoptDirectTokenForHub(from list: MachineList) throws {
-        guard let hub = access.hubEndpoint, try configuration.tokens.load(hub.id) == nil else { return }
-        for endpoint in list.endpoints where endpoint.url.sameOrigin(as: hub.url) {
-            guard let token = try configuration.tokens.load(endpoint.id) else { continue }
-            try configuration.tokens.save(token, hub.id)
-            access.tokenCache.invalidate()
-            recordEvent("hub", "reused the \(endpoint.name) login for the hub")
-            return
-        }
+    /// Builds access and auth from the hub the machine list names (nil = every machine on its own).
+    func rebuildAccess() {
+        access = MachineAccess(
+            tokens: configuration.tokens, timeout: configuration.requestTimeout, hub: machines.hub,
+            cache: access.tokenCache, transport: configuration.hubTransport
+        )
+        auth = AuthSession(access: access)
     }
 
     /// Polls the hub now and then every `hubPollInterval` until `stop()`.
@@ -66,7 +62,7 @@ extension AppModel {
         knownHubName ?? machines.endpoints.first?.name ?? hubAddress
     }
 
-    public var hubAddress: String { machines.hub?.host() ?? "" }
+    public var hubAddress: String { machines.hub?.url.host() ?? "" }
 
     /// The line for the top of the Machines screen; nil when the hub answers.
     public var hubBannerText: String? {
@@ -123,20 +119,6 @@ extension AppModel {
         }
     }
 
-    /// The list of an older build (one login per machine) becomes the hub list at once: same names,
-    /// the cached sessions move to the new ids, so the first screen is not empty while the hub answers.
-    func migrate(_ previous: [MachineEndpoint], into list: inout MachineList, hub: URL) throws {
-        let moved = previous.map { HubIdentity.endpoint(machine: $0.name, hub: hub) }
-        for (old, new) in zip(previous, moved) {
-            if let snapshot = configuration.cache.load(machineID: old.id) {
-                try configuration.cache.save(MachineSnapshot(machineID: new.id, machine: snapshot.machine, sessions: snapshot.sessions, lastSeen: snapshot.lastSeen))
-            }
-            if old.url.sameOrigin(as: hub) { knownHubName = old.name }
-        }
-        list.replaceEndpoints(moved)
-        try configuration.machinesFile.save(list)
-    }
-
     private func adoptHubMachines(_ endpoints: [MachineEndpoint], added: [MachineEndpoint]) {
         machines.replaceEndpoints(endpoints)
         state.sync(endpoints: endpoints)
@@ -147,7 +129,7 @@ extension AppModel {
         cacheWriter.saveMachines(machines)
     }
 
-    /// The hub refused the token (not revoked, not reachable): streams stop and the login screen asks for the password.
+    /// The hub refused the token (not revoked, not reachable): streams stop and the pairing screen asks for a new pairing link.
     private func signOutLocally(_ reason: String) {
         stop()
         phase = .loggedOut
@@ -157,6 +139,7 @@ extension AppModel {
 
     private func handleHubFailure(_ error: any Error, since started: Date) {
         if error.isTokenRevoked { return wipeEverything(reason: "This device was signed out. Log in again.") }
+        if error.isDeviceMoved { return wipeEverything(reason: error.deviceMovedMessage) }
         if error.meansLoggedOut { return signOutLocally("The hub did not accept this login. Log in again.") }
         if error.isCancellation { return }
         let first = !(hubStatus?.isUnreachable ?? false)

@@ -20,14 +20,14 @@ afterAll(async () => {
 
 async function upgradeThenReset(path: string): Promise<void> {
   const { port } = new URL(daemon.url);
-  const socket = connect(Number(port), "127.0.0.1");
+  const socket = connect({ port: Number(port), host: "127.0.0.1" });
   socket.on("error", () => undefined);
   await new Promise<void>((resolve) => socket.once("connect", resolve));
   socket.write(
     [`GET ${path} HTTP/1.1`, "Host: 127.0.0.1", "Connection: Upgrade", "Upgrade: websocket", "Sec-WebSocket-Version: 13",
       "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==", `Authorization: Bearer ${TEST_TOKEN}`, "", ""].join("\r\n"),
   );
-  socket.resetAndDestroy();
+  socket.destroy();
   await sleep(2);
 }
 

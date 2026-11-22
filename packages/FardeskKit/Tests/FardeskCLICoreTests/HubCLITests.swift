@@ -8,16 +8,13 @@ import Testing
 
 /// `fardesk` in hub mode against a REAL hub daemon: what the CLI prints is what the app shows.
 struct HubCLITests {
-    private static let password = "hub-password"
-
-    /// Sets the hub, logs in once, and runs `body` with a CLI that works through the hub.
+    /// Sets the hub, pairs once, and runs `body` with a CLI that works through the hub.
     private func withHubCLI(_ body: (CLIHarness, HubRig) async throws -> Void) async throws {
         try await HubRig.with { rig in
-            try await rig.hub.setPassword(Self.password)
             let cli = try CLIHarness()
             let set = await cli.run(["hub", "--set", rig.hub.url.absoluteString])
             #expect(set.status == 0, "\(set.errText)")
-            let login = await cli.run(["login"], secrets: [Self.password])
+            let login = await cli.run(["pair", try await PairingLinks.make(for: rig.hub, name: HubRig.hubName, hub: true)])
             #expect(login.status == 0, "\(login.errText)")
             try await body(cli, rig)
         }
@@ -100,7 +97,7 @@ struct HubCLITests {
             let json = await cli.run(["events", "--json"])
             let reports = try FardeskJSON.makeDecoder().decode([TelemetryReport].self, from: Data(json.outText.utf8))
             #expect(reports.contains { $0.kind == .event && $0.area == "cli.command" && $0.durationMs != nil })
-            #expect(reports.allSatisfy { !$0.message.contains(Self.password) })
+            #expect(reports.allSatisfy { !$0.message.contains(TestDaemon.token) })
             #expect(await cli.run(["errors"]).outText.contains("No errors reported"))
         }
     }

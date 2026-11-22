@@ -8,6 +8,7 @@ import { okResultSchema, pairCodeResultSchema } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
 import { buildPairingPayload, pairingLink, renderQr } from "../pairing/index.js";
 import { callDaemon } from "./daemonClient.js";
+import { requireScreen, showOnScreen } from "./pairScreen.js";
 import { EXIT_FAILURE, EXIT_OK } from "./types.js";
 import type { CommandContext } from "./types.js";
 
@@ -31,8 +32,8 @@ async function pause(ms: number, stop: Promise<void>): Promise<boolean> {
 
 async function askWindow(context: CommandContext, windowId: string): Promise<PairWindowStatus> {
   const status = await callDaemon(context, { method: "GET", path: `/v1/auth/pair-window?window=${windowId}` }, pairWindowStatusSchema);
-  if (status === null) throw new FardeskError("conflict", "the daemon stopped answering, the pairing window is gone with it");
-  return status;
+  if (status.kind === "offline") throw new FardeskError("conflict", `the daemon stopped answering, the pairing window is gone with it (${status.reason})`);
+  return status.value;
 }
 
 /** Polls (each poll keeps the window open) until the window ends; `stopped` when the command was interrupted first. */
@@ -48,7 +49,8 @@ async function holdWindow(context: CommandContext, windowId: string): Promise<{ 
 
 async function closeWindow(context: CommandContext, windowId: string): Promise<void> {
   try {
-    await callDaemon(context, { method: "POST", path: `/v1/auth/pair-window/close?window=${windowId}` }, okResultSchema);
+    const closed = await callDaemon(context, { method: "POST", path: `/v1/auth/pair-window/close?window=${windowId}` }, okResultSchema);
+    if (closed.kind === "offline") context.io.stderr(`could not close the pairing window, the daemon is gone and the window with it: ${closed.reason}`);
   } catch (error) {
     context.io.stderr(`could not close the pairing window (it closes by itself within seconds): ${(error as Error).message}`);
   }
@@ -78,21 +80,35 @@ function report(context: CommandContext, outcome: Outcome, status: PairWindowSta
   return EXIT_OK;
 }
 
+/** Plain mode prints the link and the QR code; `--show` puts the QR code on the screen and prints neither. Returns the cleanup. */
+async function presentCode(context: CommandContext, link: string): Promise<() => Promise<void>> {
+  if (!context.show) {
+    context.io.stdout(link);
+    context.io.stdout(await renderQr(link));
+    return () => Promise.resolve();
+  }
+  const screen = await showOnScreen(context, link);
+  context.io.stdout(`the pairing code is open on this computer's screen; scan it with the Fardesk app (${PAIR_CODE_TTL_MS / MS_PER_MINUTE} minutes)`);
+  return () => screen.close();
+}
+
 export async function runPair(context: CommandContext): Promise<number> {
+  if (context.show) requireScreen(context);
   const config = loadConfig(context.configPath);
   const address = await resolveBindAddress(config, context.run, context.tailscaleCommands);
   const issued = await callDaemon(context, { method: "POST", path: "/v1/auth/pair-code" }, pairCodeResultSchema);
-  if (issued === null) throw new FardeskError("conflict", "no daemon answers: start fardeskd first, the pairing window lives in the running daemon");
-  const windowId = windowIdOf(issued.code);
-  const link = pairingLink(buildPairingPayload(config, address, issued.code));
-  context.io.stdout(link);
-  context.io.stdout(await renderQr(link));
-  context.io.stdout(`pairing window open until ${issued.expiresAt} (${PAIR_CODE_TTL_MS / MS_PER_MINUTE} minutes), one device, ${PAIR_MAX_WRONG} wrong codes close it`);
-  context.io.stdout("keep this command running: pairing works only while it does (Ctrl-C closes the window)");
+  if (issued.kind === "offline") throw new FardeskError("conflict", `${issued.reason}; the pairing window lives in the running daemon`);
+  const windowId = windowIdOf(issued.value.code);
+  const link = pairingLink(buildPairingPayload(config, address, issued.value.code));
+  let cleanup: () => Promise<void> = () => Promise.resolve();
   try {
+    cleanup = await presentCode(context, link);
+    context.io.stdout(`pairing window open until ${issued.value.expiresAt} (${PAIR_CODE_TTL_MS / MS_PER_MINUTE} minutes), one device, ${PAIR_MAX_WRONG} wrong codes close it`);
+    context.io.stdout("keep this command running: pairing works only while it does (Ctrl-C closes the window)");
     const { outcome, status } = await holdWindow(context, windowId);
     return report(context, outcome, status);
   } finally {
     await closeWindow(context, windowId);
+    await cleanup();
   }
 }

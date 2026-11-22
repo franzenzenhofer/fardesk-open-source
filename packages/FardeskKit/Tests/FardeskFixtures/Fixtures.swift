@@ -57,11 +57,12 @@ public enum Fixtures {
         try decode(SessionSummary.self, "SessionSummary", name, overriding: overrides)
     }
 
-    public static func machine(_ name: String = "macosWithClaude") throws -> Machine {
-        try decode(Machine.self, "Machine", name)
+    public static func machine(_ name: String = "macosWithClaude", overriding overrides: [String: any Sendable] = [:]) throws -> Machine {
+        try decode(Machine.self, "Machine", name, overriding: overrides)
     }
 
-    public static func endpoint(_ name: String, host: String = "192.0.2.10") -> MachineEndpoint {
+
+    public static func endpoint(_ name: String, host: String = "100.64.0.10") -> MachineEndpoint {
         MachineEndpoint(
             id: UUID(),
             name: name,

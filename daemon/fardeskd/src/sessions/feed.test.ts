@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { NO_LABEL } from "../service/labelStore.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
@@ -25,9 +26,9 @@ function setup(fixture: string): { store: SessionStore; broker: ReturnType<typeo
   const { sessionId } = home.addTranscript({ fixture });
   const bus = createBus();
   let counter = 0;
-  const broker = createBroker({ timeoutMs: 60_000, bus, now: () => new Date(), newId: () => `r${String(++counter)}` });
+  const broker = createBroker({ timeoutMs: 60_000, bus, now: () => new Date(), newId: () => `r${String(++counter)}`, allowBypass: true });
   const store = createSessionStore({
-    claudeHomes: [home.dir],
+    claudeHomes: [{ path: home.dir, name: basename(home.dir) }],
     bus,
     log: createLogger(() => undefined, () => new Date()),
     registryPollMs: 1000,
@@ -39,6 +40,7 @@ function setup(fixture: string): { store: SessionStore; broker: ReturnType<typeo
     pendingKind: (id) => broker.pendingKind(id),
     isMuted: () => false,
     labelOf: () => NO_LABEL,
+    autoColors: { get: () => null, assign: () => undefined },
     onLeftWaiting: () => undefined,
   });
   stores.push(store);

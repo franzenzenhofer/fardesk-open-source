@@ -1,0 +1,2156 @@
+{
+ "note": "Generated from the demo conversations by the project's demo fixture generator. Do not edit by hand.",
+ "machines": [
+  {
+   "key": "studio",
+   "machine": {
+    "contractVersion": 4,
+    "name": "Studio",
+    "hostname": "studio.demo.invalid",
+    "os": "macos",
+    "version": "4.3.0",
+    "claudeVersion": "2.1.325",
+    "sessionsCount": 3,
+    "models": [
+     "claude-opus-5-5",
+     "claude-sonnet-5-5"
+    ],
+    "ghosttyAutomation": "ok",
+    "allowBypass": true,
+    "coordinatorEnabled": false,
+    "homes": [
+     "Personal",
+     "Work"
+    ],
+    "features": [
+     "chat-image",
+     "self-update",
+     "cold-last-turn",
+     "plan-approval"
+    ],
+    "update": {
+     "state": "idle",
+     "message": null,
+     "version": null,
+     "packageSha256": null,
+     "at": null
+    },
+    "tailscale": {
+     "state": "running"
+    }
+   },
+   "folders": [
+    {
+     "path": "/Users/dev/code/weather-dashboard",
+     "agoSec": 120
+    },
+    {
+     "path": "/Users/dev/code/invoice-parser",
+     "agoSec": 1500
+    },
+    {
+     "path": "/Users/dev/code/ios-habit-tracker",
+     "agoSec": 3720
+    }
+   ]
+  },
+  {
+   "key": "laptop",
+   "machine": {
+    "contractVersion": 4,
+    "name": "Laptop",
+    "hostname": "laptop.demo.invalid",
+    "os": "macos",
+    "version": "4.3.0",
+    "claudeVersion": "2.1.325",
+    "sessionsCount": 4,
+    "models": [
+     "claude-opus-5-5",
+     "claude-sonnet-5-5"
+    ],
+    "ghosttyAutomation": "ok",
+    "allowBypass": true,
+    "coordinatorEnabled": false,
+    "homes": [
+     "Personal"
+    ],
+    "features": [
+     "chat-image",
+     "self-update",
+     "cold-last-turn",
+     "plan-approval"
+    ],
+    "update": {
+     "state": "idle",
+     "message": null,
+     "version": null,
+     "packageSha256": null,
+     "at": null
+    },
+    "tailscale": {
+     "state": "running"
+    }
+   },
+   "folders": [
+    {
+     "path": "/Users/dev/code/rust-image-resizer",
+     "agoSec": 480
+    },
+    {
+     "path": "/Users/dev/code/marketing-site",
+     "agoSec": 240
+    },
+    {
+     "path": "/Users/dev/code/data-pipeline",
+     "agoSec": 11400
+    }
+   ]
+  },
+  {
+   "key": "server",
+   "machine": {
+    "contractVersion": 4,
+    "name": "Build server",
+    "hostname": "build-server.demo.invalid",
+    "os": "linux",
+    "version": "4.3.0",
+    "claudeVersion": "2.1.325",
+    "sessionsCount": 2,
+    "models": [
+     "claude-opus-5-5",
+     "claude-sonnet-5-5"
+    ],
+    "ghosttyAutomation": "ok",
+    "allowBypass": true,
+    "coordinatorEnabled": false,
+    "homes": [
+     "Personal"
+    ],
+    "features": [
+     "chat-image",
+     "self-update",
+     "cold-last-turn",
+     "plan-approval"
+    ],
+    "update": {
+     "state": "idle",
+     "message": null,
+     "version": null,
+     "packageSha256": null,
+     "at": null
+    },
+    "tailscale": {
+     "state": "running"
+    }
+   },
+   "folders": [
+    {
+     "path": "/Users/dev/code/api-gateway",
+     "agoSec": 720
+    },
+    {
+     "path": "/Users/dev/code/chess-engine",
+     "agoSec": 2400
+    }
+   ]
+  }
+ ],
+ "sessions": [
+  {
+   "machine": "studio",
+   "summary": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "title": "Hourly forecast chart",
+    "cwd": "/Users/dev/code/weather-dashboard",
+    "status": "working",
+    "waitingFor": null,
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": true,
+    "summary": "I'm reading the sunrise and sunset fields from the forecast response first.",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": "#389489",
+     "pinned": false
+    },
+    "autoColor": "#A899FA",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 375,
+    "updatedAgoSec": 120,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "c531f6a1-f20e-44c0-848a-156d821c6036",
+     "text": "The hourly chart on the dashboard shows UTC times. Can you make it use the city's local time zone?",
+     "ts": 375
+    },
+    {
+     "kind": "assistant",
+     "id": "5b8bd02c-5652-4fd5-8e69-f10b5e56285f",
+     "text": "I'll start by finding where the chart builds its x-axis labels.",
+     "ts": 358
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_6b07d38e70aa4b99886b56d6",
+     "tool": "Read",
+     "title": "Looked through 2 files",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": null,
+     "ts": 341
+    },
+    {
+     "kind": "assistant",
+     "id": "779d24e2-cd8c-4238-8c48-17b6589d05e7",
+     "text": "`formatHour` formats in the browser's zone, and the API sends UTC. I'll pass the city's IANA zone through instead.",
+     "ts": 273
+    },
+    {
+     "kind": "files",
+     "id": "toolu_2f719a27b2ba43668a3ce741",
+     "title": "Edited 2 files",
+     "changed": [
+      "src/lib/time.ts",
+      "src/components/HourlyChart.tsx"
+     ],
+     "ts": 256
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_01d5c6ae0bd84879826d8ac2",
+     "tool": "Bash",
+     "title": "Ran npm test -- time - 4 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 188
+    },
+    {
+     "kind": "assistant",
+     "id": "4ff34d8c-b5fd-4094-8697-b7af8fa5446f",
+     "text": "The hourly chart now labels each hour in the city's own time zone. Tokyo reads 09:00 where it used to read 00:00. I added `date-fns-tz` and updated the four time tests; all of them pass.",
+     "ts": 154
+    },
+    {
+     "kind": "user",
+     "id": "97247092-fb03-4353-842d-0744fabdf2bc",
+     "text": "Nice. Can you also show a small sun icon for the hours between sunrise and sunset?",
+     "ts": 137
+    },
+    {
+     "kind": "assistant",
+     "id": "843add89-f116-4454-8d2c-5f2e928a85f5",
+     "text": "Sure. I'm reading the sunrise and sunset fields from the forecast response first.",
+     "ts": 120
+    }
+   ],
+   "details": {
+    "toolu_6b07d38e70aa4b99886b56d6": {
+     "activityId": "toolu_6b07d38e70aa4b99886b56d6",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Looked through 2 files",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "Grep: formatHour"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "src/lib/time.ts"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_2f719a27b2ba43668a3ce741": {
+     "activityId": "toolu_2f719a27b2ba43668a3ce741",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "time.ts",
+       "subtitle": "src/lib",
+       "added": 6,
+       "removed": 6,
+       "lines": [
+        {
+         "number": 1,
+         "sign": "-",
+         "text": "import { format } from \"date-fns\";"
+        },
+        {
+         "number": 2,
+         "sign": "-",
+         "text": ""
+        },
+        {
+         "number": 3,
+         "sign": "-",
+         "text": "// Formats an ISO timestamp as HH:mm."
+        },
+        {
+         "number": 4,
+         "sign": "-",
+         "text": "export function formatHour(iso: string): string {"
+        },
+        {
+         "number": 5,
+         "sign": "-",
+         "text": "  return format(new Date(iso), \"HH:mm\");"
+        },
+        {
+         "number": 6,
+         "sign": "-",
+         "text": "}"
+        },
+        {
+         "number": 1,
+         "sign": "+",
+         "text": "import { formatInTimeZone } from \"date-fns-tz\";"
+        },
+        {
+         "number": 2,
+         "sign": "+",
+         "text": ""
+        },
+        {
+         "number": 3,
+         "sign": "+",
+         "text": "// Formats an ISO timestamp as HH:mm in the given IANA time zone."
+        },
+        {
+         "number": 4,
+         "sign": "+",
+         "text": "export function formatHour(iso: string, timeZone: string): string {"
+        },
+        {
+         "number": 5,
+         "sign": "+",
+         "text": "  return formatInTimeZone(new Date(iso), timeZone, \"HH:mm\");"
+        },
+        {
+         "number": 6,
+         "sign": "+",
+         "text": "}"
+        }
+       ]
+      },
+      {
+       "title": "HourlyChart.tsx",
+       "subtitle": "src/components",
+       "added": 1,
+       "removed": 1,
+       "lines": [
+        {
+         "number": 18,
+         "sign": "-",
+         "text": "const label = formatHour(point.time);"
+        },
+        {
+         "number": 18,
+         "sign": "+",
+         "text": "const label = formatHour(point.time, city.timeZone);"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_01d5c6ae0bd84879826d8ac2": {
+     "activityId": "toolu_01d5c6ae0bd84879826d8ac2",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "npm test -- time",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": " PASS  src/lib/time.test.ts"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "  formatHour"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "    ok formats Lisbon in UTC+0 in winter"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "    ok formats Tokyo in UTC+9"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": ""
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "Tests: 4 passed, 4 total"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "studio",
+   "summary": {
+    "id": "22222222-2222-4222-8222-222222222222",
+    "title": "Parse multi-page invoices",
+    "cwd": "/Users/dev/code/invoice-parser",
+    "status": "idle",
+    "waitingFor": null,
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": false,
+    "summary": "I ran the sample set (10 tests, including the new three-page invoice) and eve...",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": null,
+     "pinned": false
+    },
+    "autoColor": "#3B2EB6",
+    "agent": "claude",
+    "background": 0,
+    "home": "Work",
+    "startedAgoSec": 1670,
+    "updatedAgoSec": 1500,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "541b1cb7-aae0-4f06-8325-3ab6c6cea3d9",
+     "text": "Multi-page PDF invoices only return the totals of the first page. Please fix the parser.",
+     "ts": 1670
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_5cdcdb234bc048f085963cf0",
+     "tool": "Read",
+     "title": "Looked through 2 files",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": null,
+     "ts": 1653
+    },
+    {
+     "kind": "assistant",
+     "id": "933fbc39-f0c7-4d35-8d65-29a2e7a3908f",
+     "text": "Found it: `find_total` only ever looks at `pages[0]`. Totals usually sit on the last page, so I'll scan from the end.",
+     "ts": 1585
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_f002f446e9c14b808873bdbc",
+     "tool": "Edit",
+     "title": "Edited totals.py",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 1568
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_b288066635324b568badd366",
+     "tool": "Bash",
+     "title": "Ran pytest -q - 10 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 1534
+    },
+    {
+     "kind": "assistant",
+     "id": "29f7cd50-12cd-4ece-894d-621e65978015",
+     "text": "Fixed. `find_total` now searches the pages from last to first and returns the first \"Total\" line it finds. I ran the sample set (10 tests, including the new three-page invoice) and everything passes.",
+     "ts": 1500
+    }
+   ],
+   "details": {
+    "toolu_5cdcdb234bc048f085963cf0": {
+     "activityId": "toolu_5cdcdb234bc048f085963cf0",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Looked through 2 files",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "Glob: src/**/*.py"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "src/invoice_parser/totals.py"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_f002f446e9c14b808873bdbc": {
+     "activityId": "toolu_f002f446e9c14b808873bdbc",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "totals.py",
+       "subtitle": "src/invoice_parser",
+       "added": 5,
+       "removed": 5,
+       "lines": [
+        {
+         "number": 2,
+         "sign": "-",
+         "text": "    page = pages[0]"
+        },
+        {
+         "number": 3,
+         "sign": "-",
+         "text": "    for line in page.lines:"
+        },
+        {
+         "number": 4,
+         "sign": "-",
+         "text": "        if line.label == \"Total\":"
+        },
+        {
+         "number": 5,
+         "sign": "-",
+         "text": "            return line.amount"
+        },
+        {
+         "number": 6,
+         "sign": "-",
+         "text": "    return None"
+        },
+        {
+         "number": 2,
+         "sign": "+",
+         "text": "    for page in reversed(pages):"
+        },
+        {
+         "number": 3,
+         "sign": "+",
+         "text": "        for line in page.lines:"
+        },
+        {
+         "number": 4,
+         "sign": "+",
+         "text": "            if line.label == \"Total\":"
+        },
+        {
+         "number": 5,
+         "sign": "+",
+         "text": "                return line.amount"
+        },
+        {
+         "number": 6,
+         "sign": "+",
+         "text": "    return None"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_b288066635324b568badd366": {
+     "activityId": "toolu_b288066635324b568badd366",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "pytest -q",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "..........                                                               [100%]"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "10 passed in 0.41s"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "studio",
+   "summary": {
+    "id": "33333333-3333-4333-8333-333333333333",
+    "title": "Streak counter for habits",
+    "cwd": "/Users/dev/code/ios-habit-tracker",
+    "status": "ended",
+    "waitingFor": null,
+    "owned": false,
+    "replyMode": "resume",
+    "canStop": false,
+    "summary": "Want me to switch to that?",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": null,
+     "pinned": false
+    },
+    "autoColor": "#FD0568",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 3924,
+    "updatedAgoSec": 3720,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "b43f010c-7444-44c5-8672-ec6efeb63bca",
+     "text": "Add a streak counter to the habit detail screen. It should count consecutive days with a check-in.",
+     "ts": 3924
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_7e53e8421dda484d863ab3a4",
+     "tool": "Read",
+     "title": "Read HabitDetailView.swift",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 3907
+    },
+    {
+     "kind": "assistant",
+     "id": "f55f856c-7411-4b06-8c26-fdec391d9be6",
+     "text": "I'll put the streak logic into the model so it can be unit tested, then show it above the calendar.",
+     "ts": 3873
+    },
+    {
+     "kind": "files",
+     "id": "toolu_02c1a5583d0f4f898b924063",
+     "title": "Edited 2 files",
+     "changed": [
+      "Sources/Habits/Habit.swift",
+      "Sources/Habits/HabitDetailView.swift"
+     ],
+     "ts": 3856
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_7db201d8e8b2493f807fafd5",
+     "tool": "Bash",
+     "title": "Ran swift test --filter HabitTests - 6 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 3788
+    },
+    {
+     "kind": "assistant",
+     "id": "6f2fa7d9-050c-4f71-81ac-f08869e8c053",
+     "text": "The detail screen now shows a flame and \"N day streak\" under the title. The count lives in `Habit.currentStreak()`, so it is covered by the six habit tests (all pass). A missed day resets it to zero.",
+     "ts": 3754
+    },
+    {
+     "kind": "user",
+     "id": "226b1026-dd0a-4e8d-8ba8-8a68a511379e",
+     "text": "Great. Should today count if I haven't checked in yet?",
+     "ts": 3737
+    },
+    {
+     "kind": "assistant",
+     "id": "0912de5b-e2eb-4948-8c14-0c6913258b81",
+     "text": "Right now no: the streak counts back from today, so an unchecked today gives 0. A common choice is to start from yesterday until you check in, so the streak does not drop to zero at midnight. Want me to switch to that?",
+     "ts": 3720
+    }
+   ],
+   "details": {
+    "toolu_7e53e8421dda484d863ab3a4": {
+     "activityId": "toolu_7e53e8421dda484d863ab3a4",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Read HabitDetailView.swift",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "1\timport SwiftUI"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "2\t"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "3\tstruct HabitDetailView: View {"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "4\t    let habit: Habit"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "5\t    var body: some View {"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "6\t        VStack(alignment: .leading) {"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "7\t            Text(habit.name).font(.title)"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "8\t            CheckInCalendar(habit: habit)"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "9\t        }"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "10\t    }"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "11\t}"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_02c1a5583d0f4f898b924063": {
+     "activityId": "toolu_02c1a5583d0f4f898b924063",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Habit.swift",
+       "subtitle": "Sources/Habits",
+       "added": 13,
+       "removed": 1,
+       "lines": [
+        {
+         "number": 12,
+         "sign": "-",
+         "text": "    var checkIns: [Date]"
+        },
+        {
+         "number": 12,
+         "sign": "+",
+         "text": "    var checkIns: [Date]"
+        },
+        {
+         "number": 13,
+         "sign": "+",
+         "text": ""
+        },
+        {
+         "number": 14,
+         "sign": "+",
+         "text": "    /// Consecutive days with a check-in, counted back from today."
+        },
+        {
+         "number": 15,
+         "sign": "+",
+         "text": "    func currentStreak(today: Date = .now, calendar: Calendar = .current) -> Int {"
+        },
+        {
+         "number": 16,
+         "sign": "+",
+         "text": "        let days = Set(checkIns.map { calendar.startOfDay(for: $0) })"
+        },
+        {
+         "number": 17,
+         "sign": "+",
+         "text": "        var day = calendar.startOfDay(for: today)"
+        },
+        {
+         "number": 18,
+         "sign": "+",
+         "text": "        var streak = 0"
+        },
+        {
+         "number": 19,
+         "sign": "+",
+         "text": "        while days.contains(day) {"
+        },
+        {
+         "number": 20,
+         "sign": "+",
+         "text": "            streak += 1"
+        },
+        {
+         "number": 21,
+         "sign": "+",
+         "text": "            day = calendar.date(byAdding: .day, value: -1, to: day)!"
+        },
+        {
+         "number": 22,
+         "sign": "+",
+         "text": "        }"
+        },
+        {
+         "number": 23,
+         "sign": "+",
+         "text": "        return streak"
+        },
+        {
+         "number": 24,
+         "sign": "+",
+         "text": "    }"
+        }
+       ]
+      },
+      {
+       "title": "HabitDetailView.swift",
+       "subtitle": "Sources/Habits",
+       "added": 2,
+       "removed": 1,
+       "lines": [
+        {
+         "number": 7,
+         "sign": "-",
+         "text": "            Text(habit.name).font(.title)"
+        },
+        {
+         "number": 7,
+         "sign": "+",
+         "text": "            Text(habit.name).font(.title)"
+        },
+        {
+         "number": 8,
+         "sign": "+",
+         "text": "            Label(\"\\(habit.currentStreak()) day streak\", systemImage: \"flame.fill\")"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_7db201d8e8b2493f807fafd5": {
+     "activityId": "toolu_7db201d8e8b2493f807fafd5",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "swift test --filter HabitTests",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "Test Suite 'HabitTests' passed."
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "\t Executed 6 tests, with 0 failures (0 unexpected) in 0.012 seconds"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "laptop",
+   "summary": {
+    "id": "44444444-4444-4444-8444-444444444444",
+    "title": "Faster Lanczos resize",
+    "cwd": "/Users/dev/code/rust-image-resizer",
+    "status": "working",
+    "waitingFor": null,
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": true,
+    "summary": "Running the pixel-comparison tests next to make sure the output is identical.",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": null,
+     "pinned": false
+    },
+    "autoColor": "#D490F7",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 684,
+    "updatedAgoSec": 480,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "fa722db7-6bc0-4bb2-8897-5550c101211d",
+     "text": "Benchmarks show the Lanczos resize is 3x slower than bilinear. Find out why and speed it up.",
+     "ts": 684
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_1791dcb56a4d4dc1848a3ffa",
+     "tool": "Bash",
+     "title": "Ran cargo bench --bench resize 2>&1 | tail -6",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 667
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_4c1e994f550e42ec863ac91f",
+     "tool": "Read",
+     "title": "Read lanczos.rs",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 633
+    },
+    {
+     "kind": "assistant",
+     "id": "92cf0bfa-bc64-4834-82e4-2a1d483ffd6d",
+     "text": "`weight` is recomputed for every output pixel and channel, with two `sin` calls each time. The weights only depend on the scale, so I'll precompute one table per axis.",
+     "ts": 599
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_fccfc9d087ec4dbd8afd7ab9",
+     "tool": "Edit",
+     "title": "Edited lanczos.rs",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 582
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_27e0330119f9498d81c2333f",
+     "tool": "Bash",
+     "title": "Ran cargo bench --bench resize 2>&1 | tail -3",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 548
+    },
+    {
+     "kind": "assistant",
+     "id": "89ac754b-c529-42c5-8def-d4d3c6ffcc01",
+     "text": "Lanczos on a 4K image went from about 120 ms to 47 ms. It is now only 1.2x slower than bilinear. Running the pixel-comparison tests next to make sure the output is identical.",
+     "ts": 514
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_e17c640484f842b68d428d89",
+     "tool": "Bash",
+     "title": "Ran cargo test --release - 14 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 497
+    }
+   ],
+   "details": {
+    "toolu_1791dcb56a4d4dc1848a3ffa": {
+     "activityId": "toolu_1791dcb56a4d4dc1848a3ffa",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "cargo bench --bench resize 2>&1 | tail -6",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "resize/bilinear/4k    time: [38.2 ms 38.6 ms 39.1 ms]"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "resize/lanczos3/4k    time: [118.4 ms 119.9 ms 121.7 ms]"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_4c1e994f550e42ec863ac91f": {
+     "activityId": "toolu_4c1e994f550e42ec863ac91f",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Read lanczos.rs",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "12\tfn weight(x: f32) -> f32 {"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "13\t    if x == 0.0 { return 1.0; }"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "14\t    if x.abs() >= 3.0 { return 0.0; }"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "15\t    let px = std::f32::consts::PI * x;"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "16\t    3.0 * px.sin() * (px / 3.0).sin() / (px * px)"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "17\t}"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_fccfc9d087ec4dbd8afd7ab9": {
+     "activityId": "toolu_fccfc9d087ec4dbd8afd7ab9",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "lanczos.rs",
+       "subtitle": "src",
+       "added": 5,
+       "removed": 1,
+       "lines": [
+        {
+         "number": 12,
+         "sign": "-",
+         "text": "fn weight(x: f32) -> f32 {"
+        },
+        {
+         "number": 12,
+         "sign": "+",
+         "text": "fn weight_table(scale: f32, taps: usize) -> Vec<f32> {"
+        },
+        {
+         "number": 13,
+         "sign": "+",
+         "text": "    (0..taps).map(|i| weight((i as f32 - taps as f32 / 2.0) / scale)).collect()"
+        },
+        {
+         "number": 14,
+         "sign": "+",
+         "text": "}"
+        },
+        {
+         "number": 15,
+         "sign": "+",
+         "text": ""
+        },
+        {
+         "number": 16,
+         "sign": "+",
+         "text": "fn weight(x: f32) -> f32 {"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_27e0330119f9498d81c2333f": {
+     "activityId": "toolu_27e0330119f9498d81c2333f",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "cargo bench --bench resize 2>&1 | tail -3",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "resize/lanczos3/4k    time: [46.9 ms 47.3 ms 47.8 ms]"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "                      change: [-60.8% -60.5% -60.1%] (p = 0.00 < 0.05)"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_e17c640484f842b68d428d89": {
+     "activityId": "toolu_e17c640484f842b68d428d89",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "cargo test --release",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "running 14 tests"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "test result: ok. 14 passed; 0 failed"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "laptop",
+   "summary": {
+    "id": "55555555-5555-4555-8555-555555555555",
+    "title": "Hero section redesign",
+    "cwd": "/Users/dev/code/marketing-site",
+    "status": "waiting",
+    "waitingFor": "permission",
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": false,
+    "summary": "Wants to run netlify deploy --alias preview --dir dist",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": "#8E0443",
+     "pinned": false
+    },
+    "autoColor": "#1AA1FB",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 275,
+    "updatedAgoSec": 45,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "bb95a81c-f6c4-4acb-844a-101d87a4d15d",
+     "text": "Here is the hero draft. Can you rebuild it in our Astro layout? Headline left, image right.\nAttached image: /tmp/fardesk-demo/laptop/code/marketing-site/.fardesk/attachments/hero.png",
+     "ts": 275
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_0cd0b9eeb1b544af8d005589",
+     "tool": "Read",
+     "title": "Read Hero.astro",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 258
+    },
+    {
+     "kind": "assistant",
+     "id": "50ba0b16-b4e1-495e-8c57-f59c4f7c4e4f",
+     "text": "The draft has a two-column layout with a rounded image on the right. I'll add a grid to the hero and keep it single-column on phones.",
+     "ts": 224
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_8996fbe444ad448a8cfa0f6d",
+     "tool": "Edit",
+     "title": "Edited Hero.astro",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 207
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_d78cdc75b9414125825b39ad",
+     "tool": "Bash",
+     "title": "Ran npm run build",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 173
+    },
+    {
+     "kind": "assistant",
+     "id": "b3affcb4-7da4-4a9a-88fb-ed01af76c832",
+     "text": "The hero is rebuilt: headline and lead on the left, the image on the right with rounded corners. Below 800px it stacks. The site builds all 12 pages without warnings.",
+     "ts": 139
+    },
+    {
+     "kind": "user",
+     "id": "11909c2f-34c1-4f28-8afd-c66c735a0749",
+     "text": "Looks right. Now deploy a preview so I can send the link around.",
+     "ts": 122
+    },
+    {
+     "kind": "assistant",
+     "id": "3930634b-f0b3-4710-87ea-c8c57ecaf8c9",
+     "text": "Deploying the preview now. Netlify is uploading 12 pages and the new hero image.",
+     "ts": 105
+    },
+    {
+     "ts": 45,
+     "id": "demo-permission",
+     "kind": "permission",
+     "requestId": "demo-permission",
+     "tool": "Bash",
+     "title": "Run netlify deploy",
+     "summary": "netlify deploy --alias preview --dir dist",
+     "cwd": "/Users/dev/code/marketing-site",
+     "destructive": false,
+     "state": "pending"
+    }
+   ],
+   "details": {
+    "toolu_0cd0b9eeb1b544af8d005589": {
+     "activityId": "toolu_0cd0b9eeb1b544af8d005589",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Read Hero.astro",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "1\t---"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "2\tconst { title, lead } = Astro.props;"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "3\t---"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "4\t<section class=\"hero\">"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "5\t  <h1>{title}</h1>"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "6\t  <p>{lead}</p>"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "7\t</section>"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_8996fbe444ad448a8cfa0f6d": {
+     "activityId": "toolu_8996fbe444ad448a8cfa0f6d",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Hero.astro",
+       "subtitle": "src/components",
+       "added": 12,
+       "removed": 4,
+       "lines": [
+        {
+         "number": 4,
+         "sign": "-",
+         "text": "<section class=\"hero\">"
+        },
+        {
+         "number": 5,
+         "sign": "-",
+         "text": "  <h1>{title}</h1>"
+        },
+        {
+         "number": 6,
+         "sign": "-",
+         "text": "  <p>{lead}</p>"
+        },
+        {
+         "number": 7,
+         "sign": "-",
+         "text": "</section>"
+        },
+        {
+         "number": 4,
+         "sign": "+",
+         "text": "<section class=\"hero\">"
+        },
+        {
+         "number": 5,
+         "sign": "+",
+         "text": "  <div class=\"copy\">"
+        },
+        {
+         "number": 6,
+         "sign": "+",
+         "text": "    <h1>{title}</h1>"
+        },
+        {
+         "number": 7,
+         "sign": "+",
+         "text": "    <p>{lead}</p>"
+        },
+        {
+         "number": 8,
+         "sign": "+",
+         "text": "  </div>"
+        },
+        {
+         "number": 9,
+         "sign": "+",
+         "text": "  <img src=\"/img/hero.webp\" alt=\"Product preview\" width=\"640\" height=\"480\" />"
+        },
+        {
+         "number": 10,
+         "sign": "+",
+         "text": "</section>"
+        },
+        {
+         "number": 11,
+         "sign": "+",
+         "text": "<style>"
+        },
+        {
+         "number": 12,
+         "sign": "+",
+         "text": "  .hero { display: grid; gap: 2rem; align-items: center; }"
+        },
+        {
+         "number": 13,
+         "sign": "+",
+         "text": "  @media (min-width: 800px) { .hero { grid-template-columns: 1fr 1fr; } }"
+        },
+        {
+         "number": 14,
+         "sign": "+",
+         "text": "  img { border-radius: 24px; max-width: 100%; height: auto; }"
+        },
+        {
+         "number": 15,
+         "sign": "+",
+         "text": "</style>"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_d78cdc75b9414125825b39ad": {
+     "activityId": "toolu_d78cdc75b9414125825b39ad",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "npm run build",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "building client..."
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "12 pages built in 2.31s"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "laptop",
+   "summary": {
+    "id": "66666666-6666-4666-8666-666666666666",
+    "title": "Nightly import retries",
+    "cwd": "/Users/dev/code/data-pipeline",
+    "status": "ended",
+    "waitingFor": null,
+    "owned": false,
+    "replyMode": "resume",
+    "canStop": false,
+    "summary": "The tests cover the retry and the final failure.",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": null,
+     "pinned": false
+    },
+    "autoColor": "#39BFA4",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 11519,
+    "updatedAgoSec": 11400,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "b91fdf86-526d-4eeb-8386-5b97691b9717",
+     "text": "The nightly import failed twice this week with a timeout. Add retries with backoff.",
+     "ts": 11519
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_d5bb2466b4d844cb8dd88458",
+     "tool": "Read",
+     "title": "Read fetch.py",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 11502
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_b95bc456b9e24b3d8179fa30",
+     "tool": "Edit",
+     "title": "Edited fetch.py",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 11468
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_f167791be7584dd78a23b59d",
+     "tool": "Bash",
+     "title": "Ran pytest tests/test_fetch.py -q - 4 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 11434
+    },
+    {
+     "kind": "assistant",
+     "id": "d9156453-24d0-4d2b-855e-7813b8df7884",
+     "text": "`fetch_batch` now retries timeouts and connection errors up to four times, waiting 1, 2 and 4 seconds in between. HTTP errors still fail immediately. The tests cover the retry and the final failure.",
+     "ts": 11400
+    }
+   ],
+   "details": {
+    "toolu_d5bb2466b4d844cb8dd88458": {
+     "activityId": "toolu_d5bb2466b4d844cb8dd88458",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Read fetch.py",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "8\tdef fetch_batch(url):"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "9\t    response = requests.get(url, timeout=30)"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "10\t    response.raise_for_status()"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "11\t    return response.json()"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_b95bc456b9e24b3d8179fa30": {
+     "activityId": "toolu_b95bc456b9e24b3d8179fa30",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "fetch.py",
+       "subtitle": "pipeline",
+       "added": 10,
+       "removed": 4,
+       "lines": [
+        {
+         "number": 8,
+         "sign": "-",
+         "text": "def fetch_batch(url):"
+        },
+        {
+         "number": 9,
+         "sign": "-",
+         "text": "    response = requests.get(url, timeout=30)"
+        },
+        {
+         "number": 10,
+         "sign": "-",
+         "text": "    response.raise_for_status()"
+        },
+        {
+         "number": 11,
+         "sign": "-",
+         "text": "    return response.json()"
+        },
+        {
+         "number": 8,
+         "sign": "+",
+         "text": "def fetch_batch(url, attempts=4):"
+        },
+        {
+         "number": 9,
+         "sign": "+",
+         "text": "    for attempt in range(attempts):"
+        },
+        {
+         "number": 10,
+         "sign": "+",
+         "text": "        try:"
+        },
+        {
+         "number": 11,
+         "sign": "+",
+         "text": "            response = requests.get(url, timeout=30)"
+        },
+        {
+         "number": 12,
+         "sign": "+",
+         "text": "            response.raise_for_status()"
+        },
+        {
+         "number": 13,
+         "sign": "+",
+         "text": "            return response.json()"
+        },
+        {
+         "number": 14,
+         "sign": "+",
+         "text": "        except (requests.Timeout, requests.ConnectionError):"
+        },
+        {
+         "number": 15,
+         "sign": "+",
+         "text": "            if attempt == attempts - 1:"
+        },
+        {
+         "number": 16,
+         "sign": "+",
+         "text": "                raise"
+        },
+        {
+         "number": 17,
+         "sign": "+",
+         "text": "            time.sleep(2 ** attempt)"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_f167791be7584dd78a23b59d": {
+     "activityId": "toolu_f167791be7584dd78a23b59d",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "pytest tests/test_fetch.py -q",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "....                                                                     [100%]"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "4 passed in 1.12s"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "server",
+   "summary": {
+    "id": "77777777-7777-4777-8777-777777777777",
+    "title": "Per-key rate limits",
+    "cwd": "/Users/dev/code/api-gateway",
+    "status": "waiting",
+    "waitingFor": "question",
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": false,
+    "summary": "How should API keys be grouped for the rate limit?",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": "#BA75FE",
+     "pinned": false
+    },
+    "autoColor": "#8E0443",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 292,
+    "updatedAgoSec": 45,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "89e4751d-adca-4147-8268-34a5614dd7a1",
+     "text": "Rate limiting is per IP right now. Switch it to per API key, with a default of 100 requests per minute.",
+     "ts": 292
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_b98ba0e156d44f9480a216c2",
+     "tool": "Read",
+     "title": "Looked through 2 files",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": null,
+     "ts": 275
+    },
+    {
+     "kind": "files",
+     "id": "toolu_9ba3450eb30c427b8b29688a",
+     "title": "Edited 2 files",
+     "changed": [
+      "src/middleware/rateLimit.ts",
+      "src/server.ts"
+     ],
+     "ts": 207
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_89e958045f7244e189569fd2",
+     "tool": "Bash",
+     "title": "Ran npm test - 9 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 139
+    },
+    {
+     "kind": "assistant",
+     "id": "8dc2f789-827f-43b7-8e3e-91550bbc29e2",
+     "text": "Limits are now per API key (requests without a key fall back to the IP), 100 per minute. All 9 tests pass. Before I touch the staging config, I have a question about how keys should be grouped.",
+     "ts": 105
+    },
+    {
+     "ts": 45,
+     "id": "demo-question",
+     "kind": "question",
+     "requestId": "demo-question",
+     "text": "How should API keys be grouped for the rate limit?",
+     "options": [
+      "Per key",
+      "Per customer",
+      "Per key and route"
+     ],
+     "state": "pending"
+    }
+   ],
+   "details": {
+    "toolu_b98ba0e156d44f9480a216c2": {
+     "activityId": "toolu_b98ba0e156d44f9480a216c2",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Looked through 2 files",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "Grep: rateLimit"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "src/middleware/rateLimit.ts"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_9ba3450eb30c427b8b29688a": {
+     "activityId": "toolu_9ba3450eb30c427b8b29688a",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "rateLimit.ts",
+       "subtitle": "src/middleware",
+       "added": 1,
+       "removed": 1,
+       "lines": [
+        {
+         "number": 9,
+         "sign": "-",
+         "text": "    const key = req.ip;"
+        },
+        {
+         "number": 9,
+         "sign": "+",
+         "text": "    const key = req.header(\"x-api-key\") ?? req.ip;"
+        }
+       ]
+      },
+      {
+       "title": "server.ts",
+       "subtitle": "src",
+       "added": 1,
+       "removed": 1,
+       "lines": [
+        {
+         "number": 21,
+         "sign": "-",
+         "text": "app.use(rateLimit({ perMinute: 60 }));"
+        },
+        {
+         "number": 21,
+         "sign": "+",
+         "text": "app.use(rateLimit({ perMinute: 100 }));"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_89e958045f7244e189569fd2": {
+     "activityId": "toolu_89e958045f7244e189569fd2",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "npm test",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": " PASS  src/middleware/rateLimit.test.ts"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "  ok limits by api key"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "  ok falls back to the IP without a key"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "  ok allows 100 requests, rejects the 101st"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": ""
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "Tests: 9 passed, 9 total"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "server",
+   "summary": {
+    "id": "88888888-8888-4888-8888-888888888888",
+    "title": "Opening book lookup",
+    "cwd": "/Users/dev/code/chess-engine",
+    "status": "idle",
+    "waitingFor": null,
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": false,
+    "summary": "The five book tests pass.",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "default",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": null,
+     "pinned": false
+    },
+    "autoColor": "#045B45",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 2536,
+    "updatedAgoSec": 2400,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "288a8d14-419b-419a-8bd1-01419ac52bff",
+     "text": "Add a small opening book. The engine should play from it for the first eight moves.",
+     "ts": 2536
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_15dc8e2509aa46f9884aac00",
+     "tool": "Read",
+     "title": "Read search.rs",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 2519
+    },
+    {
+     "kind": "assistant",
+     "id": "7db4d815-2504-405a-880d-97acc1f12030",
+     "text": "I'll add a book keyed by position hash with weighted moves, and consult it before searching.",
+     "ts": 2485
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_bfb3114dc45a404786a898f5",
+     "tool": "Edit",
+     "title": "Edited search.rs",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 2468
+    },
+    {
+     "kind": "tool",
+     "id": "toolu_448f26bed36440b88b940983",
+     "tool": "Bash",
+     "title": "Ran cargo test book - 5 passed",
+     "status": "ok",
+     "hasDetail": true,
+     "durationMs": 17000,
+     "ts": 2434
+    },
+    {
+     "kind": "assistant",
+     "id": "40b46bb5-38c8-4195-8ba0-c14d71efcaa3",
+     "text": "The engine now plays from a small book (about 40 positions, weighted by frequency) for the first eight moves and searches normally after that. The five book tests pass.",
+     "ts": 2400
+    }
+   ],
+   "details": {
+    "toolu_15dc8e2509aa46f9884aac00": {
+     "activityId": "toolu_15dc8e2509aa46f9884aac00",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "Read search.rs",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "20\tpub fn best_move(board: &Board, depth: u8) -> Move {"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "21\t    alpha_beta(board, depth, i32::MIN, i32::MAX).1"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "22\t}"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_bfb3114dc45a404786a898f5": {
+     "activityId": "toolu_bfb3114dc45a404786a898f5",
+     "kind": "diff",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "search.rs",
+       "subtitle": "src",
+       "added": 7,
+       "removed": 2,
+       "lines": [
+        {
+         "number": 20,
+         "sign": "-",
+         "text": "pub fn best_move(board: &Board, depth: u8) -> Move {"
+        },
+        {
+         "number": 21,
+         "sign": "-",
+         "text": "    alpha_beta(board, depth, i32::MIN, i32::MAX).1"
+        },
+        {
+         "number": 20,
+         "sign": "+",
+         "text": "pub fn best_move(board: &Board, depth: u8) -> Move {"
+        },
+        {
+         "number": 21,
+         "sign": "+",
+         "text": "    if board.fullmove_number() <= 8 {"
+        },
+        {
+         "number": 22,
+         "sign": "+",
+         "text": "        if let Some(m) = book::pick(board.hash()) {"
+        },
+        {
+         "number": 23,
+         "sign": "+",
+         "text": "            return m;"
+        },
+        {
+         "number": 24,
+         "sign": "+",
+         "text": "        }"
+        },
+        {
+         "number": 25,
+         "sign": "+",
+         "text": "    }"
+        },
+        {
+         "number": 26,
+         "sign": "+",
+         "text": "    alpha_beta(board, depth, i32::MIN, i32::MAX).1"
+        }
+       ]
+      }
+     ]
+    },
+    "toolu_448f26bed36440b88b940983": {
+     "activityId": "toolu_448f26bed36440b88b940983",
+     "kind": "output",
+     "truncated": false,
+     "sections": [
+      {
+       "title": "cargo test book",
+       "subtitle": "",
+       "added": 0,
+       "removed": 0,
+       "lines": [
+        {
+         "number": null,
+         "sign": " ",
+         "text": "running 5 tests"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "test book::tests::picks_e4_from_start ... ok"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "test book::tests::leaves_book_after_move_eight ... ok"
+        },
+        {
+         "number": null,
+         "sign": " ",
+         "text": "test result: ok. 5 passed; 0 failed"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "machine": "laptop",
+   "summary": {
+    "id": "b0b0b0b0-b0b0-4b0b-80b0-b0b0b0b0b0b0",
+    "title": "Plan the shopping list feature",
+    "cwd": "/Users/dev/code/recipe-app",
+    "status": "waiting",
+    "waitingFor": "permission",
+    "owned": true,
+    "replyMode": "composer",
+    "canStop": false,
+    "summary": "Shopping list: tick off, share and keep offline",
+    "model": "claude-opus-5-5",
+    "pid": null,
+    "muted": false,
+    "permissionMode": "plan",
+    "contextTokens": null,
+    "label": {
+     "name": null,
+     "color": null,
+     "pinned": false
+    },
+    "autoColor": "#105A84",
+    "agent": "claude",
+    "background": 0,
+    "home": "Personal",
+    "startedAgoSec": 600,
+    "updatedAgoSec": 45,
+    "cacheExpiresInSec": null
+   },
+   "activities": [
+    {
+     "kind": "user",
+     "id": "demo-plan-prompt",
+     "text": "Plan a shopping list feature: tick off items, share the list, keep it offline. Do not write code yet.",
+     "ts": 600
+    },
+    {
+     "kind": "permission",
+     "id": "demo-plan",
+     "requestId": "demo-plan",
+     "tool": "ExitPlanMode",
+     "title": "Ready to code?",
+     "summary": "Shopping list: tick off, share and keep offline",
+     "cwd": "/Users/dev/code/recipe-app",
+     "destructive": false,
+     "state": "pending",
+     "plan": "# Shopping list: tick off, share and keep offline\n\n## What changes\n\n- A new **ShoppingList** screen reachable from every recipe.\n- Items are stored on the phone first and synced when a connection is back.\n- Sharing sends a plain text list through the system share sheet.\n\n## Steps\n\n1. Add the `ShoppingItem` model and its store.\n2. Build the list screen with tick-off and swipe to delete.\n3. Add the share action and the offline queue.\n4. Write tests for the store and the sync queue.\n\n## Files\n\n| File | Change |\n| --- | --- |\n| `ShoppingItem.swift` | new model |\n| `ShoppingStore.swift` | new store with offline queue |\n| `ShoppingListView.swift` | new screen |\n| `RecipeView.swift` | add the entry button |",
+     "planChoices": [
+      "approve_bypass",
+      "approve_manual",
+      "revise"
+     ],
+     "ts": 45
+    }
+   ],
+   "details": {}
+  }
+ ]
+}

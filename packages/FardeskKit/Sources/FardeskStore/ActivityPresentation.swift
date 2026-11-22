@@ -15,7 +15,7 @@ public struct ActivityPresentation: Equatable, Sendable {
         case (.running, _): FardeskSymbol.toolRunning
         case (.error, _), (_, .failed): FardeskSymbol.toolFailed
         case (_, .passed): FardeskSymbol.testsPassed
-        case (.ok, .none): ToolKind(tool: tool.tool).symbolName
+        case (.ok, .none), (.unknown, _): ToolKind(tool: tool.tool).symbolName
         }
     }
 }
@@ -38,7 +38,7 @@ public struct PermissionPresentation: Equatable, Sendable {
     public let requiresConfirmation: Bool
 
     public init(permission: PermissionActivity) {
-        cardTitle = Self.cardTitle(tool: permission.tool)
+        cardTitle = permission.plan == nil ? Self.cardTitle(tool: permission.tool) : PlanPresentation.title
         summary = permission.summary.isEmpty ? permission.title : permission.summary
         cwdLabel = FolderLabel.shortened(permission.cwd)
         requiresConfirmation = SessionAction.decide(.allow, on: permission).requiresConfirmation
@@ -68,7 +68,9 @@ public enum SessionAction: Equatable, Sendable {
         case .decide(let decision, let permission):
             switch decision {
             case .deny: false
-            case .allow, .allowAlways: permission.destructive
+            case .allow, .allowAlways, .approveBypass, .approveManual: permission.destructive
+            case .revise: false
+            case .unknown: true
             }
         }
     }

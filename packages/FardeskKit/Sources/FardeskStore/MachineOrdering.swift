@@ -8,11 +8,6 @@ public enum MachineOrdering {
         return machines.sorted { precedes($0, $1, ranks: ranks) }
     }
 
-    /// The owner's list from the build setting: names separated by ";", blanks dropped.
-    public static func parse(_ text: String) -> [String] {
-        text.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    }
-
     static func precedes(_ lhs: MachineState, _ rhs: MachineState, ranks: [String: Int]) -> Bool {
         let (leftName, rightName) = (lhs.endpoint.name.lowercased(), rhs.endpoint.name.lowercased())
         let (left, right) = (ranks[leftName] ?? ranks.count, ranks[rightName] ?? ranks.count)

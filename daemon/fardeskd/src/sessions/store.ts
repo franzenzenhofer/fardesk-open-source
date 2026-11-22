@@ -18,6 +18,8 @@ export type SessionRecord = {
   transcriptPath: string | null;
   process: LiveProcess | null;
   permissionMode: string | null;
+  /** The Claude home folder (path) the session was found in. */
+  home: string | null;
 };
 
 export type SessionStore = {
@@ -40,7 +42,7 @@ const isVisible = (entry: StoreEntry | undefined): entry is Visible => entry?.cu
 
 function recordOf(entry: Visible): SessionRecord {
   const { current: summary, ref, process } = entry;
-  return { summary, transcriptPath: ref?.path ?? null, process, permissionMode: entry.summary?.permissionMode ?? null };
+  return { summary, transcriptPath: ref?.path ?? null, process, permissionMode: entry.summary?.permissionMode ?? null, home: entry.home };
 }
 
 function visible(ctx: StoreContext, sessionId: string): Visible {
@@ -84,7 +86,7 @@ function startPolling(ctx: StoreContext): () => void {
     }
   };
   const unsubscribe = deps.bus.subscribe((event) => {
-    if (event.type !== "activity" || (event.activity.kind !== "permission" && event.activity.kind !== "question")) return;
+    if (event.type !== "activity" || (event.activity.kind !== "permission" && event.activity.kind !== "question" && event.activity.kind !== "dialog")) return;
     const entry = ctx.entries.get(event.sessionId);
     if (entry !== undefined) publishEntry(ctx, entry);
   });

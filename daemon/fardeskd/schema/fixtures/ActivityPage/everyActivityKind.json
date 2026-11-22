@@ -190,6 +190,144 @@
       "destructive": false,
       "state": "terminal",
       "typable": false
+    },
+    {
+      "id": "req-req_d1",
+      "ts": "2026-11-22T09:12:00.000Z",
+      "kind": "dialog",
+      "requestId": "req_d1",
+      "dialogKind": "cold_resume_quota",
+      "payload": {
+        "inactiveSince": 1795338000000,
+        "contextTokens": 182000,
+        "percentOfFiveHourLimit": 14,
+        "trigger": "resume",
+        "focusedAction": "resume",
+        "offersLookUp": false,
+        "offersSummary": true
+      },
+      "choices": [
+        "resume",
+        "new_conversation",
+        "compact",
+        "dismiss"
+      ],
+      "state": "pending"
+    },
+    {
+      "id": "req-req_d2",
+      "ts": "2026-11-22T09:13:00.000Z",
+      "kind": "dialog",
+      "requestId": "req_d2",
+      "dialogKind": "cold_resume_quota",
+      "payload": {
+        "inactiveSince": 1795338000000,
+        "contextTokens": 90000,
+        "percentOfFiveHourLimit": 6,
+        "trigger": "idle",
+        "focusedAction": "none",
+        "offersLookUp": false,
+        "offersSummary": false
+      },
+      "choices": [
+        "resume",
+        "new_conversation",
+        "dismiss"
+      ],
+      "state": "answered"
+    },
+    {
+      "id": "req-req_d3",
+      "ts": "2026-11-22T09:14:00.000Z",
+      "kind": "dialog",
+      "requestId": "req_d3",
+      "dialogKind": "cold_resume_quota",
+      "payload": {
+        "inactiveSince": 1795338000000,
+        "contextTokens": 120000,
+        "percentOfFiveHourLimit": 9,
+        "trigger": "resume",
+        "focusedAction": "new_conversation",
+        "offersLookUp": true,
+        "offersSummary": false
+      },
+      "choices": [
+        "resume",
+        "new_conversation",
+        "dismiss"
+      ],
+      "state": "expired"
+    },
+    {
+      "kind": "permission",
+      "tool": "ExitPlanMode",
+      "title": "Ready to code?",
+      "summary": "Soften the brush smear",
+      "plan": "# Soften the brush smear\n\n1. Lower the falloff exponent in `PaintEngine.swift` from 2.0 to 1.4.\n2. Add a regression test that compares three sample strokes.\n3. Run `swift test` and update the screenshots.",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "id": "req-req_p1",
+      "ts": "2026-11-22T10:00:00.000Z",
+      "requestId": "req_p1",
+      "state": "pending",
+      "planChoices": [
+        "approve_bypass",
+        "approve_manual",
+        "revise"
+      ]
+    },
+    {
+      "kind": "permission",
+      "tool": "ExitPlanMode",
+      "title": "Ready to code?",
+      "summary": "Soften the brush smear",
+      "plan": "# Soften the brush smear\n\n1. Lower the falloff exponent in `PaintEngine.swift` from 2.0 to 1.4.\n2. Add a regression test that compares three sample strokes.\n3. Run `swift test` and update the screenshots.",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "id": "req-req_p2",
+      "ts": "2026-11-22T10:05:00.000Z",
+      "requestId": "req_p2",
+      "state": "pending",
+      "planChoices": [
+        "approve_manual",
+        "revise"
+      ]
+    },
+    {
+      "kind": "permission",
+      "tool": "ExitPlanMode",
+      "title": "Ready to code?",
+      "summary": "Soften the brush smear",
+      "plan": "# Soften the brush smear\n\n1. Lower the falloff exponent in `PaintEngine.swift` from 2.0 to 1.4.\n2. Add a regression test that compares three sample strokes.\n3. Run `swift test` and update the screenshots.",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "id": "req-req_p3",
+      "ts": "2026-11-22T10:10:00.000Z",
+      "requestId": "req_p3",
+      "state": "allowed",
+      "planChoices": [
+        "approve_bypass",
+        "approve_manual",
+        "revise"
+      ]
+    },
+    {
+      "kind": "permission",
+      "tool": "ExitPlanMode",
+      "title": "Ready to code?",
+      "summary": "Soften the brush smear",
+      "plan": "# Soften the brush smear\n\n1. Lower the falloff exponent in `PaintEngine.swift` from 2.0 to 1.4.\n2. Add a regression test that compares three sample strokes.\n3. Run `swift test` and update the screenshots.",
+      "cwd": "/Users/dev/smear-studio",
+      "destructive": false,
+      "id": "req-req_p4",
+      "ts": "2026-11-22T10:15:00.000Z",
+      "requestId": "req_p4",
+      "state": "denied",
+      "planChoices": [
+        "approve_bypass",
+        "approve_manual",
+        "revise"
+      ]
     }
   ],
   "nextBefore": "act_0001"

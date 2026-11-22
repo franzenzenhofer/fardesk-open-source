@@ -5,7 +5,7 @@
   "properties": {
     "contractVersion": {
       "type": "number",
-      "const": 1
+      "const": 4
     },
     "name": {
       "type": "string",
@@ -57,6 +57,96 @@
     },
     "coordinatorEnabled": {
       "type": "boolean"
+    },
+    "homes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tailscale": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "running",
+            "stopped",
+            "needs-login",
+            "not-installed",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "update": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "idle",
+            "running",
+            "failed",
+            "done"
+          ]
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "packageSha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "message",
+        "version",
+        "packageSha256",
+        "at"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -70,7 +160,11 @@
     "models",
     "ghosttyAutomation",
     "allowBypass",
-    "coordinatorEnabled"
+    "coordinatorEnabled",
+    "homes",
+    "tailscale",
+    "features",
+    "update"
   ],
   "additionalProperties": false
 }

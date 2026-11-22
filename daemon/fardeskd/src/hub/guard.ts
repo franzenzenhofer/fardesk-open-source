@@ -18,6 +18,6 @@ export function knownPeer(hub: Hub, name: string): PeerMonitor {
 }
 
 export function requireOnline(peer: PeerMonitor): void {
-  const { online, problem, lastSeen } = peer.status();
-  if (!online) throw new FardeskError("machine_offline", `${peer.name} is offline: ${problem ?? "unknown"}; last seen ${lastSeen ?? "never"}`);
+  const { online, problem, detail, lastSeen } = peer.status();
+  if (!online) throw new FardeskError("machine_offline", `${peer.name} is offline: ${problem ?? "unknown"}${detail === null ? "" : ` (${detail})`}; last seen ${lastSeen ?? "never"}`);
 }

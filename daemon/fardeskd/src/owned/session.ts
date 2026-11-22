@@ -1,4 +1,5 @@
-import { query, type Options, type PermissionResult, type Query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type Options, type PermissionResult, type Query, type SDKMessage, type UserDialogRequest, type UserDialogResult } from "@anthropic-ai/claude-agent-sdk";
+import { SUPPORTED_DIALOG_KINDS } from "../permissions/dialogs.js";
 import { FardeskError } from "../core/errors.js";
 import type { Logger } from "../core/log.js";
 import { createDeferred, type Deferred } from "./deferred.js";
@@ -12,11 +13,15 @@ export type PermissionAsk = (
   suggestions: unknown,
 ) => Promise<PermissionResult>;
 
+/** Holds a Claude Code dialog until the phone answers it; resolves with what Claude Code gets back (`cancelled` when unanswered or unknown). */
+export type DialogAsk = (sessionId: string, request: UserDialogRequest, signal: AbortSignal) => Promise<UserDialogResult>;
+
 export type SessionDeps = {
   /** Known for resumed sessions, null for new ones (learned from system/init). */
   sessionId: string | null;
-  options: Omit<Options, "canUseTool">;
+  options: Omit<Options, "canUseTool" | "onUserDialog" | "supportedDialogKinds">;
   askPermission: PermissionAsk;
+  askDialog: DialogAsk;
   log: Logger;
   onEnd(): void;
   /** The conversation was replaced (/clear): the session continues under a new id. */
@@ -102,6 +107,8 @@ function openStream(deps: SessionDeps, input: InputQueue, tracker: Tracker, read
       ...deps.options,
       canUseTool: async (toolName, toolInput, options) =>
         deps.askPermission(tracker.id ?? (await ready.promise), toolName, toolInput, options.suggestions),
+      supportedDialogKinds: SUPPORTED_DIALOG_KINDS,
+      onUserDialog: async (request, { signal }) => deps.askDialog(tracker.id ?? (await ready.promise), request, signal),
     },
   });
 }

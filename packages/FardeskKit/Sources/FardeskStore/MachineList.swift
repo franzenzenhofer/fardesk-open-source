@@ -1,8 +1,11 @@
+import FardeskModels
 import Foundation
 
 public enum MachineListError: Error, Equatable, Sendable, LocalizedError {
     case unknown(query: String, available: [String])
     case ambiguous(query: String, candidates: [String])
+    /// The machine list on disk is in an older format (written before 4.0.0) or damaged.
+    case unreadableFile(path: String)
 
     public var errorDescription: String? {
         switch self {
@@ -11,6 +14,9 @@ public enum MachineListError: Error, Equatable, Sendable, LocalizedError {
             return "No machine named \"\(query)\" (machines: \(names))"
         case .ambiguous(let query, let candidates):
             return "\"\(query)\" matches several machines: \(candidates.joined(separator: ", "))"
+        case .unreadableFile(let path):
+            return "\(path) is from an older Fardesk or damaged and cannot be read. Move it away and pair again: "
+                + "run `fardeskd pair` on the hub and `fardesk pair <link>` here."
         }
     }
 }
@@ -20,17 +26,17 @@ public struct MachineList: Codable, Equatable, Sendable {
     public private(set) var endpoints: [MachineEndpoint]
     /// The hub every call goes through; nil = talk to each machine itself. With a hub the
     /// endpoints are its machines, kept here only so a restart shows them before the hub answers.
-    public private(set) var hub: URL?
+    public private(set) var hub: HubLink?
 
-    public init(endpoints: [MachineEndpoint] = [], hub: URL? = nil) {
+    public init(endpoints: [MachineEndpoint] = [], hub: HubLink? = nil) {
         self.endpoints = endpoints
         self.hub = hub
     }
 
     /// Switches hub mode on (or off with nil). The endpoints stay only while the hub stays the same.
-    public mutating func setHub(_ url: URL?) {
-        if url != hub { endpoints = [] }
-        hub = url
+    public mutating func setHub(_ link: HubLink?) {
+        if link != hub { endpoints = [] }
+        hub = link
     }
 
     /// Replaces the endpoints with the hub's machines.

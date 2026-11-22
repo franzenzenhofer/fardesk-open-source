@@ -1,0 +1,16 @@
+{
+  "Node": {
+    "ID": 1000000000000001,
+    "StableID": "nSTABLEOWN0001CNTRL",
+    "Name": "studio.example.ts.net.",
+    "User": 100000000000001,
+    "Key": "nodekey:0000000000000000000000000000000000000000000000000000000000000001",
+    "Addresses": ["100.64.0.1/32", "fd7a:115c:a1e0::1/128"],
+    "AllowedIPs": ["100.64.0.1/32", "fd7a:115c:a1e0::1/128"],
+    "Hostinfo": { "OS": "macOS", "Hostname": "Studio" },
+    "Created": "2026-01-01T00:00:00Z",
+    "MachineAuthorized": true
+  },
+  "UserProfile": { "ID": 100000000000001, "LoginName": "owner@example.com", "DisplayName": "Owner" },
+  "CapMap": {}
+}

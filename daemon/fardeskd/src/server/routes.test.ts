@@ -50,7 +50,7 @@ describe("authentication", () => {
   });
 
   it("rejects an authorization header that is not a bearer token", async () => {
-    const response = await fetch(`${daemon.url}/v1/machine`, { headers: { authorization: `Basic ${daemon.config.token}` } });
+    const response = await daemon.fetch(`/v1/machine`, { headers: { authorization: `Basic ${daemon.config.token}` } });
     expect(response.status).toBe(401);
   });
 });

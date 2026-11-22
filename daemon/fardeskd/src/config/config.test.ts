@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FardeskError } from "../core/errors.js";
 import { makeTempDir } from "../../test/support/env.js";
-import { CONFIG_DEFAULTS, defaultConfigPath, expandHome, loadConfig, updateConfigFile, writeInitialConfig, writePasswordHash } from "./config.js";
+import { CONFIG_DEFAULTS, defaultConfigPath, expandHome, loadConfig, updateConfigFile, writeInitialConfig } from "./config.js";
 
 const TOKEN = "a".repeat(32);
 const MODE_MASK = 0o777;
@@ -27,9 +27,9 @@ function failure(action: () => unknown): FardeskError {
 }
 
 describe("auth, peers and sessions keys", () => {
-  it("default to no password, 5 failures per 300 s, no peers and the old store limits", () => {
+  it("default to 5 failures per 300 s, no peers and the old store limits", () => {
     const config = loadConfig(writeConfig({ name: "m", token: TOKEN }));
-    expect(config.auth).toEqual({ passwordHash: null, maxFailures: 5, windowSeconds: 300 });
+    expect(config.auth).toEqual({ maxFailures: 5, windowSeconds: 300 });
     expect(config.peers).toEqual([]);
     expect(config.sessions).toEqual({ maxEnded: 200, maxFolders: 20, readsPerPoll: 20, tidyList: true, listEnded: 10, listEndedWithinDays: 24 });
   });
@@ -43,7 +43,7 @@ describe("auth, peers and sessions keys", () => {
   });
 
   it("accept a partial auth object and reject an invalid peer", () => {
-    expect(loadConfig(writeConfig({ name: "m", token: TOKEN, auth: { passwordHash: "x" } })).auth).toEqual({ passwordHash: "x", maxFailures: 5, windowSeconds: 300 });
+    expect(loadConfig(writeConfig({ name: "m", token: TOKEN, auth: { maxFailures: 9 } })).auth).toEqual({ maxFailures: 9, windowSeconds: 300 });
     expect(failure(() => loadConfig(writeConfig({ name: "m", token: TOKEN, peers: [{ name: "p", url: "ftp://x" }] }))).code).toBe("invalid_request");
   });
 });
@@ -59,19 +59,16 @@ describe("coordinator key", () => {
 
 describe("updateConfigFile", () => {
   it("rewrites only the given keys, keeps the rest as written, stays mode 600 and validates", () => {
-    const path = writeConfig({ name: "m", token: TOKEN, bind: { address: "1.2.3.4", port: 99 }, extraNote: undefined });
-    updateConfigFile(path, { auth: { passwordHash: "h" } });
+    const path = writeConfig({ name: "m", token: TOKEN, bind: { address: "tailscale", port: 99 }, extraNote: undefined });
+    updateConfigFile(path, { auth: { maxFailures: 7 } });
     const written = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
-    expect(written).toEqual({ name: "m", token: TOKEN, bind: { address: "1.2.3.4", port: 99 }, auth: { passwordHash: "h" } });
+    expect(written).toEqual({ name: "m", token: TOKEN, bind: { address: "tailscale", port: 99 }, auth: { maxFailures: 7 } });
     expect(statSync(path).mode & MODE_MASK).toBe(0o600);
     expect(failure(() => { updateConfigFile(path, { colour: "red" }); }).message).toContain("refusing to write invalid config");
     expect(JSON.parse(readFileSync(path, "utf8"))).toEqual(written);
   });
 
-  it("writePasswordHash keeps the other auth keys and rejects a non-object file", () => {
-    const path = writeConfig({ name: "m", token: TOKEN, auth: { maxFailures: 9 } });
-    writePasswordHash(path, "scrypt$x");
-    expect(loadConfig(path).auth).toEqual({ passwordHash: "scrypt$x", maxFailures: 9, windowSeconds: 300 });
+  it("rejects a non-object file", () => {
     expect(failure(() => { updateConfigFile(writeConfig("[1]"), {}); }).message).toContain("must hold a JSON object");
   });
 });
@@ -106,39 +103,58 @@ describe("defaultConfigPath", () => {
 
 describe("loadConfig", () => {
   it("applies every default for a minimal file and expands home paths", () => {
-    const config = loadConfig(writeConfig({ name: "mac", token: TOKEN }));
+    const path = writeConfig({ name: "mac", token: TOKEN });
+    const config = loadConfig(path);
     expect(config).toEqual({
       ...CONFIG_DEFAULTS,
       name: "mac",
       token: TOKEN,
-      claudeHomes: [join(home, ".claude")],
+      claudeHomes: [{ path: join(home, ".claude"), name: ".claude" }],
       stateDir: join(home, ".local/state/fardesk"),
       folders: { scanRoots: CONFIG_DEFAULTS.folders.scanRoots.map((root) => ({ ...root, dir: expandHome(root.dir) })) },
     });
-    expect(config.bind).toEqual({ address: "tailscale", port: 4780, allowNonTailnet: false });
+    expect(config.bind).toEqual({ address: "tailscale", port: 4780 });
     expect(config.intervals).toEqual({ registryPollMs: 1000, transcriptPollMs: 500, pingMs: 20000, typablePollMs: 5000 });
     expect(config.models).toEqual(["default", "fable", "opus", "sonnet", "haiku"]);
-    expect(config.tls).toBeNull();
     expect(config.apns).toBeNull();
   });
 
-  it("expands tls and apns paths and keeps explicit values", () => {
+  it("expands apns and home paths and keeps explicit values", () => {
     const config = loadConfig(
       writeConfig({
         name: "mac",
         token: TOKEN,
-        tls: { cert: "~/c.pem", key: "/abs/k.pem" },
         apns: { keyPath: "~/k.p8", keyId: "K", teamId: "T", topic: "app.id" },
         claudeHomes: ["~/a", "/b"],
         stateDir: "~/state",
         tmuxBinary: "/opt/tmux",
       }),
     );
-    expect(config.tls).toEqual({ cert: join(home, "c.pem"), key: "/abs/k.pem" });
     expect(config.apns).toEqual({ keyPath: join(home, "k.p8"), keyId: "K", teamId: "T", topic: "app.id" });
-    expect(config.claudeHomes).toEqual([join(home, "a"), "/b"]);
+    expect(config.claudeHomes).toEqual([{ path: join(home, "a"), name: "a" }, { path: "/b", name: "b" }]);
     expect(config.stateDir).toBe(join(home, "state"));
     expect(config.tmuxBinary).toBe("/opt/tmux");
+  });
+
+  it("names a home by its folder when it is a plain path, and by its own name when it is { path, name }", () => {
+    const config = loadConfig(writeConfig({ name: "mac", token: TOKEN, claudeHomes: ["~/.claude-team", { path: "~/.claude", name: "private" }] }));
+    expect(config.claudeHomes).toEqual([
+      { path: join(home, ".claude-team"), name: ".claude-team" },
+      { path: join(home, ".claude"), name: "private" },
+    ]);
+  });
+
+  it("refuses two homes with one name, so the app can filter by name", () => {
+    const error = failure(() => loadConfig(writeConfig({ name: "mac", token: TOKEN, claudeHomes: ["/a/.claude", "/b/.claude"] })));
+    expect(error.code).toBe("invalid_request");
+    expect(error.message).toContain('two homes are named ".claude"');
+    expect(failure(() => loadConfig(writeConfig({ name: "mac", token: TOKEN, claudeHomes: [{ path: "/a", name: "x", extra: 1 }] }))).message).toContain("claudeHomes");
+  });
+
+  it("keeps a config with named homes valid when the daemon writes it back", () => {
+    const path = writeConfig({ name: "mac", token: TOKEN, claudeHomes: ["/a", { path: "/b", name: "work" }] });
+    updateConfigFile(path, { claudeHomes: ["/a", { path: "/b", name: "work" }, "/c"] });
+    expect(loadConfig(path).claudeHomes.map((entry) => entry.name)).toEqual(["a", "work", "c"]);
   });
 
   it("reports a missing file", () => {

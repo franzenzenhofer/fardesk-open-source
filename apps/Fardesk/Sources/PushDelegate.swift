@@ -39,7 +39,14 @@ final class PushDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCen
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        await Self.record("received in the app", type: Self.type(notification.request.content.userInfo))
+        let userInfo = notification.request.content.userInfo
+        await Self.record("received in the app", type: Self.type(userInfo))
+        // "Answered" (kind resolved): the request was handled elsewhere. Its own notification goes, and this one is
+        // not shown on top of the open app, which already shows the change.
+        if userInfo["kind"] as? String == "resolved" {
+            await Self.removeDelivered(requestID: userInfo["requestId"] as? String, keeping: notification.request.identifier)
+            return []
+        }
         // The open app already shows every change live; a banner would only cover the
         // toolbar (Settings, back) and swallow the tap meant for it.
         return [.list, .sound]
@@ -55,6 +62,17 @@ final class PushDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCen
         guard let action = PushAction.parse(actionIdentifier: response.actionIdentifier, userInfo: info, text: text)
         else { return }
         await Self.perform(action)
+    }
+
+    /// Removes the delivered notifications of one request (the Allow / Deny push that was answered elsewhere).
+    private nonisolated static func removeDelivered(requestID: String?, keeping identifier: String) async {
+        guard let requestID else { return }
+        let center = UNUserNotificationCenter.current()
+        let delivered = await center.deliveredNotifications()
+        let stale = delivered
+            .filter { $0.request.content.userInfo["requestId"] as? String == requestID && $0.request.identifier != identifier }
+            .map(\.request.identifier)
+        center.removeDeliveredNotifications(withIdentifiers: stale)
     }
 
     private nonisolated static func type(_ userInfo: [AnyHashable: Any]) -> String {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createLoginLimiter } from "./rateLimit.js";
+import { createAttemptLimiter } from "./rateLimit.js";
 
-function setup(maxFailures = 3): { clock: { now: number }; limiter: ReturnType<typeof createLoginLimiter> } {
+function setup(maxFailures = 3): { clock: { now: number }; limiter: ReturnType<typeof createAttemptLimiter> } {
   const clock = { now: 1_000_000 };
-  return { clock, limiter: createLoginLimiter({ maxFailures, windowMs: 60_000, now: () => clock.now }) };
+  return { clock, limiter: createAttemptLimiter({ maxFailures, windowMs: 60_000, now: () => clock.now }) };
 }
 
 const expectLimited = (fn: () => void): void => {
@@ -46,17 +46,3 @@ describe("global cap", () => {
   });
 });
 
-it("counts in-flight attempts against both the IP and concurrent-check limits", () => {
-  const { limiter } = setup(2);
-  const releaseFirst = limiter.reserve("first");
-  const releaseSecond = limiter.reserve("first");
-  expectLimited(() => { limiter.reserve("first"); });
-  const releaseThird = limiter.reserve("second");
-  const releaseFourth = limiter.reserve("third");
-  expectLimited(() => { limiter.reserve("fourth"); });
-  releaseFirst();
-  limiter.reserve("fourth")();
-  releaseSecond();
-  releaseThird();
-  releaseFourth();
-});

@@ -5,20 +5,26 @@
   "status": "waiting",
   "waitingFor": "question",
   "owned": true,
+  "agent": "claude",
+  "background": 0,
   "replyMode": "composer",
   "canStop": true,
   "summary": "Asked which file format to use",
   "model": "claude-opus-5-5",
   "pid": 51002,
+  "home": null,
   "muted": false,
   "label": {
     "name": null,
-    "color": "pink",
-    "pinned": true
+    "color": "#F965B5",
+    "pinned": true,
+    "image": null
   },
+  "autoColor": null,
   "permissionMode": null,
   "contextTokens": null,
   "cacheExpiresAt": null,
+  "lastTurnAt": null,
   "startedAt": "2026-11-14T07:45:00.000Z",
   "updatedAt": "2026-11-14T09:05:00.000Z"
 }

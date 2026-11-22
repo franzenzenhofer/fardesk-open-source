@@ -14,11 +14,13 @@ struct RequestCard: View {
             switch activity {
             case .permission(let permission): permissionBody(permission)
             case .question(let question): questionBody(question)
+            case .dialog(let dialog): dialogBody(dialog)
             default: EmptyView()
             }
         }
         .padding()
         .background(.regularMaterial, in: .rect(cornerRadius: 20))
+        .disabledInDemo(.sessionActions)
     }
 
     private func permissionBody(_ permission: PermissionActivity) -> some View {
@@ -31,27 +33,28 @@ struct RequestCard: View {
                     Text(presentation.cwdLabel).font(.body).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Menu("More", systemImage: "ellipsis") {
-                    Button("Always allow") { request(.allowAlways, permission, presentation) }
+                if PlanPresentation(permission: permission)?.offersChoices != true {
+                    Menu("More", systemImage: "ellipsis") {
+                        Button("Always allow") { request(.allowAlways, permission, presentation) }
+                    }
+                    .labelStyle(.iconOnly)
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
-                .labelStyle(.iconOnly)
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
             }
-            Text(presentation.summary)
-                .font(.system(.body, design: .monospaced))
-                .textSelection(.enabled)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 12))
-            HStack(spacing: 12) {
-                Button { decide(.deny, permission) } label: { Text("Deny").frame(maxWidth: .infinity) }
-                    .buttonStyle(.fardeskSecondary)
-                Button { request(.allow, permission, presentation) } label: { Text("Allow").frame(maxWidth: .infinity) }
-                    .buttonStyle(.fardeskPrimary)
+            if let plan = PlanPresentation(permission: permission) {
+                PlanText(plan: plan.plan)
+                if plan.offersChoices { PlanChoices(plan: plan, requestID: permission.requestId, ref: ref) } else { allowDenyButtons(permission, presentation) }
+            } else {
+                Text(presentation.summary)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 12))
+                allowDenyButtons(permission, presentation)
             }
-            .controlSize(.large)
         }
         .confirmationDialog(
             "This looks destructive.",
@@ -63,6 +66,16 @@ struct RequestCard: View {
         }
     }
 
+    private func allowDenyButtons(_ permission: PermissionActivity, _ presentation: PermissionPresentation) -> some View {
+        HStack(spacing: 12) {
+            Button { decide(.deny, permission) } label: { Text("Deny").frame(maxWidth: .infinity) }
+                .buttonStyle(.fardeskSecondary)
+            Button { request(.allow, permission, presentation) } label: { Text("Allow").frame(maxWidth: .infinity) }
+                .buttonStyle(.fardeskPrimary)
+        }
+        .controlSize(.large)
+    }
+
     private func questionBody(_ question: QuestionActivity) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(question.text, systemImage: FardeskSymbol.question).font(.headline)
@@ -71,6 +84,24 @@ struct RequestCard: View {
                     .buttonStyle(.fardeskSecondary)
             }
         }
+    }
+
+    /// A dialog Claude Code asks itself: its title and words, one button per choice it offers.
+    private func dialogBody(_ dialog: DialogActivity) -> some View {
+        let shown = DialogPresentation(dialog, now: Date())
+        return VStack(alignment: .leading, spacing: 12) {
+            Label(shown.title, systemImage: FardeskSymbol.question).font(.headline)
+            if !shown.text.isEmpty { Text(shown.text).font(.body) }
+            ForEach(shown.buttons) { button in
+                Button { Task { await model.answerDialog(ref, requestID: dialog.requestId, answer: button.answer) } } label: {
+                    Text(button.title).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(button.isFocused ? .fardeskPrimary : .fardeskSecondary)
+                .accessibilityIdentifier("dialog-\(button.answer)")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dialog-card")
     }
 
     private func request(_ decision: PermissionDecision, _ permission: PermissionActivity, _ presentation: PermissionPresentation) {

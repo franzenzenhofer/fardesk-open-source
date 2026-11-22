@@ -1,6 +1,8 @@
 import FardeskStore
 import SwiftUI
 
+/// Pairing by a pasted link (the Mac's way in, and "add a machine" in Settings). Behind the Tailscale gate: without
+/// Tailscale the sheet says so instead of offering the field, and `AppModel.pair(link:)` refuses as well.
 struct PairingSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -9,39 +11,43 @@ struct PairingSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("fardesk://pair?...", text: $link, axis: .vertical)
-                        .lineLimit(3...6)
-                        .autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
-                } footer: {
-                    if isPairing {
-                        Label("Checking the link with \(model.hubDisplayName)...", systemImage: "hourglass").font(.body)
-                    } else if let error = model.loginError {
-                        Text(error).font(.body).foregroundStyle(StateColor.broken)
+            TailscaleGate { form }
+                .navigationTitle("Pairing Link")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(isPairing ? "Pairing..." : "Pair", action: pair).disabled(link.isEmpty || isPairing)
                     }
                 }
-            }
-            .formStyle(.grouped)
-            .navigationTitle("Pairing Link")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isPairing ? "Pairing..." : "Pair", action: pair).disabled(link.isEmpty || isPairing)
-                }
-            }
         }
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 240)
         #endif
+    }
+
+    private var form: some View {
+        Form {
+            Section {
+                TextField("fardesk://pair?...", text: $link, axis: .vertical)
+                    .lineLimit(3...6)
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
+            } footer: {
+                if isPairing {
+                    Label("Checking the link with \(model.hubDisplayName)...", systemImage: "hourglass").font(.body)
+                } else if let error = model.loginError {
+                    Text(error).font(.body).foregroundStyle(StateColor.broken)
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 
     private func pair() {

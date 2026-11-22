@@ -1,3 +1,4 @@
+import { LABEL_PRESETS } from "./palette.js";
 import type { FixtureCases } from "./fixtureTypes.js";
 
 const FAKE_TOKEN_64 = "a1b2c3d4".repeat(8);
@@ -38,9 +39,13 @@ export const permissionRequestFixtures: FixtureCases<"PermissionRequest"> = {
   allow: { decision: "allow" },
   deny: { decision: "deny" },
   allowAlways: { decision: "allow_always" },
+  approveBypass: { decision: "approve_bypass" },
+  approveManual: { decision: "approve_manual" },
+  revise: { decision: "revise", message: "Add a line saying bye." },
 };
 
 export const answerRequestFixtures: FixtureCases<"AnswerRequest"> = { option: { option: "PNG" } };
+export const dialogAnswerRequestFixtures: FixtureCases<"DialogAnswerRequest"> = { compact: { answer: "compact" } };
 
 export const muteRequestFixtures: FixtureCases<"MuteRequest"> = {
   muted: { muted: true },
@@ -49,12 +54,15 @@ export const muteRequestFixtures: FixtureCases<"MuteRequest"> = {
 
 export const labelRequestFixtures: FixtureCases<"LabelRequest"> = {
   rename: { name: "Release work" },
-  recolour: { color: "teal" },
-  blue: { color: "blue" },
-  purple: { color: "purple" },
-  pink: { color: "pink" },
+  preset: { color: "#0B9371" },
+  custom: { color: "#1A2B3C" },
   pin: { pinned: true },
   clear: { name: null, color: null, pinned: false },
+};
+
+/** The 64 presets, in picker order: the app's table must equal this file (LabelPaletteTests). */
+export const labelPaletteFixtures: FixtureCases<"LabelPalette"> = {
+  presets: LABEL_PRESETS.map(({ name, color }) => ({ name, color })),
 };
 
 export const newSessionRequestFixtures: FixtureCases<"NewSessionRequest"> = {
@@ -71,6 +79,7 @@ export const newSessionRequestFixtures: FixtureCases<"NewSessionRequest"> = {
   modeDontAsk: { cwd: "/Users/dev/crawler", prompt: "Never ask.", worktree: false, model: null, permissionMode: "dontAsk" },
   modeAuto: { cwd: "/Users/dev/crawler", prompt: "Let the classifier decide.", worktree: false, model: null, permissionMode: "auto" },
   withPermissionMode: { cwd: "/Users/dev/crawler", prompt: "Plan the retry rewrite.", worktree: false, model: null, permissionMode: "plan" },
+  inNamedHome: { cwd: "/Users/dev/crawler", prompt: "Summarise open TODOs.", worktree: false, model: null, home: "team" },
 };
 
 export const coordinatorRequestFixtures: FixtureCases<"CoordinatorRequest"> = {
@@ -94,6 +103,7 @@ export const deviceRequestFixtures: FixtureCases<"DeviceRequest"> = {
 
 export const actionResultFixtures: FixtureCases<"ActionResult"> = { session: { sessionId: "sess_7f3a91" } };
 export const okResultFixtures: FixtureCases<"OkResult"> = { ok: { ok: true } };
+export const imageResultFixtures: FixtureCases<"ImageResult"> = { stored: { ok: true, image: "3fa9c1d07be24a68" } };
 export const messageResultFixtures: FixtureCases<"MessageResult"> = {
   delivered: { ok: true },
   queued: { ok: true, queued: true },
@@ -111,9 +121,12 @@ export const errorResponseFixtures: FixtureCases<"ErrorResponse"> = {
   unsupported: { error: { code: "unsupported", message: "Session cannot be stopped" } },
   internal: { error: { code: "internal", message: "Unexpected failure" } },
   machineOffline: { error: { code: "machine_offline", message: "Studio is offline: no answer within 5 s; last seen 2026-11-16T07:18:00.000Z" } },
+  tailscaleUnavailable: { error: { code: "tailscale_unavailable", message: "Tailscale on this computer is not running" } },
+  deviceMoved: { error: { code: "device_moved", message: "This device was paired from another Tailscale device. Pair again." } },
+  masterTokenWrongNode: { error: { code: "master_token_wrong_node", message: "the master token counts only from this computer or its hub" } },
 };
 
 export const pairingPayloadFixtures: FixtureCases<"PairingPayload"> = {
-  lan: { v: 1, name: "Studio Mac", url: "http://192.0.2.10:7878", code: FAKE_CODE, hub: false },
-  tls: { v: 1, name: "Build Box", url: "https://desk.example.com:7443/", code: FAKE_CODE, hub: true },
+  tailnet: { v: 4, name: "Studio Mac", url: "http://100.64.0.10:7878", code: FAKE_CODE, hub: false },
+  hub: { v: 4, name: "Build Box", url: "http://100.64.0.20:7443/", code: FAKE_CODE, hub: true },
 };

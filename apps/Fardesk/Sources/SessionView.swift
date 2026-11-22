@@ -30,10 +30,11 @@ struct SessionView: View {
         let _ = Breadcrumbs.mark("view SessionView")
         let box = model.feeds.box(for: ref)
         let presentation = SessionPresentation(session: session, now: Date())
-        let line = SessionHeaderLine(session: session, machineName: machine.endpoint.name)
+        let line = SessionHeaderLine(session: session, machineName: machine.endpoint.name, homeTag: HomeTag.text(for: session, machineHomes: machine.homeNames))
         return VStack(spacing: 0) {
+            DemoNoticeLine()
             FeedView(ref: ref, box: box).id(ref).environment(\.attachmentSession, ref)
-            ComposerBar(ref: ref, mode: presentation.composerMode)
+            ComposerBar(ref: ref, session: session, mode: presentation.composerMode)
         }
         .onAppear { TapClock.finish("session.open", model: model) }
         .readsAloud(box: box, status: session.status)

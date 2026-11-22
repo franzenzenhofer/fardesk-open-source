@@ -1,0 +1,23 @@
+{
+  "id": "req-req_d1",
+  "ts": "2026-11-22T09:12:00.000Z",
+  "kind": "dialog",
+  "requestId": "req_d1",
+  "dialogKind": "cold_resume_quota",
+  "payload": {
+    "inactiveSince": 1795338000000,
+    "contextTokens": 182000,
+    "percentOfFiveHourLimit": 14,
+    "trigger": "resume",
+    "focusedAction": "resume",
+    "offersLookUp": false,
+    "offersSummary": true
+  },
+  "choices": [
+    "resume",
+    "new_conversation",
+    "compact",
+    "dismiss"
+  ],
+  "state": "pending"
+}

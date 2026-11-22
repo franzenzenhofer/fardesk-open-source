@@ -156,6 +156,7 @@ const assistantSchema = z
   );
 
 const errorSchema = z.looseObject({ message: z.string().min(1) });
+const compactMetadataSchema = z.looseObject({ postTokens: z.number().int().nonnegative() });
 
 const systemSchema = z
   .looseObject({
@@ -164,6 +165,7 @@ const systemSchema = z
     subtype: z.string().min(1),
     content: z.string().optional(),
     error: z.unknown().optional(),
+    compactMetadata: z.unknown().optional(),
   })
   .transform(
     (raw): TranscriptLine => ({
@@ -175,6 +177,7 @@ const systemSchema = z
       subtype: raw.subtype,
       content: raw.content ?? null,
       errorMessage: errorSchema.safeParse(raw.error).data?.message ?? null,
+      compactPostTokens: compactMetadataSchema.safeParse(raw.compactMetadata).data?.postTokens ?? null,
     }),
   );
 

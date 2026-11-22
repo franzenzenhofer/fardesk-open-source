@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { WebSocket } from "ws";
 import { TEST_TOKEN, startTestDaemon } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
 import { waitUntil } from "../../test/support/env.js";
@@ -16,8 +15,8 @@ afterEach(async () => {
   await daemon.close();
 });
 
-async function statusOfUpgrade(url: string, headers: Record<string, string>): Promise<number> {
-  const ws = new WebSocket(url, { headers });
+async function statusOfUpgrade(path: string, headers: Record<string, string>): Promise<number> {
+  const ws = daemon.connectStream(path, headers);
   return new Promise((resolve, reject) => {
     ws.once("unexpected-response", (_request, response) => { resolve(response.statusCode ?? 0); });
     ws.once("open", () => { reject(new Error("upgrade was accepted")); });
@@ -34,10 +33,9 @@ const bigActivity = (index: number): StreamEvent => ({
 describe("authentication and paths", () => {
   it("refuses an upgrade without or with a wrong token (401) and on another path (404)", async () => {
     daemon = await startTestDaemon();
-    const base = daemon.url.replace("http", "ws");
-    expect(await statusOfUpgrade(`${base}/v1/stream`, {})).toBe(401);
-    expect(await statusOfUpgrade(`${base}/v1/stream`, { authorization: "Bearer wrong" })).toBe(401);
-    expect(await statusOfUpgrade(`${base}/v1/elsewhere`, { authorization: `Bearer ${TEST_TOKEN}` })).toBe(404);
+    expect(await statusOfUpgrade(`/v1/stream`, {})).toBe(401);
+    expect(await statusOfUpgrade(`/v1/stream`, { authorization: "Bearer wrong" })).toBe(401);
+    expect(await statusOfUpgrade(`/v1/elsewhere`, { authorization: `Bearer ${TEST_TOKEN}` })).toBe(404);
   });
 });
 
@@ -101,7 +99,7 @@ describe("session events and the client's list", () => {
 describe("slow clients", () => {
   it("terminates a client that does not read once its buffer passes the limit", async () => {
     daemon = await startTestDaemon({}, {}, { maxBufferedBytes: 50_000 });
-    const socket = connect(daemon.server.port, "127.0.0.1");
+    const socket = connect({ port: daemon.server.port, host: "127.0.0.1" });
     await new Promise<void>((resolve) => socket.once("connect", () => { resolve(); }));
     const handshake = [
       "GET /v1/stream HTTP/1.1",

@@ -30,7 +30,7 @@ public struct ReconnectingStream: Sendable {
     /// Error codes after which reconnecting is pointless.
     static func isFinal(_ error: any Error) -> Bool {
         guard let code = (error as? FardeskAPIError)?.code else { return false }
-        return code == .tokenRevoked || code == .unauthorized
+        return code == .tokenRevoked || code == .unauthorized || code == .deviceMoved || code == .masterTokenWrongNode
     }
 
     public func updates() -> AsyncThrowingStream<StreamUpdate, Error> {

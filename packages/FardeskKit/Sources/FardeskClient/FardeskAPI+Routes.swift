@@ -95,7 +95,7 @@ extension FardeskAPI {
 
     /// Asks Claude to write a summary and continue from it (`/compact`); the result is the session to continue in.
     public func compact(sessionID: String) async throws -> ActionResult {
-        try await post(["v1", "sessions", sessionID, "compact"], timeout: Self.slowTimeout)
+        try await post(["v1", "sessions", sessionID, "compact"], timeout: Self.compactTimeout)
     }
 
     public func mute(sessionID: String, muted: Bool) async throws {
@@ -106,13 +106,48 @@ extension FardeskAPI {
         let _: OkResult = try await post(["v1", "sessions", sessionID, "label"], request)
     }
 
-    public func decide(sessionID: String, requestID: String, decision: PermissionDecision) async throws {
-        let body = PermissionDecisionRequest(decision: decision)
+    /// Gives the chat its own image (JPEG or PNG, at most 2 MB); the result is its content hash.
+    public func setImage(sessionID: String, data: Data, mediaType: String) async throws -> ImageResult {
+        let request = APIRequest(
+            method: .post, segments: ["v1", "sessions", sessionID, "image"],
+            body: data, contentType: mediaType, timeout: Self.slowTimeout
+        )
+        return try await send(request)
+    }
+
+    public func clearImage(sessionID: String) async throws {
+        let _: OkResult = try await post(["v1", "sessions", sessionID, "image", "clear"])
+    }
+
+    /// The bytes of the chat's own image; a chat without one answers not found.
+    public func image(sessionID: String) async throws -> Data {
+        try await sendRaw(APIRequest(method: .get, segments: ["v1", "sessions", sessionID, "image"], timeout: Self.slowTimeout))
+    }
+
+    public func hide(sessionID: String) async throws {
+        let _: OkResult = try await post(["v1", "sessions", sessionID, "hide"])
+    }
+
+    public func unhide(sessionID: String) async throws {
+        let _: OkResult = try await post(["v1", "sessions", sessionID, "unhide"])
+    }
+
+    public func hiddenSessions() async throws -> [HiddenSession] {
+        let list: HiddenSessionList = try await send(APIRequest(method: .get, segments: ["v1", "sessions", "hidden"]))
+        return list.sessions
+    }
+
+    public func decide(sessionID: String, requestID: String, decision: PermissionDecision, message: String?) async throws {
+        let body = PermissionDecisionRequest(decision: decision, message: message)
         let _: OkResult = try await post(["v1", "sessions", sessionID, "permission", requestID], body)
     }
 
     public func answer(sessionID: String, requestID: String, option: String) async throws {
         let _: OkResult = try await post(["v1", "sessions", sessionID, "answer", requestID], AnswerRequest(option: option))
+    }
+
+    public func answerDialog(sessionID: String, requestID: String, answer: String) async throws {
+        let _: OkResult = try await post(["v1", "sessions", sessionID, "dialog", requestID], DialogAnswerRequest(answer: answer))
     }
 
     public func newSession(_ request: NewSessionRequest) async throws -> ActionResult {
@@ -166,10 +201,6 @@ extension FardeskAPI {
 
     // MARK: Auth
 
-    public func login(password: String, deviceName: String) async throws -> LoginResult {
-        try await post(["v1", "auth", "login"], LoginRequest(password: password, deviceName: deviceName))
-    }
-
     /// Exchanges the one-time code of a pairing link for a device token (no bearer needed).
     public func pair(code: String, deviceName: String) async throws -> LoginResult {
         try await post(["v1", "auth", "pair"], PairRequest(code: code, deviceName: deviceName))
@@ -185,11 +216,6 @@ extension FardeskAPI {
 
     public func revoke(device: String?) async throws -> RevokeResult {
         try await post(["v1", "auth", "revoke"], RevokeRequest(device: device))
-    }
-
-    public func changePassword(current: String, next: String) async throws {
-        let body = PasswordChangeRequest(current: current, next: next)
-        let _: OkResult = try await post(["v1", "auth", "password"], body)
     }
 
     // MARK: Core

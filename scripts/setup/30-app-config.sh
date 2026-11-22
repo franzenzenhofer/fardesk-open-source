@@ -10,16 +10,10 @@ fardesk_require FARDESK_BUNDLE_PREFIX || exit 1
 CONFIG_DIR="$REPO_ROOT/apps/Fardesk/Config"
 LOCAL="${FARDESK_LOCAL_XCCONFIG:-$CONFIG_DIR/Local.xcconfig}"
 
-# xcconfig reads // as a comment: URLs are written with /$()/.
-xcconfig_value() { printf '%s\n' "${1//\/\//\/\$()\/}"; }
-
 # The key = value pairs this script owns (key, then value), one per line pair.
 wanted_pairs() {
   printf '%s\n' FARDESK_BUNDLE_PREFIX "$FARDESK_BUNDLE_PREFIX"
   printf '%s\n' FARDESK_TEAM_ID "${FARDESK_TEAM_ID:-}"
-  printf '%s\n' FARDESK_MACHINE_ORDER "${FARDESK_MACHINE_ORDER:-}"
-  [[ -z "${FARDESK_APP_BOOTSTRAP_MACHINES:-}" ]] || printf '%s\n' FARDESK_BOOTSTRAP_MACHINES "$(xcconfig_value "$FARDESK_APP_BOOTSTRAP_MACHINES")"
-  [[ -z "${FARDESK_APP_HUB_URL:-}" ]] || printf '%s\n' FARDESK_HUB "$(xcconfig_value "$FARDESK_APP_HUB_URL")"
 }
 
 current_value() { # key

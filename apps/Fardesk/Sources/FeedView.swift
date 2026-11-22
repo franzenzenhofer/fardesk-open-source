@@ -3,7 +3,7 @@ import FardeskStore
 import SwiftUI
 
 /// The one stream of a session: the conversation, the queued messages, what blocks Claude (permission,
-/// question, cold card) and the latest notice, all in order at the bottom. It follows new content while the
+/// question, dialog) and the latest notice, all in order at the bottom. It follows new content while the
 /// user is at the bottom and never moves when the user scrolled up (then "New activity" shows).
 struct FeedView: View {
     private static let bottomID = "feed-bottom"
@@ -27,6 +27,9 @@ struct FeedView: View {
     @State private var hasNewActivity = false
     /// Whether the feed was put at its newest row once: rows that arrive after the screen opened must land there too.
     @State private var hasLanded = false
+    @State private var loadingEarlier = false
+    /// What the last "Load earlier messages" brought, faded in and marked (nil before the first tap).
+    @State private var earlier: EarlierRows?
 
     private var pending: [PendingMessage] { model.outbox.pending(for: ref) }
 
@@ -44,15 +47,19 @@ struct FeedView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     if feed.canLoadMore {
-                        Button("Load earlier") { loadEarlier(feed, proxy) }
-                            .frame(maxWidth: .infinity)
+                        LoadEarlierButton(isLoading: loadingEarlier) { loadEarlier(feed, proxy) }
                     }
                     if showsSkeleton(feed, pending: pending) { SkeletonRows() }
-                    ForEach(feed.blocks) { FeedRow(block: $0, gotIt: model.outbox.isDelivered(rowID: $0.id)).equatable().id($0.id) }
+                    ForEach(feed.blocks) { block in
+                        if block.id == earlier?.boundaryID, let earlier { EarlierRowsMark(label: earlier.label) }
+                        FeedRow(block: block, gotIt: model.outbox.isDelivered(rowID: block.id)).equatable()
+                            .modifier(FadesInWhenNew(isNew: earlier?.ids.contains(block.id) == true))
+                            .id(block.id)
+                    }
                     ForEach(pending) { PendingMessageRow(message: $0).id($0.id) }
                     FeedStepLog(ref: ref, box: box)
                     PendingRequestCards(ref: ref, box: box)
-                    ColdCard(ref: ref)
+                    AttentionCardView(ref: ref, box: box)
                     NoticeRow(scope: .session(ref))
                     Color.clear.frame(height: 1).id(Self.bottomID)
                 }
@@ -79,6 +86,7 @@ struct FeedView: View {
             // (the split view detail, the Coordinator) and also for a chat opened and scrolled up before.
             .task(id: ref) {
                 hasLanded = false
+                earlier = nil
                 hasNewActivity = false
                 if !box.feed.blocks.isEmpty { land(proxy) }
             }
@@ -119,9 +127,13 @@ struct FeedView: View {
     /// Older rows go above; the row the user was reading stays where it was.
     private func loadEarlier(_ feed: SessionFeed, _ proxy: ScrollViewProxy) {
         let anchor = feed.blocks.first?.id
+        loadingEarlier = true
         Task {
             await model.loadOlder(ref)
-            if let anchor { proxy.scrollTo(anchor, anchor: .top) }
+            earlier = EarlierRows(blockIDs: box.feed.blocks.map(\.id), previousFirstID: anchor)
+            loadingEarlier = false
+            // The old first row moves down a little, so the rows that came in (fading in) are on screen above it.
+            if let anchor { proxy.scrollTo(anchor, anchor: UnitPoint(x: 0.5, y: 0.4)) }
         }
     }
 

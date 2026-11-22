@@ -7,13 +7,12 @@ import type { PairingPayload } from "../contract/schema.js";
 const LINK_PREFIX = "fardesk://pair?d=";
 
 /** The base URL clients use to reach this daemon on `address`. */
-export function daemonUrl(config: Pick<Config, "tls" | "bind">, address: string): string {
-  const scheme = config.tls === null ? "http" : "https";
+export function daemonUrl(config: Pick<Config, "bind">, address: string): string {
   const host = address.includes(":") ? `[${address}]` : address;
-  return `${scheme}://${host}:${config.bind.port}`;
+  return `http://${host}:${config.bind.port}`;
 }
 
-export function buildPairingPayload(config: Pick<Config, "name" | "tls" | "bind" | "hub">, address: string, code: string): PairingPayload {
+export function buildPairingPayload(config: Pick<Config, "name" | "bind" | "hub">, address: string, code: string): PairingPayload {
   return { v: CONTRACT_VERSION, name: config.name, url: daemonUrl(config, address), code, hub: config.hub.enabled };
 }
 

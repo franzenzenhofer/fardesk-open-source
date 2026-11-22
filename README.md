@@ -36,8 +36,11 @@ user, by design. The rules that keep it safe for one person:
 - **One user, one tailnet.** Every computer and the phone belong to you. Do not run it on a Tailscale network
   shared with other people unless a Tailscale access rule limits port 4780 to your own devices (snippet in
   [SECURITY.md](SECURITY.md)).
-- **The daemon only listens on your Tailscale address** (or loopback). Any other bind address makes it exit with
-  an error unless you turn on TLS and set `bind.allowNonTailnet` yourself.
+- **Tailscale only, no other way.** The daemon listens only on your Tailscale address; a config with any other
+  address, or a peer outside the tailnet, makes it exit with an error, and there is no setting to allow one. There is no
+  password login either: a phone gets in only by pairing. Transport security is Tailscale (WireGuard): the daemon
+  speaks plain HTTP on its tailnet address and has no certificate of its own, and the app talks only to 100.64.0.0/10.
+  Tailscale is mandatory: the pairing screen shows no scanner while the phone is not on Tailscale.
 - **Pairing uses a one-time code.** The QR code or link holds a code that works once and expires after 10
   minutes. The phone swaps it for its own token. Each phone can be revoked and wiped on its own.
 - **Permission prompts are on by default** for sessions started from the phone. Skipping them
@@ -140,11 +143,12 @@ Per-machine daemon settings live in `~/.config/fardesk/config.json` (mode 600). 
 Yes, by design. That is why it only binds to your tailnet, pairs with one-time codes, gives each phone its own
 revocable token, asks for permission by default, and keeps the Coordinator off. See the security section above.
 
-**Plain HTTP in 2026?**
-Traffic between your devices is inside Tailscale's WireGuard tunnel. HTTPS with a Tailscale certificate
-(`tailscale cert`) is one optional setup step. The app still has an App Transport Security exception because
-that setting cannot allow an IP range. On a tailnet shared with other people, use the access rule in
-[SECURITY.md](SECURITY.md) and turn TLS on.
+**Is it encrypted?**
+Yes, by Tailscale: its WireGuard tunnel encrypts and authenticates every connection between your devices, and the
+daemon listens only on its tailnet address. Fardesk adds no TLS of its own: iOS refuses a self-signed certificate
+on an IP address (App Transport Security), so the apps carry one exception for exactly 100.64.0.0/10 and speak plain
+HTTP inside the tunnel. On a tailnet shared with other people, also use the access rule in
+[SECURITY.md](SECURITY.md).
 
 **Why not SSH and tmux, or a terminal app over Tailscale SSH?**
 SSH gives you a terminal. Fardesk gives you a list of every session on every machine with its state, a push

@@ -9,8 +9,6 @@ export type CliIo = {
   env: NodeJS.ProcessEnv;
   /** Resolves when the process should stop serving (SIGINT or SIGTERM). */
   untilStop(): Promise<void>;
-  /** The new password for `set-password` (stdin: prompted twice on a terminal, one line when piped). */
-  readPassword(): Promise<string>;
 };
 
 export type CliDeps = {
@@ -22,6 +20,12 @@ export type CliDeps = {
   tailnetTiming?: TailnetTiming;
   /** `fardeskd pair`: how often it asks the daemon whether the window is still open (default 1 second). */
   pairPollMs?: number;
+  /** How long a refused connection to the daemon is retried before "not running" (default 4 seconds: a restart). */
+  restartWaitMs?: number;
+  /** Deadline of one daemon request (default 15 seconds). */
+  requestTimeoutMs?: number;
+  /** `pair --show`: the platform that picks the image viewer (default: this one). */
+  platform?: NodeJS.Platform;
 };
 
 export type CommandContext = {
@@ -33,6 +37,8 @@ export type CommandContext = {
   args: readonly string[];
   /** `install-hooks --dry-run`: show what would change, write nothing. */
   dryRun: boolean;
+  /** `pair --show`: put the pairing QR code on this computer's screen instead of printing it. */
+  show: boolean;
   /** `audit --since`: an ISO time or a span like 30m, 2h, 7d. */
   since: string | null;
   io: CliIo;

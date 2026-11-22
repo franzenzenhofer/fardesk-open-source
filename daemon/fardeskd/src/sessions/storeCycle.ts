@@ -1,4 +1,5 @@
 // The poll cycle of the session store: sync entries with the registry and the transcripts, then publish.
+import { homeNameOfPath, homePaths } from "../config/claudeHomes.js";
 import type { SessionSummary } from "../contract/schema.js";
 import { createTailer, finishedToolCalls, mapActivities, summarise } from "../transcript/index.js";
 import type { TranscriptLine } from "../transcript/index.js";
@@ -23,8 +24,10 @@ function buildFor(ctx: StoreContext, entry: StoreEntry): SessionSummary | null {
     ownedBusy: deps.isBusy(entry.id),
     pendingKind: deps.pendingKind(entry.id),
     crossSessionAccepted: entry.home !== null && ctx.acceptingHomes.has(entry.home),
+    home: entry.home === null ? null : homeNameOfPath(deps.claudeHomes, entry.home),
     muted: deps.isMuted(entry.id),
     label: deps.labelOf(entry.id),
+    autoColor: deps.autoColors.get(entry.id),
     typable: entry.process !== null && (deps.isTypable?.(entry.process.pid) ?? false),
   };
   const cwd = resolveCwd(input);
@@ -107,7 +110,7 @@ function syncLive(ctx: StoreContext, entry: StoreEntry, live: HomedProcess, ref:
 
 /** False when the transcript vanished: the session is not there any more. */
 function syncEnded(ctx: StoreContext, entry: StoreEntry, ref: TranscriptRef, budget: { reads: number }): boolean {
-  entry.home = null;
+  entry.home = ref.home;
   entry.process = null;
   entry.ref = ref;
   stopTailer(entry);
@@ -155,11 +158,21 @@ function entryFor(ctx: StoreContext, id: string): StoreEntry {
   return entry;
 }
 
+/** Every session that has a start time gets its automatic colour, oldest first (colour/autoColourStore.ts). */
+function assignAutoColours(ctx: StoreContext): void {
+  const sessions = [...ctx.entries.values()].flatMap((entry) => {
+    const times = resolveTimes({ process: entry.process, summary: entry.summary ?? EMPTY_SUMMARY, transcriptMtimeMs: entry.ref?.mtimeMs ?? null });
+    return entry.summary === null || times === null ? [] : [{ id: entry.id, startedAtMs: Date.parse(times.startedAt), userColor: ctx.deps.labelOf(entry.id).color }];
+  });
+  ctx.deps.autoColors.assign(sessions, [...ctx.entries.keys()]);
+}
+
 export function refreshStore(ctx: StoreContext): void {
   const { deps, entries } = ctx;
-  ctx.acceptingHomes = new Set(deps.claudeHomes.filter(acceptsCrossSession));
-  const processes = collectProcesses(deps.claudeHomes);
-  const transcripts = collectTranscripts(deps.claudeHomes, new Set(processes.keys()), deps.limits.maxEnded);
+  const homes = homePaths(deps.claudeHomes);
+  ctx.acceptingHomes = new Set(homes.filter(acceptsCrossSession));
+  const processes = collectProcesses(homes);
+  const transcripts = collectTranscripts(homes, new Set(processes.keys()), deps.limits.maxEnded);
   const budget = { reads: deps.limits.maxEndedReadsPerRefresh };
   for (const [id, process] of processes) syncLive(ctx, entryFor(ctx, id), process, transcripts.get(id) ?? null);
   for (const [id, ref] of transcripts) {
@@ -172,6 +185,7 @@ export function refreshStore(ctx: StoreContext): void {
   }
   const left = [...entries.values()].filter(leftWaiting).map((entry) => entry.id);
   for (const entry of gone) if (entry.missedPolls === 0) entries.delete(entry.id);
+  assignAutoColours(ctx);
   for (const entry of entries.values()) publishEntry(ctx, entry);
   for (const id of left) deps.onLeftWaiting(id);
 }

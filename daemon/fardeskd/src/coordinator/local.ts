@@ -2,7 +2,7 @@
 import type { Config } from "../config/config.js";
 import { FardeskError } from "../core/errors.js";
 import type { Services } from "../service/types.js";
-import { createRemoteEndpoint } from "./remote.js";
+import { createRemoteEndpoint } from "./remoteEndpoint.js";
 import type { MachineEndpoint } from "./types.js";
 
 export type LocalServices = Pick<
@@ -17,10 +17,16 @@ export type LocalServices = Pick<
   | "notifyPhone"
   | "decide"
   | "answer"
+  | "answerDialog"
   | "resume"
   | "clear"
   | "compact"
   | "kill"
+  | "setSessionImage"
+  | "clearSessionImage"
+  | "machine"
+  | "updatePackage"
+  | "startUpdate"
 >;
 export type BackendConfig = Pick<Config, "name" | "peers" | "coordinator">;
 export type Machine = { name: string; endpoint: MachineEndpoint | null };
@@ -36,12 +42,21 @@ export function createLocalEndpoint(services: LocalServices): MachineEndpoint {
     spawn: async (request) => (await services.newSession(request)).sessionId,
     stop: async (sessionId) => services.stop(sessionId),
     folders: (query, limit) => Promise.resolve(services.searchFolders(query, limit)),
-    decide: async (sessionId, requestId, decision) => services.decide(sessionId, requestId, decision),
+    decide: async (sessionId, requestId, decision, message) => services.decide(sessionId, requestId, decision, message),
     answer: async (sessionId, requestId, option) => services.answer(sessionId, requestId, option),
+    answerDialog: async (sessionId, requestId, answer) => services.answerDialog(sessionId, requestId, answer),
     resume: async (sessionId) => (await services.resume(sessionId)).sessionId,
     clear: async (sessionId) => (await services.clear(sessionId)).sessionId,
     compact: async (sessionId) => (await services.compact(sessionId)).sessionId,
     kill: async (sessionId) => services.kill(sessionId, false),
+    machine: () => Promise.resolve(services.machine()),
+    updatePackage: () => Promise.resolve(services.updatePackage()),
+    startUpdate: async (bytes, sha256) => services.startUpdate(bytes, sha256),
+    setImage: async (sessionId, image) => Promise.resolve(services.setSessionImage(sessionId, { mediaType: image.mediaType, bytes: image.bytes })),
+    clearImage: async (sessionId): Promise<void> => {
+      services.clearSessionImage(sessionId);
+      return Promise.resolve();
+    },
   };
 }
 

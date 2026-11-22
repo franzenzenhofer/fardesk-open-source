@@ -30,6 +30,18 @@ ensure_config() {
   fi
 }
 
+# `fardeskd` on PATH: a small sh script that runs the CLI with the same node the service uses. Rewritten on every install.
+install_launcher() {
+  local bin_dir="$HOME/.local/bin" launcher="$HOME/.local/bin/fardeskd"
+  mkdir -p "$bin_dir"
+  printf '#!/bin/sh\nexec "%s" "%s/dist/main.js" "$@"\n' "$NODE_BIN" "$INSTALL_DIR" > "$launcher"
+  chmod 755 "$launcher"
+  case ":$PATH:" in
+    *":$bin_dir:"*) ;;
+    *) echo "fardeskd installed at $launcher, but $bin_dir is not on PATH: add it to your shell profile" ;;
+  esac
+}
+
 install_launchd() {
   local plist="$HOME/Library/LaunchAgents/$LABEL.plist"
   mkdir -p "$HOME/Library/LaunchAgents"
@@ -61,6 +73,7 @@ for log in "$LOG_DIR/fardeskd.out.log" "$LOG_DIR/fardeskd.err.log"; do
 done
 install_dependencies
 ensure_config
+install_launcher
 case "$(uname -s)" in
   Darwin) install_launchd ;;
   Linux) install_systemd ;;

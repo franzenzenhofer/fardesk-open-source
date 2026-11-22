@@ -11,6 +11,12 @@ struct DevicesSection: View {
 
     var body: some View {
         Group {
+            if model.isDemo {
+                Section("Devices") {
+                    Text("Signed-in devices need a real machine.").foregroundStyle(.secondary)
+                    Button("Revoke all", role: .destructive) {}
+                }
+            }
             if isLoading && machines.isEmpty {
                 Section("Devices") {
                     HStack(spacing: 8) {
@@ -33,7 +39,7 @@ struct DevicesSection: View {
                 }
             }
         }
-        .task { await reload() }
+        .task { if !model.isDemo { await reload() } }
         .confirmationDialog(
             "Revoke every device?",
             isPresented: Binding(get: { revokeAll != nil }, set: { if !$0 { revokeAll = nil } }),

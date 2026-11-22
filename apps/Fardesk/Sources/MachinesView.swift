@@ -49,10 +49,13 @@ struct MachinesView: View {
         container
         .confirmsKill()
         .promptsRename()
+        .sheetsLabelColours()
         .sensoryFeedback(.impact(weight: .light), trigger: model.sendSignal)
         .sensoryFeedback(.error, trigger: model.failureSignal)
         .sheet(isPresented: $coordinator.showsSettings) { SettingsView() }
-        .sheet(isPresented: $coordinator.showsNewSession) { NewSessionView() }
+        .sheet(isPresented: $coordinator.showsNewSession, onDismiss: { coordinator.newSessionPreset = nil }) {
+            NewSessionView(preset: coordinator.newSessionPreset)
+        }
         .sheet(isPresented: Binding(get: { coordinator.terminalTarget != nil }, set: { if !$0 { coordinator.terminalTarget = nil } })) {
             if let ref = coordinator.terminalTarget { TerminalCommandSheet(ref: ref) }
         }

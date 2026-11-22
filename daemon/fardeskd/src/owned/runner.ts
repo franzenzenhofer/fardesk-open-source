@@ -1,3 +1,4 @@
+import type { ClaudeHomeEntry } from "../config/claudeHomes.js";
 import type { PermissionMode } from "../contract/schema.js";
 import type { Logger } from "../core/log.js";
 import type { Broker } from "../permissions/broker.js";
@@ -10,7 +11,8 @@ import type { OwnedRunner } from "./types.js";
 
 export type OwnedRunnerDeps = {
   claudeBinary: string;
-  claudeHome: string;
+  /** Read on every start: the list is replaced in place when the config is reloaded. A new session names one of these. */
+  claudeHomes: readonly ClaudeHomeEntry[];
   statePath: string;
   /** The mode of sessions that have no mode of their own (new sessions without a request mode, resumes without a transcript mode). */
   permissionMode: PermissionMode;
@@ -25,6 +27,8 @@ export type OwnedRunnerDeps = {
   broker: Broker;
   log: Logger;
   findCwd(sessionId: string): string;
+  /** The Claude home folder an existing session lives in. */
+  findHome(sessionId: string): string;
   /** The mode the session's last turn ran in, from its transcript; null when unknown. */
   findMode(sessionId: string): PermissionMode | null;
 };
@@ -41,8 +45,9 @@ export function createOwnedRunner(deps: OwnedRunnerDeps): OwnedRunner {
       await owned.require(sessionId).session.interrupt(deps.interruptTimeoutMs);
     },
     async stop(sessionId): Promise<void> {
-      await owned.require(sessionId).session.close();
-      await waitForRelease(deps.claudeHome, sessionId, deps.kill);
+      const { session, home } = owned.require(sessionId);
+      await session.close();
+      await waitForRelease(home, sessionId, deps.kill);
     },
     clear: async (sessionId): Promise<string> => owned.require(sessionId).session.clear(deps.clearTimeoutMs),
     compact: async (sessionId): Promise<void> => owned.require(sessionId).session.compact(deps.compactTimeoutMs),
@@ -52,7 +57,7 @@ export function createOwnedRunner(deps: OwnedRunnerDeps): OwnedRunner {
       owned.freeze();
       const entries = owned.entries();
       await Promise.all(entries.map(async ([, entry]) => entry.session.close()));
-      await Promise.all(entries.map(async ([id]) => waitForRelease(deps.claudeHome, id, deps.kill)));
+      await Promise.all(entries.map(async ([id, entry]) => waitForRelease(entry.home, id, deps.kill)));
     },
   };
 }

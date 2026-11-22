@@ -10,16 +10,33 @@ public struct Machine: Codable, Sendable, Hashable {
     public let sessionsCount: Int
     public let models: [String]
     public let ghosttyAutomation: GhosttyAutomation
-    /// False when the machine's `owned.allowBypass` is off: it refuses sessions in bypassPermissions (older daemons: true).
+    /// False when the machine's `owned.allowBypass` is off: it refuses sessions in bypassPermissions.
     public let allowBypass: Bool
-    /// False when the machine's `coordinator.enabled` is off (older daemons: true).
+    /// False when the machine's `coordinator.enabled` is off.
     public let coordinatorEnabled: Bool
+    /// The names of the machine's Claude homes (accounts), in config order; the first is the default of new sessions.
+    public let homes: [String]
+    /// Tailscale on that machine, as the daemon read it last.
+    public let tailscale: TailscaleStatus
+    /// What the daemon can do, by name (`MachineFeature`); empty for a daemon that predates the list.
+    public let features: [String]
+    /// The state of the last update; nil for a daemon without self-update.
+    public let update: MachineUpdate?
+}
+
+/// `Machine.tailscale`: whether Tailscale runs on a machine (the daemon reads it every 30 s).
+public struct TailscaleStatus: Codable, Sendable, Hashable {
+    public enum State: String, TolerantEnum {
+        case running, stopped, needsLogin = "needs-login", notInstalled = "not-installed", unknown
+    }
+
+    public let state: State
 }
 
 extension Machine {
     private enum CodingKeys: String, CodingKey {
         case contractVersion, name, hostname, os, version, claudeVersion, sessionsCount, models, ghosttyAutomation
-        case allowBypass, coordinatorEnabled
+        case allowBypass, coordinatorEnabled, homes, tailscale, features, update
     }
 
     public init(from decoder: any Decoder) throws {
@@ -33,8 +50,12 @@ extension Machine {
         sessionsCount = try c.decode(Int.self, forKey: .sessionsCount)
         models = try c.decode([String].self, forKey: .models)
         ghosttyAutomation = try c.decode(GhosttyAutomation.self, forKey: .ghosttyAutomation)
-        allowBypass = try c.decodeIfPresent(Bool.self, forKey: .allowBypass) ?? true
-        coordinatorEnabled = try c.decodeIfPresent(Bool.self, forKey: .coordinatorEnabled) ?? true
+        allowBypass = try c.decode(Bool.self, forKey: .allowBypass)
+        coordinatorEnabled = try c.decode(Bool.self, forKey: .coordinatorEnabled)
+        homes = try c.decode([String].self, forKey: .homes)
+        tailscale = try c.decode(TailscaleStatus.self, forKey: .tailscale)
+        features = try c.decodeIfPresent([String].self, forKey: .features) ?? []
+        update = try c.decodeIfPresent(MachineUpdate.self, forKey: .update)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -50,6 +71,10 @@ extension Machine {
         try c.encode(ghosttyAutomation, forKey: .ghosttyAutomation)
         try c.encode(allowBypass, forKey: .allowBypass)
         try c.encode(coordinatorEnabled, forKey: .coordinatorEnabled)
+        try c.encode(homes, forKey: .homes)
+        try c.encode(tailscale, forKey: .tailscale)
+        try c.encode(features, forKey: .features)
+        try c.encodeIfPresent(update, forKey: .update)
     }
 }
 
@@ -65,6 +90,12 @@ public struct SessionSummary: Codable, Sendable, Hashable, Identifiable {
     public let summary: String
     public let model: String?
     public let pid: Int?
+    /// Which coding agent runs the session (the list shows its mark).
+    public let agent: AgentKind
+    /// Background jobs (a background command, subagent or monitor) still running after the turn ended; 0 when none.
+    public let background: Int
+    /// The name of the Claude home (account) the session lives in, never its path.
+    public let home: String?
     public let muted: Bool
     /// The mode of the session's last turn; nil when its transcript has none.
     public let permissionMode: PermissionMode?
@@ -72,16 +103,20 @@ public struct SessionSummary: Codable, Sendable, Hashable, Identifiable {
     public let contextTokens: Int?
     /// When the prompt cache of the last turn goes cold; nil when unknown.
     public let cacheExpiresAt: Date?
+    /// When the last turn ended; nil when unknown or right after a compaction (added in 4.2.0, optional to read).
+    public let lastTurnAt: Date?
     public let startedAt: Date
     public let updatedAt: Date
-    /// The user's name, colour and pin (older daemons: none).
+    /// The user's name, colour and pin.
     public var label: SessionLabel = .none
+    /// The daemon's automatic colour for this session (one of the presets); nil when it has none yet.
+    public var autoColor: LabelColor?
 }
 
 extension SessionSummary {
     private enum CodingKeys: String, CodingKey {
         case id, title, cwd, status, waitingFor, owned, replyMode, canStop
-        case summary, model, pid, muted, permissionMode, contextTokens, cacheExpiresAt, startedAt, updatedAt, label
+        case summary, model, pid, agent, background, home, muted, permissionMode, contextTokens, cacheExpiresAt, lastTurnAt, startedAt, updatedAt, label, autoColor
     }
 
     public init(from decoder: any Decoder) throws {
@@ -97,13 +132,18 @@ extension SessionSummary {
         summary = try c.decode(String.self, forKey: .summary)
         model = try c.decode(String?.self, forKey: .model)
         pid = try c.decode(Int?.self, forKey: .pid)
+        agent = try c.decode(AgentKind.self, forKey: .agent)
+        background = try c.decode(Int.self, forKey: .background)
+        home = try c.decode(String?.self, forKey: .home)
         muted = try c.decode(Bool.self, forKey: .muted)
         permissionMode = try c.decodeIfPresent(PermissionMode.self, forKey: .permissionMode)
         contextTokens = try c.decodeIfPresent(Int.self, forKey: .contextTokens)
         cacheExpiresAt = try c.decodeIfPresent(Date.self, forKey: .cacheExpiresAt)
+        lastTurnAt = try c.decodeIfPresent(Date.self, forKey: .lastTurnAt)
         startedAt = try c.decode(Date.self, forKey: .startedAt)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
         label = try c.decodeIfPresent(SessionLabel.self, forKey: .label) ?? .none
+        autoColor = try c.decode(LabelColor?.self, forKey: .autoColor)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -119,12 +159,17 @@ extension SessionSummary {
         try c.encode(summary, forKey: .summary)
         try c.encode(model, forKey: .model)
         try c.encode(pid, forKey: .pid)
+        try c.encode(agent, forKey: .agent)
+        try c.encode(background, forKey: .background)
+        try c.encode(home, forKey: .home)
         try c.encode(muted, forKey: .muted)
         try c.encode(permissionMode, forKey: .permissionMode)
         try c.encode(contextTokens, forKey: .contextTokens)
         try c.encode(cacheExpiresAt, forKey: .cacheExpiresAt)
+        try c.encode(lastTurnAt, forKey: .lastTurnAt)
         try c.encode(startedAt, forKey: .startedAt)
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encode(label, forKey: .label)
+        try c.encode(autoColor, forKey: .autoColor)
     }
 }

@@ -1,6 +1,8 @@
 // GET /v1/hub and /m/<machine>/...: the local app for this machine and for /v1/auth/*, cache or forward for a peer.
 import type { Context } from "hono";
 import { MAX_ATTACHMENT_BYTES } from "../attachments/store.js";
+import { MAX_IMAGE_BYTES } from "../service/imageStore.js";
+import { MAX_UPDATE_PACKAGE_BYTES } from "../update/updater.js";
 import { MASTER_DEVICE_ID } from "../auth/deviceRegistry.js";
 import type { AuthService } from "../auth/service.js";
 import { FardeskError } from "../core/errors.js";
@@ -18,12 +20,13 @@ const SHORT_TIMEOUT_MS = 15_000;
 const LONG_TIMEOUT_MS = 120_000;
 // /compact waits up to 180 s for the compact boundary, plus a resume of an ended session first.
 const COMPACT_TIMEOUT_MS = 240_000;
-const LONG_ACTIONS = /\/(new|resume|takeover|fork|clear|attachments)$/;
-// Login and logout are about the caller's session with the hub itself (the peer token belongs to the hub, not to the
-// phone); the other /v1/auth/* routes (devices, revoke, password, reload) are about the machine that is addressed.
-const HUB_OWN_AUTH = new Set(["/v1/auth/login", "/v1/auth/logout"]);
+// A release package (about 2 MB) goes up and down through the hub: machine/update and update/package.
+const LONG_ACTIONS = /\/(new|resume|takeover|fork|clear|attachments|image|machine\/update|update\/package)$/;
+// Logout is about the caller's session with the hub itself (the peer token belongs to the hub, not to the
+// phone); the other /v1/auth/* routes (devices, revoke) are about the machine that is addressed.
+const HUB_OWN_AUTH = new Set(["/v1/auth/logout"]);
 // Device callers may only forward peer auth operations available to ordinary devices.
-const DEVICE_PEER_AUTH = new Set([PAIR_PATH, "/v1/auth/devices", "/v1/auth/revoke", "/v1/auth/password", "/v1/auth/reload"]);
+const DEVICE_PEER_AUTH = new Set([PAIR_PATH, "/v1/auth/devices", "/v1/auth/revoke"]);
 const DEVICES_PATH = "/v1/devices";
 const DROPPED_HEADERS = new Set(["authorization", "host", "content-length", "connection", "transfer-encoding", "accept-encoding"]);
 
@@ -38,7 +41,10 @@ function parseTarget(url: URL): Omit<Target, "body"> {
 async function bodyOf(c: Ctx, path: string): Promise<Uint8Array<ArrayBuffer> | undefined> {
   if (c.req.method === "GET" || c.req.method === "HEAD") return undefined;
   const attachment = c.req.method === "POST" && /^\/v1\/sessions\/[^/]+\/attachments$/.test(path);
-  return readBoundedBody(c.req.raw, attachment ? MAX_ATTACHMENT_BYTES : MAX_JSON_BYTES, attachment);
+  const image = c.req.method === "POST" && /^\/v1\/sessions\/[^/]+\/image$/.test(path);
+  const update = c.req.method === "POST" && path === "/v1/machine/update";
+  const limit = update ? MAX_UPDATE_PACKAGE_BYTES : attachment ? MAX_ATTACHMENT_BYTES : image ? MAX_IMAGE_BYTES : MAX_JSON_BYTES;
+  return readBoundedBody(c.req.raw, limit, attachment || image || update);
 }
 
 async function local(app: App, c: Ctx, target: Target): Promise<Response> {

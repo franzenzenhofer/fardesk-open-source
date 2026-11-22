@@ -20,8 +20,10 @@ const TRANSCRIPT: TranscriptSummary = {
   startedAt: T0,
   updatedAt: T1,
   pendingToolUse: false,
+  backgroundTasks: 0,
   contextTokens: null,
   cacheExpiresAt: null,
+  lastTurnAt: null,
 };
 
 function proc(overrides: Partial<LiveProcess> = {}): LiveProcess {
@@ -53,7 +55,9 @@ function input(overrides: Partial<StatusInput> = {}): StatusInput {
     pendingKind: null,
     muted: false,
     label: NO_LABEL,
+    autoColor: null,
     crossSessionAccepted: false,
+    home: null,
     ...overrides,
   };
 }
@@ -210,6 +214,17 @@ const ROWS: Row[] = [
 describe("buildSessionSummary status mapping", () => {
   it.each(ROWS)("$name", ({ overrides, expected }) => {
     expect(build(overrides)).toMatchObject(expected);
+  });
+});
+
+describe("background", () => {
+  it("counts the background tasks of an idle live session and keeps its status idle", () => {
+    const summary = build({ summary: { ...TRANSCRIPT, backgroundTasks: 2 } });
+    expect(summary).toMatchObject({ status: "idle", background: 2 });
+  });
+
+  it("is 0 for a stopped session whatever the transcript says", () => {
+    expect(build({ process: null, summary: { ...TRANSCRIPT, backgroundTasks: 2 } })).toMatchObject({ status: "ended", background: 0 });
   });
 });
 

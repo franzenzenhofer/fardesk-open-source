@@ -84,5 +84,8 @@ public enum PushPresentation {
 
 extension SessionPresentation {
     /// "machine", "folder": the grey part of the header line, before the status.
-    public func headerLeadParts(machineName: String) -> [String] { [machineName, folderLabel] }
+    /// `homeTag`: the Claude home name, only given for a machine with more than one home (see HomeTag).
+    public func headerLeadParts(machineName: String, homeTag: String? = nil) -> [String] {
+        [machineName] + (homeTag.map { [$0] } ?? []) + [folderLabel]
+    }
 }

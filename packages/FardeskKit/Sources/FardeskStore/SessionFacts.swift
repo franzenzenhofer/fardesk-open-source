@@ -13,10 +13,13 @@ public struct SessionFacts: Equatable, Sendable {
     public init(session: SessionSummary, machineName: String, now: Date = .now) {
         let presentation = SessionPresentation(session: session, now: now)
         var rows = [
-            Row(label: "Status", value: presentation.statusLabel),
+            Row(label: "Status", value: presentation.subtitleParts.joined(separator: ": ")),
+            Row(label: "Agent", value: session.agent.displayName),
             Row(label: "Machine", value: machineName),
-            Row(label: "Folder", value: session.cwd),
+            Row(label: "Started in", value: session.cwd),
         ]
+        // The Claude home (account folder, e.g. .claude or .claude-team): shown here, never in the list.
+        if let home = session.home { rows.append(Row(label: "Claude home", value: home)) }
         if let mode = session.permissionMode { rows.append(Row(label: "Mode", value: mode.label)) }
         if let model = session.model { rows.append(Row(label: "Model", value: model)) }
         if let tokens = session.contextTokens { rows.append(Row(label: "Context", value: "\(tokens.formatted()) tokens")) }

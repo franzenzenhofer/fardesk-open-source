@@ -1,0 +1,35 @@
+{
+  "contractVersion": 4,
+  "name": "Studio Mac",
+  "hostname": "studio-mac.local",
+  "os": "macos",
+  "version": "0.1.0",
+  "claudeVersion": "2.4.1",
+  "sessionsCount": 3,
+  "models": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5"
+  ],
+  "ghosttyAutomation": "ok",
+  "allowBypass": true,
+  "coordinatorEnabled": true,
+  "homes": [
+    ".claude",
+    "team"
+  ],
+  "tailscale": {
+    "state": "stopped"
+  },
+  "features": [
+    "chat-image",
+    "self-update",
+    "cold-last-turn"
+  ],
+  "update": {
+    "state": "done",
+    "message": null,
+    "version": "4.2.0",
+    "packageSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "at": "2026-11-22T10:00:00.000Z"
+  }
+}

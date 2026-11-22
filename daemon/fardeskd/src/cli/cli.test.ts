@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClaudeHome } from "../../test/support/claudeHome.js";
@@ -140,7 +140,7 @@ describe("pair", () => {
     const { configPath } = await setup();
     const result = await run(["pair", "--config", configPath]);
     expect(result.code).toBe(1);
-    expect(result.err.join("\n")).toContain("start fardeskd first");
+    expect(result.err.join("\n")).toContain("fardeskd is not running");
   });
 });
 
@@ -193,6 +193,27 @@ describe("serve", () => {
     expect(await exit).toBe(0);
     expect(existsSync(join(stateDir, "hook.sock"))).toBe(false);
     expect(await portAccepts(port)).toBe(false);
+  });
+
+  it("refuses a config that still has tls: Fardesk 4 uses Tailscale for encryption", async () => {
+    const { configPath } = await setup({ tls: { cert: "tls/cert.pem", key: "tls/key.pem" } });
+    const result = await run(["status", "--config", configPath]);
+    expect(result.code).toBe(1);
+    expect(result.err[0]).toContain("remove tls: Fardesk 4 uses Tailscale for encryption");
+  });
+
+  it("has no pin command any more", async () => {
+    const { configPath } = await setup();
+    expect((await run(["pin", "--config", configPath])).code).not.toBe(0);
+  });
+
+  it("init writes only the config, mode 600, and no certificate", async () => {
+    const dir = makeTempDir("fdi-");
+    const io = captureIo();
+    expect(await runCli(["init", "--name", "box", "--config", join(dir, "config.json")], io, deps)).toBe(0);
+    expect(statSync(join(dir, "config.json")).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(dir, "tls"))).toBe(false);
+    expect(io.out.join("\n")).not.toMatch(/certificate|pin/);
   });
 
   it("closes everything and exits 1 when the port is taken", async () => {

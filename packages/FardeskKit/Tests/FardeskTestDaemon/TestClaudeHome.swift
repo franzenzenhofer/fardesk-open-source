@@ -73,10 +73,21 @@ final class TestClaudeHome: @unchecked Sendable {
         children = []
     }
 
+    /// Ten minutes: longer than any test, short enough that a stand-in leaked by a crashed run dies on its own.
+    static let standInSeconds = "600"
+
+    deinit { stopChildren() }
+
+    /// A stand-in for a live Claude process. It must never hold the test run's output: a leaked one with inherited
+    /// stdout kept `swift test` waiting for the pipe to close for its whole lifetime (2026-11-21). So no inherited
+    /// files, a short life, and it ends with this object at the latest.
     private func writeRegistry(sessionID: String) throws {
         let child = Process()
         child.executableURL = URL(filePath: "/bin/sleep")
-        child.arguments = ["3600"]
+        child.arguments = [Self.standInSeconds]
+        child.standardInput = FileHandle.nullDevice
+        child.standardOutput = FileHandle.nullDevice
+        child.standardError = FileHandle.nullDevice
         try child.run()
         children.append(child)
         let source = RepoPaths.fixtures.appending(path: "registry/busy.json")

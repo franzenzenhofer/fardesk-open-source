@@ -1,0 +1,17 @@
+{
+  "kind": "permission",
+  "tool": "ExitPlanMode",
+  "title": "Ready to code?",
+  "summary": "Soften the brush smear",
+  "plan": "# Soften the brush smear\n\n1. Lower the falloff exponent in `PaintEngine.swift` from 2.0 to 1.4.\n2. Add a regression test that compares three sample strokes.\n3. Run `swift test` and update the screenshots.",
+  "cwd": "/Users/dev/smear-studio",
+  "destructive": false,
+  "id": "req-req_p2",
+  "ts": "2026-11-22T10:05:00.000Z",
+  "requestId": "req_p2",
+  "state": "pending",
+  "planChoices": [
+    "approve_manual",
+    "revise"
+  ]
+}

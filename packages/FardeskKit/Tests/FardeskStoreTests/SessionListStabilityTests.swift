@@ -14,7 +14,7 @@ struct SessionListStabilityTests {
     ) throws -> SessionSummary {
         let stamp = Date.ISO8601FormatStyle(includingFractionalSeconds: true).format(base.addingTimeInterval(seconds))
         var overrides: [String: any Sendable] = ["id": id, "status": status, "updatedAt": stamp]
-        if pinned { overrides["label"] = ["name": "Mine", "color": "blue", "pinned": true] as [String: any Sendable] }
+        if pinned { overrides["label"] = ["name": "Mine", "color": "#8E0443", "pinned": true] as [String: any Sendable] }
         overrides["waitingFor"] = waitingFor ?? NSNull()
         return try Fixtures.session("working", overriding: overrides)
     }

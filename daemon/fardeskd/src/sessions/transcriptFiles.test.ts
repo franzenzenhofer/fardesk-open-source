@@ -25,8 +25,8 @@ describe("findTranscripts", () => {
     utimesSync(join(dir2, `${ID_B}.jsonl`), SECONDS_OLD + 100, SECONDS_OLD + 100);
     const refs = findTranscripts(home);
     expect(refs).toEqual([
-      { sessionId: ID_B, path: join(dir2, `${ID_B}.jsonl`), mtimeMs: (SECONDS_OLD + 100) * 1000, sizeBytes: 10, projectDir: dir2 },
-      { sessionId: ID_A, path: join(dir1, `${ID_A}.jsonl`), mtimeMs: SECONDS_OLD * 1000, sizeBytes: 5, projectDir: dir1 },
+      { sessionId: ID_B, path: join(dir2, `${ID_B}.jsonl`), mtimeMs: (SECONDS_OLD + 100) * 1000, sizeBytes: 10, projectDir: dir2, home },
+      { sessionId: ID_A, path: join(dir1, `${ID_A}.jsonl`), mtimeMs: SECONDS_OLD * 1000, sizeBytes: 5, projectDir: dir1, home },
     ]);
   });
 

@@ -11,7 +11,7 @@ extension AppModel {
         action: String,
         origin: CallOrigin = .user,
         notice: CallNotice = .none,
-        _ call: (FardeskAPI) async throws -> Result
+        _ call: (any FardeskService) async throws -> Result
     ) async -> Result? {
         let started = Date()
         let machine = machineName(machineID)
@@ -21,7 +21,7 @@ extension AppModel {
             guard let endpoint = machines.endpoints.first(where: { $0.id == machineID }) else {
                 throw AppStateError.unknownMachine(machineID)
             }
-            let result = try await call(access.api(for: endpoint))
+            let result = try await call(service(for: endpoint))
             if notice.showsProgress, let scope {
                 recordEvent("action", "\(action): done", machineID: machineID, since: started)
                 showNotice(.succeeded(action, machine: machine), in: scope)
@@ -49,7 +49,7 @@ extension AppModel {
         let step = hasCache ? nil : beginStep(ref, "\(Self.loadingStepPrefix) \(Self.firstPageRows) rows from \(machineName(ref.machineID))...")
         guard let page = await perform(
             on: ref.machineID, action: "load activity", origin: .background,
-            { try await $0.activity(sessionID: id, limit: Self.firstPageRows) }
+            { try await $0.activity(sessionID: id, before: nil, limit: Self.firstPageRows) }
         ) else {
             // A cancelled open (the screen went away or opened again) is no failure: the next open says what happens.
             if let step { Task.isCancelled ? dropStep(ref, step) : failStep(ref, step, reason: "the machine did not answer") }
@@ -66,7 +66,7 @@ extension AppModel {
         let id = ref.sessionID
         guard let cursor = feeds.feed(for: ref).nextBefore else { return }
         guard let page = await perform(
-            on: ref.machineID, action: "load older activity", notice: .failure(ref), { try await $0.activity(sessionID: id, before: cursor) }
+            on: ref.machineID, action: "load older activity", notice: .failure(ref), { try await $0.activity(sessionID: id, before: cursor, limit: nil) }
         ) else { return }
         prepend(page, to: ref)
     }
@@ -102,7 +102,7 @@ extension AppModel {
     }
 
     /// Uploads the attachments, then sends the text with their ids.
-    func upload(_ message: OutgoingMessage, with api: FardeskAPI, to sessionID: String) async throws -> MessageResult {
+    func upload(_ message: OutgoingMessage, with api: any FardeskService, to sessionID: String) async throws -> MessageResult {
         var ids: [String] = []
         for attachment in message.attachments {
             let stored = try await api.uploadAttachment(
@@ -121,11 +121,31 @@ extension AppModel {
         } != nil
     }
 
+    /// Answers a plan ("Ready to code?"): approve with or without bypass, or send feedback with `revise`.
+    @discardableResult
+    public func decidePlan(
+        _ ref: SessionRef, requestID: String, decision: PermissionDecision, message: String? = nil
+    ) async -> Bool {
+        let id = ref.sessionID
+        return await perform(on: ref.machineID, action: "answer the plan", notice: .failure(ref)) {
+            try await $0.decide(sessionID: id, requestID: requestID, decision: decision, message: message)
+        } != nil
+    }
+
     @discardableResult
     public func answer(_ option: String, requestID: String, in ref: SessionRef) async -> Bool {
         let id = ref.sessionID
         return await perform(on: ref.machineID, action: "answer the question", notice: .failure(ref)) {
             try await $0.answer(sessionID: id, requestID: requestID, option: option)
+        } != nil
+    }
+
+    /// Answers a dialog Claude Code itself asked with one of its choices.
+    @discardableResult
+    public func answerDialog(_ ref: SessionRef, requestID: String, answer: String) async -> Bool {
+        let id = ref.sessionID
+        return await perform(on: ref.machineID, action: "answer the dialog", notice: .failure(ref)) {
+            try await $0.answerDialog(sessionID: id, requestID: requestID, answer: answer)
         } != nil
     }
 
@@ -158,6 +178,37 @@ extension AppModel {
         return await perform(on: ref.machineID, action: Self.labelAction(request), notice: .failure(ref)) {
             try await $0.label(sessionID: id, request)
         } != nil
+    }
+
+    /// Gives the chat its own image, then re-reads the list so the row shows it (the label carries the new hash).
+    @discardableResult
+    public func setImage(_ data: Data, mediaType: String, for ref: SessionRef) async -> Bool {
+        guard isAvailable(.sessionActions) else { return false }
+        let id = ref.sessionID
+        let done = await perform(on: ref.machineID, action: "set the chat image", notice: .failure(ref)) {
+            try await $0.setImage(sessionID: id, data: data, mediaType: mediaType)
+        } != nil
+        if done { await refresh() }
+        return done
+    }
+
+    @discardableResult
+    public func clearImage(_ ref: SessionRef) async -> Bool {
+        guard isAvailable(.sessionActions) else { return false }
+        let id = ref.sessionID
+        let done = await perform(on: ref.machineID, action: "remove the chat image", notice: .failure(ref)) {
+            try await $0.clearImage(sessionID: id)
+        } != nil
+        if done { await refresh() }
+        return done
+    }
+
+    /// The chat's image bytes for the app's image cache; nil when it has none or the machine does not answer.
+    public func imageData(_ ref: SessionRef) async -> Data? {
+        let id = ref.sessionID
+        return await perform(on: ref.machineID, action: "read the chat image", origin: .background) {
+            try await $0.image(sessionID: id)
+        }
     }
 
     static func labelAction(_ request: LabelRequest) -> String {

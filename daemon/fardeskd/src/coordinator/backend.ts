@@ -1,6 +1,7 @@
 // The coordinator's view of all machines: this daemon plus the linked peers.
 import { FardeskError } from "../core/errors.js";
 import type { Activity, PermissionDecision, SessionSummary } from "../contract/schema.js";
+import { updateAll } from "../update/updateAll.js";
 import { activityLine } from "./lines.js";
 import { machinesOf, requireEndpoint } from "./local.js";
 import type { BackendConfig, LocalServices, Machine } from "./local.js";
@@ -47,11 +48,17 @@ const fullRead: Read = async (machine) => (machine.endpoint === null ? [] : mach
 
 function openRequest(machine: string, session: { id: string; title: string }, activity: Activity): PendingRequest | null {
   const base = { machine, sessionId: session.id, title: session.title, requestId: "" };
+  if (activity.kind === "permission" && activity.state === "pending" && activity.plan !== undefined) {
+    return { ...base, requestId: activity.requestId, kind: "permission", what: `${activity.title}\n${activity.plan}`, options: [...(activity.planChoices ?? [])], plan: activity.plan };
+  }
   if (activity.kind === "permission" && activity.state === "pending") {
     return { ...base, requestId: activity.requestId, kind: "permission", what: `${activity.title}: ${activity.summary}`, options: ["allow", "deny", "allow_always"] };
   }
   if (activity.kind === "question" && activity.state === "pending") {
     return { ...base, requestId: activity.requestId, kind: "question", what: activity.text, options: activity.options };
+  }
+  if (activity.kind === "dialog" && activity.state === "pending") {
+    return { ...base, requestId: activity.requestId, kind: "dialog", what: `${activity.dialogKind}: ${JSON.stringify(activity.payload)}`, options: activity.choices };
   }
   return null;
 }
@@ -62,7 +69,7 @@ async function requestsOf(machines: Machine[], machine: string, session: { id: s
 }
 
 type Reads = Pick<CoordinatorBackend, "listSessions" | "searchSessions" | "pendingRequests">;
-type Actions = Omit<CoordinatorBackend, keyof Reads | "notifyPhone">;
+type Actions = Omit<CoordinatorBackend, keyof Reads | "notifyPhone" | "updateMachines">;
 type On = (machine: string) => MachineEndpoint;
 
 const matchesText = (session: SessionSummary, needle: string): boolean =>
@@ -101,7 +108,7 @@ function reads(machines: Machine[]): Reads {
 
 /** Without `coordinator.mayApprove` the coordinator may deny a request but never allow one: that stays with the human. */
 function guardApproval(mayApprove: boolean, decision: PermissionDecision): void {
-  if (!mayApprove && decision !== "deny") {
+  if (!mayApprove && decision !== "deny" && decision !== "revise") {
     throw new FardeskError("unsupported", "the Coordinator may not approve permission requests: set coordinator.mayApprove to true in config.json to allow it");
   }
 }
@@ -113,14 +120,17 @@ function actions(on: On, mayApprove: boolean): Actions {
     spawnSession: async (machine, request) => on(machine).spawn(request),
     stopSession: async (machine, sessionId) => on(machine).stop(sessionId),
     findFolders: async (machine, query, limit) => on(machine).folders(query, limit),
-    decidePermission: async (machine, sessionId, requestId, decision): Promise<void> => {
+    decidePermission: async (machine, sessionId, requestId, { decision, message }): Promise<void> => {
       guardApproval(mayApprove, decision);
-      await on(machine).decide(sessionId, requestId, decision);
+      await on(machine).decide(sessionId, requestId, decision, message);
     },
     answerQuestion: async (machine, sessionId, requestId, option) => on(machine).answer(sessionId, requestId, option),
+    answerDialog: async (machine, sessionId, requestId, answer) => on(machine).answerDialog(sessionId, requestId, answer),
     resumeSession: async (machine, sessionId) => on(machine).resume(sessionId),
     clearSession: async (machine, sessionId) => on(machine).clear(sessionId),
     compactSession: async (machine, sessionId) => on(machine).compact(sessionId),
+    setSessionImage: async (machine, sessionId, image) => on(machine).setImage(sessionId, image),
+    clearSessionImage: async (machine, sessionId) => on(machine).clearImage(sessionId),
     async endSession(machine, sessionId): Promise<string> {
       await on(machine).kill(sessionId);
       return sessionId;
@@ -134,6 +144,7 @@ export function createCoordinatorBackend(config: BackendConfig, services: LocalS
   return {
     ...reads(machines),
     ...actions((machine) => requireEndpoint(machines, machine), config.coordinator.mayApprove),
+    updateMachines: async () => updateAll(machines, config.name),
     async notifyPhone(title, body): Promise<number> {
       const sessionId = currentSession();
       if (sessionId === null) throw new FardeskError("conflict", "the coordinator session has no id yet");

@@ -21,8 +21,14 @@ public struct NeedsYouItem: Equatable, Sendable {
 /// All machines in list order. Events from the clients flow in through `apply`.
 public struct AppState: Equatable, Sendable {
     public private(set) var machines: [MachineState]
-    /// Machine names the owner wants first, in this order (empty = alphabetical).
-    public let machineOrder: [String]
+    /// Machine names the user wants first, in this order (empty = alphabetical).
+    public private(set) var machineOrder: [String]
+
+    /// The user reordered the machines: the list follows at once.
+    public mutating func setMachineOrder(_ names: [String]) {
+        machineOrder = names
+        machines = MachineOrdering.sorted(machines, preferred: names)
+    }
 
     public init(machines: [MachineState] = [], machineOrder: [String] = []) {
         self.machineOrder = machineOrder

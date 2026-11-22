@@ -130,7 +130,7 @@ describe("find_folders", () => {
 describe("the MCP tools", () => {
   const run = async (name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => runTool(suite.backend, name, args);
 
-  it("are exactly the fourteen named tools", () => {
+  it("are exactly the fifteen named tools", () => {
     expect(coordinatorTools(suite.backend).map((candidate) => candidate.name)).toEqual([
       "list_sessions",
       "read_activity",
@@ -146,6 +146,9 @@ describe("the MCP tools", () => {
       "clear_session",
       "compact_session",
       "end_session",
+      "set_session_image",
+      "clear_session_image",
+      "update_machines",
     ]);
   });
 

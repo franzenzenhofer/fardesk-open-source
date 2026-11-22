@@ -13,11 +13,11 @@ final class AppServices {
     nonisolated static let keychainService = AppIdentity.bundleID
     nonisolated static let apnsTokenKey = "apnsToken"
     nonisolated static let requireFaceIDKey = "requireFaceID"
-    nonisolated static let bootstrapInfoKey = "FardeskBootstrapMachines"
-    nonisolated static let hubInfoKey = "FardeskHub"
 
     let model: AppModel
     let coordinator = SessionCoordinator()
+    /// Demo mode (pretend machines in a model of their own); idle until the user asks to see it.
+    let demo = DemoMode()
     /// The one reader of replies for the whole app: every screen with a composer needs it in its environment.
     let voice = VoiceReader()
     let extensionWriter: ExtensionWriter
@@ -83,35 +83,54 @@ final class AppServices {
     }
 
     private static func configuration() -> AppModelConfiguration {
-        let support = URL.applicationSupportDirectory.appending(path: "Fardesk", directoryHint: .isDirectory)
-        let bootstrap = Bundle.main.object(forInfoDictionaryKey: bootstrapInfoKey) as? String ?? ""
-        var forcesCold = false
+        var support = URL.applicationSupportDirectory.appending(path: "Fardesk", directoryHint: .isDirectory)
+        var tokenService = keychainService
         #if DEBUG
-        forcesCold = UserDefaults.standard.bool(forKey: "FardeskForceCold")
+        // UI tests: a clean install on a fresh directory and an empty keychain service, so the paired state the
+        // other tests rely on stays untouched (launch argument -FardeskCleanStart YES).
+        if UserDefaults.standard.bool(forKey: "FardeskCleanStart") {
+            support = FileManager.default.temporaryDirectory.appending(path: "fardesk-clean-\(UUID().uuidString)", directoryHint: .isDirectory)
+            tokenService += ".cleanstart"
+        }
         #endif
         var hubTransport: URL?
         #if DEBUG
         // UI tests: the hub is "down" (requests go nowhere) while the app stays logged in as before.
         if UserDefaults.standard.bool(forKey: "FardeskHubDown") { hubTransport = URL(string: "http://127.0.0.1:9") }
         #endif
-        var hubText = Bundle.main.object(forInfoDictionaryKey: hubInfoKey) as? String ?? ""
+        var tailscaleIsOn: @Sendable () -> Bool = TailscaleInterface.isUp
         #if DEBUG
-        // UI tests point the app at a hub that is not there (launch argument -FardeskHubOverride <url>).
-        if let override = UserDefaults.standard.string(forKey: "FardeskHubOverride") { hubText = override }
+        // UI tests: the simulator shares the host network, so Tailscale is declared by launch argument -FardeskTailscale on|off.
+        switch UserDefaults.standard.string(forKey: "FardeskTailscale") {
+        case "on": tailscaleIsOn = { true }
+        case "off": tailscaleIsOn = { false }
+        default: break
+        }
+        #endif
+        var hub: HubLink?
+        #if DEBUG
+        // UI tests point the app at a hub that is not there (launch argument -FardeskHubOverride "<http url>").
+        if let override = UserDefaults.standard.string(forKey: "FardeskHubOverride") { hub = hubLink(from: override) }
         #endif
         return AppModelConfiguration(
             machinesFile: MachineListFile(url: support.appending(path: "machines.json")),
-            tokens: .keychain(service: keychainService),
+            tokens: .keychain(service: tokenService),
             cache: OfflineCache(directory: support.appending(path: "cache", directoryHint: .isDirectory)),
             deviceName: deviceName,
-            seedMachines: BootstrapMachines.parse(bootstrap),
+            tailscaleIsOn: tailscaleIsOn,
             telemetryFile: support.appending(path: "telemetry-queue.json"),
-            hub: HubSetting.parse(hubText),
-            treatsEverySessionAsCold: forcesCold,
+            hub: hub,
             hubTransport: hubTransport,
-            machineOrder: AppIdentity.machineOrder
+            machineOrderFile: MachineOrderFile(url: support.appending(path: "machine-order.json"))
         )
     }
+
+    #if DEBUG
+    private static func hubLink(from text: String) -> HubLink? {
+        guard let url = URL(string: text), MachineAddress.isAllowed(url) else { return nil }
+        return HubLink(url: url)
+    }
+    #endif
 
     private static var deviceName: String {
         #if os(iOS)

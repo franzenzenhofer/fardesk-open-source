@@ -5,6 +5,7 @@ import type { Config } from "../config/config.js";
 import type { PermissionMode } from "../contract/schema.js";
 import { knownPermissionMode } from "../sessions/permissionMode.js";
 import { createBus } from "../core/bus.js";
+import { FardeskError } from "../core/errors.js";
 import type { Bus } from "../core/bus.js";
 import type { Logger } from "../core/log.js";
 import { createHookReceiver } from "../hooks/receiver.js";
@@ -19,6 +20,9 @@ import { createSessionStore } from "../sessions/store.js";
 import type { SessionStore } from "../sessions/store.js";
 import { apnsFromConfig } from "./apnsSetup.js";
 import { createHookHandler } from "./hooks.js";
+import { createAutoColourStore } from "../colour/autoColourStore.js";
+import { createHiddenStore } from "./hiddenStore.js";
+import type { HiddenStore } from "./hiddenStore.js";
 import { createLabelStore } from "./labelStore.js";
 import type { LabelStore } from "./labelStore.js";
 import { createMuteStore } from "./muteStore.js";
@@ -31,6 +35,8 @@ export const HOOK_SOCKET_FILE = "hook.sock";
 const DEVICES_FILE = "devices.json";
 const MUTES_FILE = "mutes.json";
 const LABELS_FILE = "labels.json";
+const HIDDEN_FILE = "hidden-sessions.json";
+const AUTO_COLOURS_FILE = "auto-colours.json";
 const PAUSE_FILE = "notification-pause.json";
 const MS_PER_SECOND = 1000;
 const FALLBACK_TITLE = "Claude Code";
@@ -45,6 +51,7 @@ export type Core = {
   devices: DeviceStore;
   muteStore: MuteStore;
   labelStore: LabelStore;
+  hiddenStore: HiddenStore;
   pauseStore: PauseStore;
   /** Pids of live sessions whose terminal can be typed into; filled by the typable watch. */
   typablePids: Set<number>;
@@ -70,6 +77,7 @@ function createStore(config: Config, log: Logger, parts: Pick<Core, "bus" | "bro
     pendingKind: (id) => broker.pendingKind(id),
     isMuted: (id) => muteStore.isMuted(id),
     labelOf: (id) => labelStore.get(id),
+    autoColors: createAutoColourStore(join(config.stateDir, AUTO_COLOURS_FILE)),
     isTypable: (pid) => parts.typablePids.has(pid),
     onLeftWaiting: (id) => {
       if (!owned.isOwned(id)) broker.cancelSession(id);
@@ -102,25 +110,39 @@ function createPushNotifier(setup: { config: Config; log: Logger; doneDelayMs?: 
     isPaused: () => core.pauseStore.isPaused(),
     isKnown: (id) => core.store.find(id) !== undefined,
     isWorking: (id) => core.store.find(id)?.summary.status === "working",
+    stillWaiting: (id, requestId) => core.broker.handedOff(id, requestId) !== null && core.store.find(id)?.summary.status === "waiting",
     log,
   });
 }
 
+export function requireHome(sessionId: string, home: string | null): string {
+  if (home === null) throw new FardeskError("not_found", `session ${sessionId} is in no configured Claude home`);
+  return home;
+}
+
+function createPreferenceStores(stateDir: string): Pick<Core, "muteStore" | "labelStore" | "hiddenStore"> {
+  return {
+    muteStore: createMuteStore(join(stateDir, MUTES_FILE)),
+    labelStore: createLabelStore(join(stateDir, LABELS_FILE)),
+    hiddenStore: createHiddenStore(join(stateDir, HIDDEN_FILE)),
+  };
+}
+
 export async function createCore(config: Config, options: ServiceOptions, log: Logger, closers: Closer[]): Promise<Core> {
   const bus = createBus();
-  const muteStore = createMuteStore(join(config.stateDir, MUTES_FILE));
-  const labelStore = createLabelStore(join(config.stateDir, LABELS_FILE));
-  const broker = createBroker({ timeoutMs: config.permissionTimeoutSeconds * MS_PER_SECOND, bus, now: () => new Date(), newId: randomUUID });
+  const { muteStore, labelStore, hiddenStore } = createPreferenceStores(config.stateDir);
+  const broker = createBroker({ timeoutMs: config.permissionTimeoutSeconds * MS_PER_SECOND, bus, now: () => new Date(), newId: randomUUID, allowBypass: config.owned.allowBypass });
   closers.push(() => { broker.close(); });
   const findCwd = (id: string): string => core.store.get(id).summary.cwd;
+  const findHome = (id: string): string => requireHome(id, core.store.get(id).home);
   const findMode = (id: string): PermissionMode | null => knownPermissionMode(core.store.find(id)?.permissionMode ?? null);
-  const owned = options.createOwned({ config, broker, log, findCwd, findMode });
+  const owned = options.createOwned({ config, broker, log, findCwd, findHome, findMode });
   closers.push(async () => owned.close());
   const typablePids = new Set<number>();
   const store = createStore(config, log, { bus, broker, owned, muteStore, labelStore, typablePids });
   closers.push(() => { store.close(); });
   const devices = createDeviceStore(join(config.stateDir, DEVICES_FILE), () => new Date());
-  const parts: Parts = { bus, broker, owned, store, devices, muteStore, labelStore, pauseStore: createPauseStore(join(config.stateDir, PAUSE_FILE), () => new Date()), typablePids, apns: resolveApns(config, options, closers) };
+  const parts: Parts = { bus, broker, owned, store, devices, muteStore, labelStore, hiddenStore, pauseStore: createPauseStore(join(config.stateDir, PAUSE_FILE), () => new Date()), typablePids, apns: resolveApns(config, options, closers) };
   const notifier = createPushNotifier({ config, log, doneDelayMs: options.doneDelayMs }, parts);
   const core: Core = { ...parts, notifier };
   closers.push(() => { notifier.close(); });

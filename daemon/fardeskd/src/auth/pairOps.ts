@@ -1,4 +1,4 @@
-// Pairing codes and master-token rotation: the auth operations that do not depend on the password.
+// Pairing codes and master-token rotation: the auth operations around a device token.
 import { updateConfigFile } from "../config/config.js";
 import type { LoginResult, PairCodeResult, PairRequest } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
@@ -8,10 +8,11 @@ import { newMasterToken } from "./masterToken.js";
 import type { MasterToken } from "./masterToken.js";
 import { PAIR_MAX_WRONG, createPairWindow } from "./pairCodes.js";
 import type { PairWindow, PairWindowStatus } from "./pairCodes.js";
-import { createLoginLimiter } from "./rateLimit.js";
+import { createAttemptLimiter } from "./rateLimit.js";
 import type { AuthDeps } from "./service.js";
 import { admitTailnetCaller } from "./tailnetCaller.js";
-import type { TailnetGate } from "./tailnetCaller.js";
+import type { Admitted, TailnetGate } from "./tailnetCaller.js";
+import type { NodeBinding } from "./nodeBinding.js";
 
 const MS_PER_SECOND = 1000;
 const LOCKED_STATUS = 429;
@@ -31,19 +32,19 @@ export type PairOps = {
   rotateToken: (callerId: string) => void;
 };
 
-type PairParts = { deps: AuthDeps; tailnet: TailnetGate; master: MasterToken; issueLogin: (deviceName: string, ip: string) => LoginResult };
+type PairParts = { deps: AuthDeps; tailnet: TailnetGate; master: MasterToken; issueLogin: (deviceName: string, ip: string, node: NodeBinding) => LoginResult };
 
 function requireMaster(callerId: string, what: string): void {
   if (callerId !== MASTER_DEVICE_ID) throw new FardeskError("unauthorized", `only the master token can ${what}`);
 }
 
-type PairGuards = { window: PairWindow; gate: TailnetGate; limiter: ReturnType<typeof createLoginLimiter> };
+type PairGuards = { window: PairWindow; gate: TailnetGate; limiter: ReturnType<typeof createAttemptLimiter> };
 
 function createGuards({ config, now }: AuthDeps, gate: TailnetGate): PairGuards {
   return {
     window: createPairWindow(now),
     gate,
-    limiter: createLoginLimiter({ maxFailures: config.auth.maxFailures, windowMs: config.auth.windowSeconds * MS_PER_SECOND, now }),
+    limiter: createAttemptLimiter({ maxFailures: config.auth.maxFailures, windowMs: config.auth.windowSeconds * MS_PER_SECOND, now }),
   };
 }
 
@@ -51,13 +52,14 @@ const WRONG_MESSAGE = "pairing code is wrong, already used or expired";
 const CLOSED_MESSAGE = "no pairing window is open: run fardeskd pair on this computer and keep it running";
 const LOCKED_MESSAGE = `pairing window closed after ${PAIR_MAX_WRONG} wrong codes`;
 
-/** Rate limit, then who is calling (before the code is touched, so a refused device cannot burn it), then the code. Returns the caller's tailnet device. */
-async function admitPairing({ window, gate, limiter }: PairGuards, { audit }: AuthDeps, request: PairRequest, ip: string): Promise<string | null> {
-  const device = await admitTailnetCaller(limiter, gate, ip);
+/** Rate limit, then who is calling (before the code is touched, so a refused device cannot burn it), then the code. Returns the admitted caller (tailnet device and node). */
+async function admitPairing({ window, gate, limiter }: PairGuards, { audit }: AuthDeps, request: PairRequest, ip: string): Promise<Admitted> {
+  const admitted = await admitTailnetCaller(limiter, gate, ip);
+  const { device } = admitted;
   const result = window.redeem(request.code);
   if (result === "ok") {
     limiter.recordSuccess(ip);
-    return device;
+    return admitted;
   }
   limiter.recordFailure(ip);
   if (result === "locked") {
@@ -92,9 +94,9 @@ export function createPairOps({ deps, tailnet, master, issueLogin }: PairParts):
       await admitTailnetCaller(guards.limiter, guards.gate, ip);
     },
     async pair(request, ip): Promise<LoginResult> {
-      const tailnetDevice = await admitPairing(guards, deps, request, ip);
-      const login = issueLogin(request.deviceName, ip);
-      guards.window.paired({ deviceName: request.deviceName, deviceId: login.deviceId, tailnetDevice });
+      const admitted = await admitPairing(guards, deps, request, ip);
+      const login = issueLogin(request.deviceName, ip, admitted.node);
+      guards.window.paired({ deviceName: request.deviceName, deviceId: login.deviceId, tailnetDevice: admitted.device });
       return login;
     },
     rotateToken(callerId): void {

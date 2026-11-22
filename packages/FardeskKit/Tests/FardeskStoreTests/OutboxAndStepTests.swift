@@ -40,6 +40,21 @@ struct OutboxAndStepTests {
         #expect(Outbox.gotItLabel == "Claude got it")
     }
 
+    /// Owner bug 2026-11-22: a message sent while Claude was busy stayed "pending" at the bottom of the chat for hours.
+    /// Claude Code joins queued messages into one user turn, so the sent text is in the middle of the row, not at its start.
+    @Test func aQueuedMessageJoinedToAnEarlierOneIsStillGotIt() throws {
+        var outbox = Outbox()
+        let sentAt = Date()
+        let id = outbox.add(OutgoingMessage(text: OutgoingMessage.attachmentsOnlyText), to: ref, kind: .reply, at: sentAt)
+        outbox.set(id, .sent)
+        let joined = try Fixtures.userRow(
+            "I'm sending the screenshots now.See attached.\nAttached image: /tmp/a.png", id: "u2", at: sentAt.addingTimeInterval(30)
+        )
+        outbox.reconcile(ref, rows: [joined])
+        #expect(outbox.pending(for: ref).isEmpty, "the pending bubble goes once Claude got the joined message")
+        #expect(outbox.isDelivered(rowID: "u2"))
+    }
+
     @Test func aMessageThatFailedOverTheWireButArrivedIsStillDelivered() throws {
         var outbox = Outbox()
         let id = outbox.add(OutgoingMessage(text: "ping"), to: ref, kind: .reply, at: Date())
@@ -116,7 +131,7 @@ struct OutboxAndStepTests {
     @Test func theCoordinatorAlwaysHasAMachineToOpenOn() throws {
         #expect(CoordinatorPresentation.defaultMachine(in: []) == nil)
         var other = MachineState(endpoint: Fixtures.endpoint("Mac mini Pro"))
-        var hub = MachineState(endpoint: Fixtures.endpoint("Linux", host: "192.0.2.11"))
+        var hub = MachineState(endpoint: Fixtures.endpoint("Linux", host: "100.64.0.11"))
         #expect(CoordinatorPresentation.defaultMachine(in: [other, hub])?.endpoint.name == "Mac mini Pro", "offline machines still open the screen")
         hub.apply(hub: HubMachine(name: "Linux", online: true, hub: true))
         other.apply(hub: HubMachine(name: "Mac mini Pro", online: true))

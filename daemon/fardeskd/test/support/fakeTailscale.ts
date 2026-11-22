@@ -18,7 +18,7 @@ const SCRIPT = [
   'if [ "$1" = "whois" ]; then',
   '  if [ -f "$dir/whois-delay" ]; then sleep "$(cat "$dir/whois-delay")"; fi',
   '  if [ -f "$dir/whois-$3.json" ]; then cat "$dir/whois-$3.json"; exit 0; fi',
-  '  echo "no match for $3" >&2; exit 1',
+  '  echo "peer not found" >&2; exit 1',
   "fi",
   "exit 2",
   "",
@@ -27,10 +27,10 @@ const SCRIPT = [
 /** The tailnet address of the computer the fake tailscale runs on. */
 export const SELF_ADDRESS = "100.64.0.1";
 
-export type FakeDevice = { name: string; login: string; tags?: string[] };
+export type FakeDevice = { name: string; login: string; tags?: string[]; /** Default: derived from the address. */ stableId?: string };
 
-function whoisJson({ name, login, tags }: FakeDevice): string {
-  const node = { ID: 1, Name: name, ...(tags === undefined ? {} : { Tags: tags }) };
+function whoisJson(address: string, { name, login, tags, stableId }: FakeDevice): string {
+  const node = { ID: 1, StableID: stableId ?? `stable-${address}`, Name: name, Addresses: [`${address}/32`], ...(tags === undefined ? {} : { Tags: tags }) };
   return JSON.stringify({ Node: node, UserProfile: { ID: 7, LoginName: tags === undefined ? login : "tagged-devices" } });
 }
 
@@ -42,6 +42,8 @@ export type FakeTailscale = {
   setDevice(address: string, device: FakeDevice): void;
   /** Replaces the whole whois answer for an address. */
   setRaw(address: string, raw: string): void;
+  /** Makes this address unknown to whois again ("peer not found"). */
+  clearDevice(address: string): void;
   /** The next `count` calls of `status` fail like an unreachable daemon. */
   failNext(count: number): void;
   /** Every `whois` call now takes this many seconds before it answers. */
@@ -64,7 +66,8 @@ export function createFakeTailscale(address: string | null): FakeTailscale {
     dir,
     binary: join(dir, "tailscale"),
     setRaw,
-    setDevice: (whoisAddress, device) => { setRaw(whoisAddress, whoisJson(device)); },
+    clearDevice: (whoisAddress) => { rmSync(join(dir, `whois-${whoisAddress}.json`), { force: true }); },
+    setDevice: (whoisAddress, device) => { setRaw(whoisAddress, whoisJson(whoisAddress, device)); },
     setWhoisDelay: (seconds) => { writeFileSync(join(dir, "whois-delay"), `${seconds}\n`); },
     failNext: (count) => {
       writeFileSync(join(dir, "failures-left"), `${count}\n`);

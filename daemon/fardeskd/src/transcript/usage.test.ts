@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { at, parseObject, say, user } from "../../test/support/transcriptLines.js";
+import { at, parseObject, say, system, user } from "../../test/support/transcriptLines.js";
+import { COMPACT_SUBTYPE } from "./lineTypes.js";
 import { FIVE_MINUTES_MS, ONE_HOUR_MS, lastContextUsage, parseUsage } from "./usage.js";
 import { summarise } from "./summary.js";
 
@@ -51,7 +52,7 @@ describe("usage on transcript lines", () => {
 
   it("takes the LAST main-chain assistant line with usage: 1 h bucket", () => {
     const lines = [user(1, "go"), withUsage(2, { input_tokens: 1 }), withUsage(5, ONE_HOUR_USAGE), say(6, "no usage here")];
-    expect(lastContextUsage(lines)).toEqual({ contextTokens: 426_323, cacheExpiresAt: new Date(Date.parse(at(5)) + ONE_HOUR_MS).toISOString() });
+    expect(lastContextUsage(lines)).toEqual({ contextTokens: 426_323, cacheExpiresAt: new Date(Date.parse(at(5)) + ONE_HOUR_MS).toISOString(), lastTurnAt: new Date(Date.parse(at(5))).toISOString() });
     expect(summarise(lines, MAX)).toMatchObject({ contextTokens: 426_323, cacheExpiresAt: "2026-01-01T11:00:05.000Z" });
   });
 
@@ -68,5 +69,25 @@ describe("usage on transcript lines", () => {
   it("is null without any usage", () => {
     expect(lastContextUsage([user(1, "go"), say(2, "plain")])).toBeNull();
     expect(summarise([user(1, "go"), say(2, "plain")], MAX)).toMatchObject({ contextTokens: null, cacheExpiresAt: null });
+  });
+});
+
+describe("usage after a compaction", () => {
+  const boundary = (second: number, metadata: unknown): ReturnType<typeof system> =>
+    system(second, COMPACT_SUBTYPE, { content: "Conversation compacted", compactMetadata: metadata });
+
+  it("a compaction after the last answer gives the size after the summary and no cache expiry (never cold)", () => {
+    const lines = [withUsage(2, ONE_HOUR_USAGE), boundary(9, { trigger: "manual", preTokens: 426_323, postTokens: 27_005 })];
+    expect(lastContextUsage(lines)).toEqual({ contextTokens: 27_005, cacheExpiresAt: null, lastTurnAt: null });
+    expect(summarise(lines, MAX)).toMatchObject({ contextTokens: 27_005, cacheExpiresAt: null });
+  });
+
+  it("an answer after the compaction counts again", () => {
+    const lines = [boundary(2, { postTokens: 27_005 }), withUsage(5, { input_tokens: 30_000 })];
+    expect(lastContextUsage(lines)).toEqual({ contextTokens: 30_000, cacheExpiresAt: new Date(Date.parse(at(5)) + FIVE_MINUTES_MS).toISOString(), lastTurnAt: new Date(Date.parse(at(5))).toISOString() });
+  });
+
+  it("a boundary without readable metadata still clears the cache expiry", () => {
+    expect(lastContextUsage([withUsage(1, ONE_HOUR_USAGE), boundary(3, "garbage")])).toEqual({ contextTokens: null, cacheExpiresAt: null, lastTurnAt: null });
   });
 });

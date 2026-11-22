@@ -7,6 +7,7 @@ import { FardeskError } from "../core/errors.js";
 import { buildHookEntries, HOOK_MARKER } from "../hooks/command.js";
 import { installHooks, uninstallHooks } from "../hooks/installer.js";
 import type { InstallResult } from "../hooks/installer.js";
+import { homePaths } from "../config/claudeHomes.js";
 import { previewInstall } from "../hooks/preview.js";
 import { HOOK_SOCKET_FILE } from "../service/core.js";
 import { EXIT_OK } from "./types.js";
@@ -15,7 +16,7 @@ import type { CommandContext } from "./types.js";
 const SETTINGS_FILE = "settings.json";
 export const settingsPathOf = (home: string): string => join(home, SETTINGS_FILE);
 
-export const settingsPathsOf = (config: Config): string[] => config.claudeHomes.map(settingsPathOf);
+export const settingsPathsOf = (config: Config): string[] => homePaths(config.claudeHomes).map(settingsPathOf);
 
 export function describeResult(path: string, result: InstallResult): string {
   if (!result.changed) return `${path}: unchanged`;

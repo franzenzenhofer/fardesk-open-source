@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "device_moved",
+    "message": "This device was paired from another Tailscale device. Pair again."
+  }
+}

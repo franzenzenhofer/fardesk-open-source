@@ -7,13 +7,15 @@ import { createPeerCache } from "./cache.js";
 import type { PeerCache } from "./cache.js";
 import { callPeer, PROBE_TIMEOUT_MS, probePeer } from "./probe.js";
 import type { PeerCall, PeerLink, ProbeResult } from "./probe.js";
+import { NOT_LINKED, SLOW_ANSWER } from "./failure.js";
 import { openUpstream } from "./upstream.js";
 
 export type { PeerCall } from "./probe.js";
 
-const NOT_LINKED = "not linked: no token for it in coordinator.peerTokens";
 
-export type PeerStatus = { online: boolean; lastSeen: string | null; latencyMs: number | null; problem: string | null };
+
+/** `problem`: a sentence for a non-specialist; `detail`: the technical cause, for support. Both null while online. */
+export type PeerStatus = { online: boolean; lastSeen: string | null; latencyMs: number | null; problem: string | null; detail: string | null };
 
 export type PeerMonitor = {
   readonly name: string;
@@ -40,14 +42,13 @@ function parseJson(raw: string): unknown {
 
 type Listeners = Set<(raw: string) => void>;
 
-function ingest(cache: PeerCache, listeners: Listeners, log: Logger, name: string): (raw: string) => void {
+export function ingest(cache: PeerCache, listeners: Listeners, log: Logger, name: string): (raw: string) => void {
   return (raw) => {
+    // The app reads every event tolerantly (VERSIONING.md), so the raw event always goes on to it; only the hub's own
+    // cache skips an event it cannot read, such as a new event type of a newer 4.x peer.
     const parsed = streamEventSchema.safeParse(parseJson(raw));
-    if (!parsed.success) {
-      log.warn("hub_unreadable_event", { peer: name });
-      return;
-    }
-    cache.apply(parsed.data);
+    if (parsed.success) cache.apply(parsed.data);
+    else log.warn("hub_unreadable_event", { peer: name });
     for (const listener of listeners) listener(raw);
   };
 }
@@ -89,10 +90,10 @@ export const SLOW_PROBES_TOLERATED = 1;
  * timeout keeps an online peer online. A refused connection is definitive at once.
  */
 export function nextStatus(previous: PeerStatus, result: ProbeResult, slowInARow: number): PeerStatus {
-  if (result.online) return { online: true, lastSeen: new Date().toISOString(), latencyMs: result.latencyMs, problem: null };
+  if (result.online) return { online: true, lastSeen: new Date().toISOString(), latencyMs: result.latencyMs, problem: null, detail: null };
   const tolerated = previous.online && result.timedOut && slowInARow <= SLOW_PROBES_TOLERATED;
-  if (tolerated) return { ...previous, latencyMs: null, problem: `slow: ${result.problem ?? "no answer"}, still trying` };
-  return { online: false, lastSeen: previous.lastSeen, latencyMs: result.latencyMs, problem: result.problem };
+  if (tolerated) return { ...previous, latencyMs: null, problem: SLOW_ANSWER, detail: result.detail };
+  return { online: false, lastSeen: previous.lastSeen, latencyMs: result.latencyMs, problem: result.problem, detail: result.detail };
 }
 
 function watchProbe({ link, cache, shared, listeners, log }: ProbeDeps, probeMs: number): Watch {
@@ -121,7 +122,7 @@ export function createPeerMonitor(options: MonitorOptions): PeerMonitor {
   const link = token === null ? null : { name, baseUrl: options.url.replace(/\/+$/, ""), token };
   const cache = createPeerCache();
   const listeners = new Set<(raw: string) => void>();
-  const shared: Shared = { status: { online: false, lastSeen: null, latencyMs: null, problem: link === null ? NOT_LINKED : "not checked yet" }, live: false };
+  const shared: Shared = { status: { online: false, lastSeen: null, latencyMs: null, ...(link === null ? NOT_LINKED : { problem: "not checked yet", detail: null }) }, live: false };
   const onMessage = ingest(cache, listeners, options.log, name);
   const upstream = link === null ? null : openUpstream({ baseUrl: link.baseUrl, token: link.token, onMessage, onLive: (isLive) => { shared.live = isLive; } });
   const watch = link === null ? null : watchProbe({ link, cache, shared, listeners, log: options.log }, options.probeMs);
@@ -134,7 +135,7 @@ export function createPeerMonitor(options: MonitorOptions): PeerMonitor {
       listeners.add(listener);
       return (): void => { listeners.delete(listener); };
     },
-    call: async (call) => (link === null ? Promise.reject(new FardeskError("machine_offline", `${name} is ${NOT_LINKED}`)) : callPeer(link, call)),
+    call: async (call) => (link === null ? Promise.reject(new FardeskError("machine_offline", `${name} is ${NOT_LINKED.detail}`)) : callPeer(link, call)),
     close(): void {
       watch?.stop();
       upstream?.close();

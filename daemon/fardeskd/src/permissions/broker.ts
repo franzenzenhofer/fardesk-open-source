@@ -4,6 +4,8 @@ import type { FinishedToolCall } from "../transcript/index.js";
 import type { Bus } from "../core/bus.js";
 import { FardeskError } from "../core/errors.js";
 import { describeRequest } from "./describe.js";
+import { checkPlanDecision, isPlanChoice, planChoicesFor } from "./plan.js";
+import type { PlanAnswer } from "./plan.js";
 import { canType, terminalShapeOf } from "./terminalKeys.js";
 import type { TerminalReach, TerminalShape } from "./terminalKeys.js";
 
@@ -14,12 +16,15 @@ const TERMINAL = "terminal";
 export type BrokerAnswer =
   | { state: "allowed"; always: boolean }
   | { state: "denied" }
+  | ({ state: "planned" } & PlanAnswer)
   | { state: "answered"; option: string }
   | { state: "expired"; timedOut?: true };
 
 export type AskInput = { sessionId: string; toolName: string; toolInput: unknown; cwd: string };
 export type AskHandle = { requestId: string; kind: PendingKind; activity: BrokerActivity; answer: Promise<BrokerAnswer> };
-export type PendingKind = "permission" | "question";
+export type PendingKind = "permission" | "question" | "dialog";
+/** A Claude Code dialog (`request_user_dialog`): kind and payload as Claude Code sent them, `choices` the valid answers. */
+export type DialogInput = { sessionId: string; dialogKind: string; payload: Record<string, unknown>; choices: string[] };
 
 /** A request that timed out: its dialog now waits at the computer, and may still be answered by typing into it. */
 export type HandedOff = { activity: BrokerActivity; shape: TerminalShape | null; typable: boolean };
@@ -29,16 +34,22 @@ export type BrokerOptions = {
   bus: Bus;
   now: () => Date;
   newId: () => string;
+  /** `owned.allowBypass`: a plan request offers "approve and switch to bypass permissions" only where this is on. */
+  allowBypass: boolean;
 };
 
 export type Broker = {
   ask(input: AskInput): AskHandle;
-  decide(sessionId: string, requestId: string, decision: PermissionDecision): void;
+  /** Holds a Claude Code dialog until the phone answers it or the session withdraws it. It never times out: Claude Code owns the deadline. */
+  askDialog(input: DialogInput): AskHandle;
+  answerDialog(sessionId: string, requestId: string, answer: string): void;
+  /** `message` is what Claude should change in a plan: required for `revise`. The plan decisions only fit a plan request. */
+  decide(sessionId: string, requestId: string, decision: PermissionDecision, message?: string): void;
   answer(sessionId: string, requestId: string, option: string): void;
   cancelSession(sessionId: string): void;
   /** The request is moot (the hook connection closed because the dialog was answered in the terminal): no-op when already resolved. */
   cancelRequest(sessionId: string, requestId: string): void;
-  /** The transcript holds this tool call's result: its pending permission request cannot be answered any more. */
+  /** The transcript holds this tool call's result: its open permission or question request cannot be answered any more. */
   toolFinished(sessionId: string, call: FinishedToolCall): void;
   activities(sessionId: string): Activity[];
   pendingKind(sessionId: string): PendingKind | null;
@@ -56,10 +67,13 @@ type Entry = {
   requestId: string;
   activity: BrokerActivity;
   shape: TerminalShape | null;
+  /** The tool the hook asked about (a question is the AskUserQuestion tool): a finished call of it ends the request. */
+  toolName: string;
   /** What the hook asked about: a finished tool call only ends the request for exactly this input. */
   toolInput: unknown;
   settle: (answer: BrokerAnswer) => void;
-  timer: NodeJS.Timeout;
+  /** Null for a dialog: Claude Code decides how long it stays open. */
+  timer: NodeJS.Timeout | null;
 };
 
 type Ledger = {
@@ -73,7 +87,7 @@ type Ledger = {
   all(): Entry[][];
 };
 
-const DECISION_ANSWERS: Record<PermissionDecision, BrokerAnswer> = {
+const DECISION_ANSWERS: Record<"allow" | "allow_always" | "deny", BrokerAnswer> = {
   allow: { state: "allowed", always: false },
   allow_always: { state: "allowed", always: true },
   deny: { state: "denied" },
@@ -87,12 +101,13 @@ const TOOL_START_SLACK_MS = 5_000;
 
 function permissionState(answer: BrokerAnswer): PermissionState {
   if (answer.state === "allowed") return "allowed";
+  if (answer.state === "planned") return answer.choice === "revise" ? "denied" : "allowed";
   return answer.state === "denied" ? "denied" : "expired";
 }
 
 function resolvedActivity(activity: BrokerActivity, answer: BrokerAnswer): BrokerActivity {
   // No answer in time: Claude Code shows its own dialog at the computer, so the request stays visible as "terminal".
-  if (answer.state === "expired" && answer.timedOut === true) return { ...activity, state: TERMINAL };
+  if (activity.kind !== "dialog" && answer.state === "expired" && answer.timedOut === true) return { ...activity, state: TERMINAL };
   if (activity.kind === "permission") return { ...activity, state: permissionState(answer) };
   return { ...activity, state: answer.state === "answered" ? "answered" : "expired" };
 }
@@ -100,14 +115,22 @@ function resolvedActivity(activity: BrokerActivity, answer: BrokerAnswer): Broke
 /** Broker rows are told apart from transcript rows of the same tool call by this id prefix. */
 export const BROKER_ID_PREFIX = "req-";
 
-function buildActivity(input: AskInput, requestId: string, ts: string): BrokerActivity {
+function buildActivity(input: AskInput, requestId: string, ts: string, allowBypass: boolean): BrokerActivity {
   const description = describeRequest(input.toolName, input.toolInput);
   const base = { id: `${BROKER_ID_PREFIX}${requestId}`, ts, requestId, state: PENDING } as const;
   if (description.kind === "question") {
     return { ...base, kind: "question", text: description.text, options: description.options };
   }
-  const { title, summary, destructive } = description;
-  return { ...base, kind: "permission", tool: input.toolName, title, summary, cwd: input.cwd, destructive };
+  const { title, summary, destructive, plan } = description;
+  const permission = { ...base, kind: "permission", tool: input.toolName, title, summary, cwd: input.cwd, destructive } as const;
+  return plan === undefined ? permission : { ...permission, plan, planChoices: planChoicesFor(allowBypass) };
+}
+
+/** Turns a decision into the answer the waiting hook or session gets; a plan decision must fit the request. */
+function answerFor(entry: Entry, decision: PermissionDecision, message: string | undefined): BrokerAnswer {
+  if (!isPlanChoice(decision)) return DECISION_ANSWERS[decision];
+  const { planChoices } = requireKind(entry, "permission");
+  return { state: "planned", ...checkPlanDecision(planChoices, decision, message) };
 }
 
 const isPending = (entry: Entry): boolean => entry.activity.state === PENDING;
@@ -135,7 +158,7 @@ function createLedger(bus: Bus): Ledger {
   const publish = (entry: Entry): void => {    bus.publish({ type: "activity", sessionId: entry.sessionId, activity: entry.activity });
   };
   const finish = (entry: Entry, answer: BrokerAnswer): void => {
-    clearTimeout(entry.timer);
+    if (entry.timer !== null) clearTimeout(entry.timer);
     entry.activity = resolvedActivity(entry.activity, answer);
     publish(entry);
     trimHistory(entriesOf(entry.sessionId));
@@ -171,21 +194,41 @@ function checkOption(labels: string[], option: string): void {
   }
 }
 
-function startRequest(ledger: Ledger, options: BrokerOptions, input: AskInput): AskHandle {
+function buildDialogActivity(input: DialogInput, requestId: string, ts: string): BrokerActivity {
+  const { dialogKind, payload, choices } = input;
+  return { id: `${BROKER_ID_PREFIX}${requestId}`, ts, requestId, state: PENDING, kind: "dialog", dialogKind, payload, choices };
+}
+
+type Opening = Pick<Entry, "sessionId" | "toolName" | "toolInput" | "shape"> & { build(requestId: string): BrokerActivity; timed: boolean };
+
+function startRequest(ledger: Ledger, options: BrokerOptions, opening: Opening): AskHandle {
   const requestId = options.newId();
-  const activity = buildActivity(input, requestId, options.now().toISOString());
+  const activity = opening.build(requestId);
   let settle!: (answer: BrokerAnswer) => void;
   const answer = new Promise<BrokerAnswer>((resolve) => {
     settle = resolve;
   });
-  const timer = setTimeout(() => {
-    ledger.finish(entry, TIMED_OUT);
-  }, options.timeoutMs);
-  timer.unref();
-  const shape = terminalShapeOf(input.toolName, input.toolInput);
-  const entry: Entry = { sessionId: input.sessionId, requestId, activity, shape, toolInput: input.toolInput, settle, timer };
+  const { sessionId, toolName, toolInput, shape } = opening;
+  const entry: Entry = { sessionId, requestId, activity, shape, toolName, toolInput, settle, timer: null };
+  if (opening.timed) {
+    entry.timer = setTimeout(() => {
+      ledger.finish(entry, TIMED_OUT);
+    }, options.timeoutMs);
+    entry.timer.unref();
+  }
   ledger.add(entry);
   return { requestId, kind: activity.kind, activity, answer };
+}
+
+function askOpening(options: BrokerOptions, input: AskInput): Opening {
+  const { sessionId, toolName, toolInput } = input;
+  const build = (requestId: string): BrokerActivity => buildActivity(input, requestId, options.now().toISOString(), options.allowBypass);
+  return { sessionId, toolName, toolInput, shape: terminalShapeOf(toolName, toolInput), build, timed: true };
+}
+
+function dialogOpening(options: BrokerOptions, input: DialogInput): Opening {
+  const build = (requestId: string): BrokerActivity => buildDialogActivity(input, requestId, options.now().toISOString());
+  return { sessionId: input.sessionId, toolName: "", toolInput: null, shape: null, build, timed: false };
 }
 
 function expireWhere(ledger: Ledger, sessionId: string, matches: (entry: Entry) => boolean, open: (entry: Entry) => boolean): void {
@@ -197,33 +240,44 @@ function handedOffEntry(ledger: Ledger, sessionId: string, requestId: string): E
 }
 
 function handedOffView(entry: Entry | null): HandedOff | null {
-  return entry === null ? null : { activity: entry.activity, shape: entry.shape, typable: entry.activity.typable === true };
+  return entry === null ? null : { activity: entry.activity, shape: entry.shape, typable: entry.activity.kind !== "dialog" && entry.activity.typable === true };
 }
 
 function markReach(ledger: Ledger, sessionId: string, requestId: string, reach: TerminalReach): void {
   const entry = handedOffEntry(ledger, sessionId, requestId);
-  if (entry === null) return;
+  if (entry === null || entry.activity.kind === "dialog") return;
   const typable = canType(entry.shape, reach);
   if (entry.activity.typable === typable) return;
   entry.activity = { ...entry.activity, typable };
   ledger.republish(entry);
 }
 
-/** A permission request is for this tool call when it names the tool, carries the same input and was asked right then. */
+/** A request (permission or question) is for this tool call when it names the tool, carries the same input and was asked right then. */
 function isCallOf(entry: Entry, call: FinishedToolCall): boolean {
-  const { activity } = entry;
-  if (activity.kind !== "permission" || activity.tool !== call.tool) return false;
-  return Math.abs(Date.parse(activity.ts) - Date.parse(call.startedAt)) <= TOOL_START_SLACK_MS && isDeepStrictEqual(entry.toolInput, call.input);
+  if (entry.toolName !== call.tool) return false;
+  return Math.abs(Date.parse(entry.activity.ts) - Date.parse(call.startedAt)) <= TOOL_START_SLACK_MS && isDeepStrictEqual(entry.toolInput, call.input);
+}
+
+function dialogMethods(ledger: Ledger, options: BrokerOptions): Pick<Broker, "askDialog" | "answerDialog"> {
+  return {
+    askDialog: (input): AskHandle => startRequest(ledger, options, dialogOpening(options, input)),
+    answerDialog: (sessionId, requestId, answer): void => {
+      const entry = ledger.findPending(sessionId, requestId);
+      checkOption(requireKind(entry, "dialog").choices, answer);
+      ledger.finish(entry, { state: "answered", option: answer });
+    },
+  };
 }
 
 export function createBroker(options: BrokerOptions): Broker {
   const ledger = createLedger(options.bus);
   return {
-    ask: (input): AskHandle => startRequest(ledger, options, input),
-    decide: (sessionId, requestId, decision): void => {
+    ask: (input): AskHandle => startRequest(ledger, options, askOpening(options, input)),
+    ...dialogMethods(ledger, options),
+    decide: (sessionId, requestId, decision, message): void => {
       const entry = ledger.findPending(sessionId, requestId);
       requireKind(entry, "permission");
-      ledger.finish(entry, DECISION_ANSWERS[decision]);
+      ledger.finish(entry, answerFor(entry, decision, message));
     },
     answer: (sessionId, requestId, option): void => {
       const entry = ledger.findPending(sessionId, requestId);

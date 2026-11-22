@@ -1,0 +1,24 @@
+{
+  "source": "Studio",
+  "version": "4.3.0",
+  "machines": [
+    {
+      "name": "Studio",
+      "from": "4.3.0",
+      "result": "current",
+      "message": "already on 4.3.0"
+    },
+    {
+      "name": "Linux",
+      "from": "4.2.0",
+      "result": "started",
+      "message": "installing 4.3.0, restarts when done"
+    },
+    {
+      "name": "Laptop",
+      "from": null,
+      "result": "failed",
+      "message": "Laptop did not answer"
+    }
+  ]
+}

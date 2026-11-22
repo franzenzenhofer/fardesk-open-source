@@ -72,8 +72,8 @@ scripts in `scripts/setup/`. Each script is safe to run again and has a `--check
    (through the setup scripts).
 2. Never print a token, a pairing code, a link or a password in the chat or in logs. Show the QR code only on
    the user's own terminal.
-3. Never set `bind.address` to anything but `tailscale`. If a script refuses a bind address, that is the
-   safety check working: stop and report.
+3. Tailscale only, no other way: never set `bind.address` to anything but `tailscale` and never list a peer
+   outside the tailnet. If the daemon refuses an address, that is the safety check working: stop and report.
 4. Do not turn on bypass mode, the Coordinator, full push content or `cross-session accept` unless the user
    asked. Before you do, show the user the risk paragraph from README.md and wait for a yes.
 5. At every failed check: stop, report the exact output and what you tried. Do not work around a check.
@@ -84,6 +84,11 @@ scripts in `scripts/setup/`. Each script is safe to run again and has a `--check
 Run `bash scripts/setup/00-doctor.sh`. It checks the table above and validates `fardesk.env`.
 
 HUMAN: install Tailscale and log in on every computer and on the phone; log in to Claude Code on every computer.
+
+HUMAN: in the Tailscale admin console (Machines, the "..." menu of each computer), choose **Disable key expiry** for
+every computer that runs fardeskd. Tailscale node keys expire after 180 days by default; an expired key logs the
+computer out of the tailnet, and Fardesk (Tailscale only) can no longer reach it until someone logs in there again.
+Check: `tailscale status --json` shows no `KeyExpiry` for those computers.
 
 Check: the doctor ends with no FAIL line.
 
@@ -125,7 +130,9 @@ this).
 ## Step 4: the app
 
 `bash scripts/setup/30-app-config.sh` writes `apps/Fardesk/Config/Local.xcconfig` (ignored by git) and generates
-the Xcode project. Then `bash scripts/setup/40-app-run.sh`.
+the Xcode project. Then `bash scripts/setup/40-app-run.sh`. The file holds only the identity of the build (bundle
+prefix, team id): the app has no machine built in, machines come from pairing (Step 5) and their order is set in
+the app's settings.
 
 HUMAN: sign in to Xcode with an Apple account, choose the team, connect the iPhone, enable developer mode on it,
 and trust the developer certificate on the phone (Settings, General, VPN and Device Management).

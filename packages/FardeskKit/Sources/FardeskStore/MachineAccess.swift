@@ -1,4 +1,5 @@
 import FardeskClient
+import FardeskModels
 import Foundation
 import Synchronization
 
@@ -35,13 +36,13 @@ public struct MachineAccess: Sendable {
     public let tokens: TokenStore
     public let timeout: TimeInterval
     /// In hub mode every endpoint shares the one token of the hub.
-    public let hub: URL?
+    public let hub: HubLink?
     public let tokenCache: TokenCache
     /// Where requests really go (tests make the hub unreachable without changing who the app is logged in to).
     public let transport: URL?
 
     public init(
-        tokens: TokenStore, timeout: TimeInterval = FardeskAPI.defaultTimeout, hub: URL? = nil,
+        tokens: TokenStore, timeout: TimeInterval = FardeskAPI.defaultTimeout, hub: HubLink? = nil,
         cache: TokenCache = TokenCache(), transport: URL? = nil
     ) {
         self.tokens = tokens
@@ -62,12 +63,12 @@ public struct MachineAccess: Sendable {
 
     /// Where an endpoint's token is stored: its own slot, or the hub's.
     func tokenID(for endpoint: MachineEndpoint) -> UUID {
-        hub.map(HubIdentity.tokenID(hub:)) ?? endpoint.id
+        hub.map { HubIdentity.tokenID(hub: $0.url) } ?? endpoint.id
     }
 
     /// The hub as an endpoint (login, `GET /v1/hub`); nil without a hub.
     public var hubEndpoint: MachineEndpoint? {
-        hub.map { MachineEndpoint(id: HubIdentity.tokenID(hub: $0), name: "hub", url: $0) }
+        hub.map { MachineEndpoint(id: HubIdentity.tokenID(hub: $0.url), name: "hub", url: $0.url) }
     }
 
     /// The API for a machine; throws `notLoggedIn` when no token is stored for it.
@@ -76,10 +77,5 @@ public struct MachineAccess: Sendable {
             throw MachineAccessError.notLoggedIn(machine: endpoint.name)
         }
         return FardeskAPI(baseURL: rebased(endpoint.url), token: token, timeout: override ?? timeout)
-    }
-
-    /// The API without a token, for the login call.
-    public func anonymousAPI(for endpoint: MachineEndpoint) -> FardeskAPI {
-        FardeskAPI(baseURL: rebased(endpoint.url), token: nil, timeout: timeout)
     }
 }

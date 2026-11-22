@@ -9,6 +9,7 @@ import { sleep, waitUntil } from "../../test/support/env.js";
 import { startInbox } from "../../test/support/inboxServer.js";
 import type { InboxServer } from "../../test/support/inboxServer.js";
 
+import { LABEL_PRESETS } from "../contract/palette.js";
 import { messageResultSchema } from "../contract/schema.js";
 import { isProcessAlive } from "../sessions/processes.js";
 
@@ -62,20 +63,29 @@ describe("mute and devices", () => {
   it("patches the label, persists it and shows it in the list", async () => {
     const { id } = await seed();
     const label = (): unknown => daemon.services.sessions().find((session) => session.id === id)?.label;
-    expect(label()).toEqual({ name: null, color: null, pinned: false });
-    await expectApiOk(daemon, `/v1/sessions/${id}/label`, { name: " Release work ", color: "blue" });
+    expect(label()).toEqual({ name: null, color: null, pinned: false, image: null });
+    await expectApiOk(daemon, `/v1/sessions/${id}/label`, { name: " Release work ", color: "#1AA1FB" });
     await expectApiOk(daemon, `/v1/sessions/${id}/label`, { pinned: true });
-    expect(label()).toEqual({ name: "Release work", color: "blue", pinned: true });
-    expect(JSON.parse(readFileSync(join(daemon.config.stateDir, "labels.json"), "utf8"))).toEqual({ labels: { [id]: { name: "Release work", color: "blue", pinned: true } } });
+    expect(label()).toEqual({ name: "Release work", color: "#1AA1FB", pinned: true, image: null });
+    expect(JSON.parse(readFileSync(join(daemon.config.stateDir, "labels.json"), "utf8"))).toEqual({ labels: { [id]: { name: "Release work", color: "#1AA1FB", pinned: true, image: null } } });
     await expectApiOk(daemon, `/v1/sessions/${id}/label`, { name: "", color: null, pinned: false });
-    expect(label()).toEqual({ name: null, color: null, pinned: false });
+    expect(label()).toEqual({ name: null, color: null, pinned: false, image: null });
+  });
+
+  it("accepts every preset and any other #RRGGBB colour", async () => {
+    const { id } = await seed();
+    for (const color of [...LABEL_PRESETS.map((preset) => preset.color), "#010203", "#FFFFFF"]) {
+      await expectApiOk(daemon, `/v1/sessions/${id}/label`, { color });
+      expect(daemon.services.sessions().find((session) => session.id === id)?.label.color).toBe(color);
+    }
   });
 
   it("validates the label request and the session", async () => {
     const { id } = await seed();
-    await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { color: "red" });
+    for (const color of ["red", "blue", "#abcdef", "#FFF", "#12345G", "#1234567", "1AA1FB", ""]) {
+      await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { color });
+    }
     await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { name: "x".repeat(81) });
-    await expectApiError(daemon, "POST", `/v1/sessions/${id}/label`, 400, "invalid_request", { title: "nope" });
     await expectApiError(daemon, "POST", "/v1/sessions/nope/label", 404, "not_found", { pinned: true });
   });
 

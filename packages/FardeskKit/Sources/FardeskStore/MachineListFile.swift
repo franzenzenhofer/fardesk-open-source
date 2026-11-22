@@ -16,10 +16,16 @@ public struct MachineListFile: Sendable {
         ConfigPath.resolve(environmentKey: environmentKey, relativePath: relativeDefaultPath, environment: environment, home: home)
     }
 
-    /// A missing file is an empty list; an unreadable or corrupt file throws.
+    /// A missing file is an empty list; a file in an older format or a damaged one throws `unreadableFile`, which says
+    /// what to do (the bare decoding error only said "the data isn't in the correct format").
     public func load() throws -> MachineList {
         guard FileManager.default.fileExists(atPath: url.path) else { return MachineList() }
-        return try JSONDecoder().decode(MachineList.self, from: Data(contentsOf: url))
+        let data = try Data(contentsOf: url)
+        do {
+            return try JSONDecoder().decode(MachineList.self, from: data)
+        } catch is DecodingError {
+            throw MachineListError.unreadableFile(path: url.path)
+        }
     }
 
     public func save(_ list: MachineList) throws {

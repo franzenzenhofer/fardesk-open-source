@@ -1,7 +1,8 @@
 import FardeskStore
 import SwiftUI
 
-/// One check (sent) or two overlapping checks (Claude got it), right-aligned under the bubble.
+/// One grey check (the computer took it), one blue check (in the session) or two blue checks (Claude read it),
+/// right-aligned under the bubble.
 struct DeliveryMarkView: View {
     let mark: DeliveryMark
 
@@ -12,7 +13,7 @@ struct DeliveryMarkView: View {
             }
         }
         .font(.callout.weight(.semibold))
-        .foregroundStyle(mark.tone == .primary ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        .foregroundStyle(mark.tone == .blue ? AnyShapeStyle(Color.blue) : AnyShapeStyle(.secondary))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(mark.accessibilityLabel)
         .accessibilityIdentifier("delivery-mark")

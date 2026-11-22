@@ -7,6 +7,9 @@ Wants=network-online.target
 ExecStart=__NODE__ __INSTALL_DIR__/dist/main.js serve
 WorkingDirectory=__INSTALL_DIR__
 Environment=PATH=__PATH__
+# An update runs the installer from inside the daemon; the installer restarts this unit and must survive it.
+KillMode=process
+Environment=FARDESK_LABEL=__LABEL__
 Restart=always
 RestartSec=5
 StandardOutput=append:__LOG_DIR__/fardeskd.out.log

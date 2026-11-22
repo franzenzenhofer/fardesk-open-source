@@ -37,8 +37,10 @@ const summarySchema = z.strictObject({
   startedAt: z.iso.datetime().nullable(),
   updatedAt: z.iso.datetime().nullable(),
   pendingToolUse: z.boolean(),
+  backgroundTasks: z.number().int().nonnegative(),
   contextTokens: z.number().int().nullable(),
   cacheExpiresAt: z.string().nullable(),
+  lastTurnAt: z.string().nullable(),
 });
 
 const names = readdirSync(TRANSCRIPTS)

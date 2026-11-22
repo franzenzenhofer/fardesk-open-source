@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 async function post(path: string, body: Uint8Array | ReadableStream<Uint8Array>, headers: Record<string, string>): Promise<{ status: number; message: string }> {
-  const response = await fetch(`${daemon.url}${path}`, {
+  const response = await daemon.fetch(path, {
     method: "POST",
     headers: { authorization: `Bearer ${TEST_TOKEN}`, "content-type": "image/png", ...headers },
     body,
@@ -91,7 +91,7 @@ describe("upload size limits", () => {
 describe("stored attachments", () => {
   async function store(cwd: string): Promise<{ id: string; path: string }> {
     const { id } = await seedSession(daemon, inbox, { cwd });
-    const response = await fetch(`${daemon.url}/v1/sessions/${id}/attachments`, { method: "POST", headers: { authorization: `Bearer ${TEST_TOKEN}`, "content-type": "image/png" }, body: PNG });
+    const response = await daemon.fetch(`/v1/sessions/${id}/attachments`, { method: "POST", headers: { authorization: `Bearer ${TEST_TOKEN}`, "content-type": "image/png" }, body: PNG });
     return { id, path: attachmentResultSchema.parse(await response.json()).path };
   }
 
@@ -107,7 +107,7 @@ describe("stored attachments", () => {
     writeFileSync(secret, "do not serve me");
     rmSync(path);
     symlinkSync(secret, path);
-    const response = await fetch(`${daemon.url}/v1/sessions/${id}/attachment?path=${encodeURIComponent(path)}`, { headers: { authorization: `Bearer ${TEST_TOKEN}` } });
+    const response = await daemon.fetch(`/v1/sessions/${id}/attachment?path=${encodeURIComponent(path)}`, { headers: { authorization: `Bearer ${TEST_TOKEN}` } });
     expect(response.status).toBe(404);
     expect(await response.text()).not.toContain("do not serve me");
   });

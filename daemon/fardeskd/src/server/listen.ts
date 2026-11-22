@@ -1,11 +1,9 @@
-// Starts the HTTP(S) listener on exactly the given address and attaches the WebSocket stream.
-import { readFileSync } from "node:fs";
-import { createServer as createHttpsServer } from "node:https";
+// Starts the plain HTTP listener on exactly the given address (the tailnet address) and attaches the WebSocket stream.
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { serve } from "@hono/node-server";
 import type { App } from "./context.js";
-import type { Config } from "../config/config.js";
+import { rememberPeerAddresses } from "./peerAddress.js";
 import type { Bus } from "../core/bus.js";
 import type { Services } from "../service/types.js";
 import { MAX_BUFFERED_BYTES, attachStream } from "./stream.js";
@@ -14,8 +12,6 @@ import type { StreamRouter } from "./stream.js";
 export type ListenOptions = {
   address: string;
   port: number;
-  tls: Config["tls"];
-
   pingMs: number;
   maxBufferedBytes?: number;
   /** Extra stream paths (the hub's /m/<machine>/v1/stream). */
@@ -25,17 +21,11 @@ export type ListenOptions = {
 export type RunningServer = { server: Server; address: string; port: number; close(): Promise<void> };
 
 async function listen(app: App, options: ListenOptions): Promise<Server> {
-  const { address, port, tls } = options;
+  const { address, port } = options;
   return new Promise((resolve, reject) => {
-    const base = { fetch: app.fetch, port, hostname: address };
-    const server = (
-      tls === null
-        ? serve(base, () => { resolve(server); })
-        : serve(
-            { ...base, createServer: createHttpsServer, serverOptions: { cert: readFileSync(tls.cert), key: readFileSync(tls.key) } },
-            () => { resolve(server); },
-          )
-    ) as Server;
+    // Plain HTTP on exactly one address, the tailnet address: Tailscale (WireGuard) encrypts and authenticates the link.
+    const server = serve({ fetch: app.fetch, port, hostname: address }, () => { resolve(server); }) as Server;
+    rememberPeerAddresses(server);
     server.once("error", reject);
   });
 }

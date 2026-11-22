@@ -8,12 +8,11 @@ const OWNED_STATE_FILE = "owned.json";
 const CLEAR_TIMEOUT_MS = 30_000;
 const COMPACT_TIMEOUT_MS = 180_000;
 
-export const createRealOwned: OwnedFactory = ({ config, broker, log, findCwd, findMode }) => {
-  const [claudeHome] = config.claudeHomes;
-  if (claudeHome === undefined) throw new FardeskError("invalid_request", "config.claudeHomes is empty: owned sessions need a Claude home");
+export const createRealOwned: OwnedFactory = ({ config, broker, log, findCwd, findHome, findMode }) => {
+  if (config.claudeHomes.length === 0) throw new FardeskError("invalid_request", "config.claudeHomes is empty: owned sessions need a Claude home");
   return createOwnedRunner({
     claudeBinary: config.claudeBinary,
-    claudeHome,
+    claudeHomes: config.claudeHomes,
     statePath: join(config.stateDir, OWNED_STATE_FILE),
     permissionMode: config.owned.permissionMode,
     allowBypass: config.owned.allowBypass,
@@ -24,6 +23,7 @@ export const createRealOwned: OwnedFactory = ({ config, broker, log, findCwd, fi
     broker,
     log,
     findCwd,
+    findHome,
     findMode,
   });
 };

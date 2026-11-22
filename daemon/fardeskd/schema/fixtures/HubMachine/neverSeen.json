@@ -4,7 +4,8 @@
   "hub": false,
   "lastSeen": null,
   "latencyMs": null,
-  "problem": "not linked: no token for it in coordinator.peerTokens",
+  "problem": "This computer is not linked to the hub yet.",
+  "detail": "not linked: no token for it in coordinator.peerTokens",
   "sessions": 0,
   "waiting": 0,
   "working": 0

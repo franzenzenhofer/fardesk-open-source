@@ -88,7 +88,7 @@ extension AppModel {
         action: String,
         intro: String,
         step existing: Int? = nil,
-        _ call: (FardeskAPI) async throws -> ActionResult
+        _ call: (any FardeskService) async throws -> ActionResult
     ) async -> Result<SessionRef, any Error> {
         let machine = machineName(origin.machineID)
         let step = existing ?? beginStep(origin, "\(intro) on \(machine)...")
@@ -97,7 +97,7 @@ extension AppModel {
             guard let endpoint = machines.endpoints.first(where: { $0.id == origin.machineID }) else {
                 throw AppStateError.unknownMachine(origin.machineID)
             }
-            let result = try await call(access.api(for: endpoint))
+            let result = try await call(service(for: endpoint))
             let real = SessionRef(machineID: origin.machineID, sessionID: result.sessionId)
             finishStep(origin, step, as: "Session started (\(result.sessionId.prefix(6)))")
             var log = stepLogs[origin] ?? StepLog()

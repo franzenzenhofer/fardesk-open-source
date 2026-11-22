@@ -20,7 +20,7 @@ export const KEY_SETTLE_MS = 700;
 
 export type TerminalAnswers = {
   reach(sessionId: string): Promise<TerminalReach>;
-  decide(sessionId: string, requestId: string, decision: PermissionDecision): Promise<void>;
+  decide(sessionId: string, requestId: string, decision: PermissionDecision, message?: string): Promise<void>;
   answer(sessionId: string, requestId: string, option: string): Promise<void>;
 };
 
@@ -88,10 +88,10 @@ export function watchHandOffs(parts: { bus: Bus; broker: Broker }, answers: Term
 export function createTerminalAnswers(deps: ActionDeps, broker: Broker): TerminalAnswers {
   return {
     reach: async (sessionId) => reachOf(await placementOf(deps, sessionId)),
-    async decide(sessionId, requestId, decision): Promise<void> {
+    async decide(sessionId, requestId, decision, message): Promise<void> {
       const handed = broker.handedOff(sessionId, requestId);
       if (handed === null) {
-        broker.decide(sessionId, requestId, decision);
+        broker.decide(sessionId, requestId, decision, message);
         return;
       }
       requireTypable(handed, sessionId, "permission");

@@ -17,31 +17,15 @@ public struct OutputSink: Sendable {
     )
 }
 
-/// Where answers come from: secrets without echo, plain lines, yes/no.
+/// Where answers come from: plain lines (yes/no questions).
 public struct InputReader: Sendable {
-    public let readSecret: @Sendable (String) throws -> String
     public let readLine: @Sendable () -> String?
 
-    public init(
-        readSecret: @escaping @Sendable (String) throws -> String,
-        readLine: @escaping @Sendable () -> String?
-    ) {
-        self.readSecret = readSecret
+    public init(readLine: @escaping @Sendable () -> String?) {
         self.readLine = readLine
     }
 
-    /// A terminal asks with echo off (`readpassphrase`); a pipe supplies one line from stdin.
-    public static let terminal = InputReader(
-        readSecret: { prompt in
-            guard isatty(STDIN_FILENO) != 0 else { return Swift.readLine() ?? "" }
-            var buffer = [CChar](repeating: 0, count: 1024)
-            guard readpassphrase(prompt, &buffer, buffer.count, RPP_REQUIRE_TTY) != nil else {
-                throw CLIError.usage("could not read the password from the terminal")
-            }
-            return String(cString: buffer)
-        },
-        readLine: { Swift.readLine() }
-    )
+    public static let terminal = InputReader(readLine: { Swift.readLine() })
 }
 
 /// Everything a command may touch outside its arguments, so tests can run commands in-process.
@@ -54,6 +38,8 @@ public struct CLIContext: Sendable {
     public let now: @Sendable () -> Date
     public let timeZone: TimeZone
     public let requestTimeout: TimeInterval
+    /// Whether this device has a tailnet address; pairing is refused without one.
+    public let tailscaleIsOn: @Sendable () -> Bool
 
     public init(
         output: OutputSink,
@@ -63,7 +49,8 @@ public struct CLIContext: Sendable {
         hostName: String,
         now: @escaping @Sendable () -> Date = { Date() },
         timeZone: TimeZone = .current,
-        requestTimeout: TimeInterval = 15
+        requestTimeout: TimeInterval = 15,
+        tailscaleIsOn: @escaping @Sendable () -> Bool = TailscaleInterface.isUp
     ) {
         self.output = output
         self.input = input
@@ -73,6 +60,7 @@ public struct CLIContext: Sendable {
         self.now = now
         self.timeZone = timeZone
         self.requestTimeout = requestTimeout
+        self.tailscaleIsOn = tailscaleIsOn
     }
 
     public static let live = CLIContext(
@@ -80,8 +68,18 @@ public struct CLIContext: Sendable {
         input: .terminal,
         environment: ProcessInfo.processInfo.environment,
         home: FileManager.default.homeDirectoryForCurrentUser,
-        hostName: Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+        hostName: Host.current().localizedName ?? ProcessInfo.processInfo.hostName,
+        tailscaleIsOn: liveTailscaleIsOn
     )
+
+    /// Tailscale as this device sees it. A DEBUG build (the ATS gate check, scripts/check-ats.sh) may pretend it is on
+    /// with `FARDESK_TEST_TAILSCALE=on`, so a sandbox daemon on loopback can be paired; a release build has no such seam.
+    private static let liveTailscaleIsOn: @Sendable () -> Bool = {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["FARDESK_TEST_TAILSCALE"] == "on" { return true }
+        #endif
+        return TailscaleInterface.isUp()
+    }
 
     @TaskLocal public static var current: CLIContext = .live
 

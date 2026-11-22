@@ -1,19 +1,33 @@
 import FardeskModels
 
-/// The round status glyph at the left of a session row in the machines list (mockup 01).
+/// The status glyph of a session, the one table for the list, the chat header and the widgets
+/// (docs/design/STATES.md). No pause sign and no check mark: a pause reads as "stopped by someone" and a check as
+/// "approved", and neither is what the session is doing.
 public struct SessionRowGlyph: Equatable, Sendable {
+    public init(session: SessionSummary) {
+        self.init(status: session.status, waitingFor: session.waitingFor, background: session.background)
+    }
+
     public let symbolName: String
-    /// Green while working, orange while it waits for you, grey when idle or ended.
+    /// Green while working, orange while it needs you, black when it is your turn, grey when stopped.
     public let tint: StateTone
     public let pulses: Bool
 
-    public init(status: SessionStatus) {
+    /// `waitingFor`: a dialog at the computer gets the computer sign, so it reads as "go to the computer".
+    /// `background`: a finished turn with background jobs still running is green and outlined, not "your turn".
+    public init(status: SessionStatus, waitingFor: WaitingReason? = nil, background: Int = 0) {
+        if status == .idle, background > 0 {
+            (symbolName, tint, pulses) = (FardeskSymbol.workingInBackground, .ok, false)
+            return
+        }
         tint = StateTone(status: status)
         switch status {
-        case .waiting: (symbolName, pulses) = ("exclamationmark.circle.fill", false)
-        case .working: (symbolName, pulses) = ("play.circle.fill", true)
-        case .idle: (symbolName, pulses) = ("pause.circle.fill", false)
-        case .ended: (symbolName, pulses) = ("checkmark.circle", false)
+        case .waiting where waitingFor == .terminal: (symbolName, pulses) = (FardeskSymbol.waitingAtComputer, false)
+        case .waiting: (symbolName, pulses) = (FardeskSymbol.waiting, false)
+        case .working: (symbolName, pulses) = (FardeskSymbol.working, true)
+        case .idle: (symbolName, pulses) = (FardeskSymbol.idle, false)
+        case .ended: (symbolName, pulses) = (FardeskSymbol.ended, false)
+        case .unknown: (symbolName, pulses) = (FardeskSymbol.unknown, false)
         }
     }
 }

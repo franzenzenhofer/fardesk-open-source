@@ -9,7 +9,7 @@ struct PairingLinkTests {
         "fardesk://pair?d=" + Base64URL.encode(Data(json.utf8))
     }
 
-    @Test(arguments: ["lan", "tls"])
+    @Test(arguments: ["tailnet", "hub"])
     func makeThenParseRoundTripsFixtures(name: String) throws {
         let payload = try Fixtures.decode(PairingPayload.self, "PairingPayload", name)
         let text = try PairingLink.make(payload)
@@ -19,13 +19,13 @@ struct PairingLinkTests {
     }
 
     @Test func parseToleratesSurroundingWhitespace() throws {
-        let payload = try Fixtures.decode(PairingPayload.self, "PairingPayload", "lan")
+        let payload = try Fixtures.decode(PairingPayload.self, "PairingPayload", "tailnet")
         let text = try PairingLink.make(payload)
         #expect(try PairingLink.parse("  \(text)\n") == payload)
     }
 
     @Test func endpointIsBuiltFromPayload() throws {
-        let payload = try Fixtures.decode(PairingPayload.self, "PairingPayload", "lan")
+        let payload = try Fixtures.decode(PairingPayload.self, "PairingPayload", "tailnet")
         let id = UUID()
         let endpoint = MachineEndpoint(payload: payload, id: id)
         #expect(endpoint.id == id)
@@ -69,9 +69,9 @@ struct PairingLinkTests {
 }
 
 struct MachineListTests {
-    private let linux = Fixtures.endpoint("Linux", host: "192.0.2.1")
-    private let mac = Fixtures.endpoint("Mac mini Pro", host: "192.0.2.2")
-    private let macM2 = Fixtures.endpoint("Mac Studio M2", host: "192.0.2.3")
+    private let linux = Fixtures.endpoint("Linux", host: "100.64.0.1")
+    private let mac = Fixtures.endpoint("Mac mini Pro", host: "100.64.0.2")
+    private let macM2 = Fixtures.endpoint("Mac Studio M2", host: "100.64.0.3")
 
     @Test func addAppendsNewUrlsAndReplacesSameUrl() {
         var list = MachineList()
@@ -90,7 +90,7 @@ struct MachineListTests {
     }
 
     @Test func exactNameWinsOverLongerNames() throws {
-        let longer = Fixtures.endpoint("Linux2", host: "192.0.2.9")
+        let longer = Fixtures.endpoint("Linux2", host: "100.64.0.9")
         let list = MachineList(endpoints: [longer, linux])
         #expect(try list.find(named: "linux") == linux)
     }
@@ -129,7 +129,7 @@ struct MachineListTests {
     }
 
     @Test func duplicateExactNamesAreAmbiguous() {
-        let twin = Fixtures.endpoint("Linux", host: "192.0.2.50")
+        let twin = Fixtures.endpoint("Linux", host: "100.64.0.50")
         let list = MachineList(endpoints: [linux, twin])
         #expect(throws: MachineListError.ambiguous(query: "linux", candidates: ["Linux", "Linux"])) {
             try list.find(named: "linux")
@@ -154,6 +154,15 @@ struct MachineListFileTests {
         #expect(try file.load() == MachineList())
     }
 
+    /// A list written before 4.0.0 stored the hub as a plain URL string. Loading it must say what to do, not
+    /// "the data isn't in the correct format" (owner's CLI, 2026-11-22).
+    @Test func anOldFormatListSaysToPairAgain() throws {
+        let url = try temporaryDirectory().appending(path: "machines.json")
+        try Data(#"{"endpoints":[],"hub":"http://100.64.0.5:4780"}"#.utf8).write(to: url)
+        #expect(throws: MachineListError.unreadableFile(path: url.path)) { try MachineListFile(url: url).load() }
+        #expect(MachineListError.unreadableFile(path: "/x").errorDescription?.contains("fardesk pair <link>") == true)
+    }
+
     @Test func saveCreatesParentDirectoryWithOwnerOnlyMode() throws {
         let url = try temporaryDirectory().appending(path: "nested/dir/machines.json")
         let file = MachineListFile(url: url)
@@ -168,7 +177,7 @@ struct MachineListFileTests {
         let url = directory.appending(path: "machines.json")
         let file = MachineListFile(url: url)
         try file.save(MachineList(endpoints: [Fixtures.endpoint("Linux")]))
-        let second = MachineList(endpoints: [Fixtures.endpoint("Mac", host: "192.0.2.7")])
+        let second = MachineList(endpoints: [Fixtures.endpoint("Mac", host: "100.64.0.7")])
         try file.save(second)
         #expect(try file.load() == second)
         #expect(try mode(of: url) == 0o600)

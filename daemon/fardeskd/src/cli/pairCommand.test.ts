@@ -1,16 +1,9 @@
 // `fardeskd pair` against a real daemon: it holds the window open, reports who paired, and closes the window on exit.
 import { afterEach, describe, expect, it } from "vitest";
-import { captureIo, runWithoutProcesses } from "../../test/support/cliConfig.js";
-import type { CapturedIo } from "../../test/support/cliConfig.js";
-import { startTestDaemon, writeConfigFile } from "../../test/support/daemon.js";
-import type { TestDaemon } from "../../test/support/daemon.js";
-import { waitUntil } from "../../test/support/env.js";
-import { PAIR_MAX_WRONG } from "../auth/pairCodes.js";
-import { createRealOwned } from "../service/ownedFactory.js";
-import { runCli } from "./index.js";
+import { PAIR_MAX_WRONG, WRONG_PAIR_CODE as WRONG, captureIo, runPairCli, startTestDaemon, waitUntil, writeConfigFile } from "../../test/support/pairCli.js";
+import type { CapturedIo, TestDaemon } from "../../test/support/pairCli.js";
 
 const LINK_PREFIX = "fardesk://pair?d=";
-const WRONG = "x".repeat(43);
 let daemon: TestDaemon;
 
 afterEach(async () => {
@@ -22,12 +15,12 @@ type Running = { io: CapturedIo; done: Promise<number>; code: () => string };
 async function startPair(overrides: Record<string, unknown> = {}): Promise<Running> {
   daemon = await startTestDaemon(overrides);
   const io = captureIo();
-  const done = runCli(["pair", "--config", writeConfigFile(daemon.config)], io, { createOwned: createRealOwned, run: runWithoutProcesses, pairPollMs: 50 });
+  const done = runPairCli(["--config", writeConfigFile(daemon.config)], io);
   await waitUntil(() => io.out.some((line) => line.startsWith(LINK_PREFIX)));
   const code = (): string => {
     const link = io.out.find((line) => line.startsWith(LINK_PREFIX)) ?? "";
     const payload = JSON.parse(Buffer.from(link.slice(LINK_PREFIX.length), "base64url").toString("utf8")) as Record<string, unknown>;
-    expect(payload).toMatchObject({ v: 1, name: "test-mac", url: daemon.url, hub: false });
+    expect(payload).toMatchObject({ v: 4, name: "test-mac", url: daemon.url, hub: false });
     expect(payload).not.toHaveProperty("token");
     return payload["code"] as string;
   };
@@ -80,7 +73,7 @@ describe("fardeskd pair", () => {
     const first = await startPair();
     const oldCode = first.code();
     const second = captureIo();
-    const secondDone = runCli(["pair", "--config", writeConfigFile(daemon.config)], second, { createOwned: createRealOwned, run: runWithoutProcesses, pairPollMs: 50 });
+    const secondDone = runPairCli(["--config", writeConfigFile(daemon.config)], second);
     expect(await first.done).toBe(1);
     expect(first.io.err.join("\n")).toContain("replaced");
     expect(await pairWith(oldCode)).toBe(401);

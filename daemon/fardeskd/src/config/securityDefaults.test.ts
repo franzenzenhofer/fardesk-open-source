@@ -9,7 +9,6 @@ describe("safe defaults", () => {
     expect(config.owned).toMatchObject({ permissionMode: "default", allowBypass: false });
     expect(config.coordinator).toMatchObject({ enabled: false, permissionMode: "default", fullTools: false, mayApprove: false });
     expect(config.push).toEqual({ content: "generic" });
-    expect(config.bind.allowNonTailnet).toBe(false);
   });
 
   it("keeps a partly written section working: every key has its own default", () => {

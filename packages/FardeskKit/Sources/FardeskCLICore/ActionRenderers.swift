@@ -58,6 +58,10 @@ public enum ActionRenderer {
         case .decided(.deny): "Denied"
         case .decided(.allow): "Allowed"
         case .decided(.allowAlways): "Allowed, and always for this kind"
+        case .decided(.approveBypass): "Plan approved, bypassing permissions"
+        case .decided(.approveManual): "Plan approved, edits asked about"
+        case .decided(.revise): "Sent back for changes"
+        case .decided(.unknown): "Decided"
         case .answered(let option): "Answered: \(option)"
         }
     }

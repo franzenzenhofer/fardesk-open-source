@@ -15,7 +15,7 @@ describe("activityLine", () => {
 
   it("covers every activity kind", () => {
     expect(new Set(cases.map(([, activity]) => activity.kind))).toEqual(
-      new Set(["user", "assistant", "tool", "files", "question", "permission", "system"]),
+      new Set(["user", "assistant", "tool", "files", "question", "dialog", "permission", "system"]),
     );
   });
 

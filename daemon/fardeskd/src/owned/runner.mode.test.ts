@@ -37,10 +37,11 @@ async function expectBypassRun(id: string): Promise<void> {
 }
 
 describe("permissionOptions", () => {
-  it("allows skipping permissions only for bypassPermissions", () => {
-    expect(permissionOptions("bypassPermissions")).toEqual({ permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true });
-    expect(permissionOptions("plan")).toEqual({ permissionMode: "plan" });
-    expect(permissionOptions("default")).toEqual({ permissionMode: "default" });
+  it("allows skipping permissions for bypassPermissions, and for every mode where the machine allows bypass", () => {
+    expect(permissionOptions("bypassPermissions", false)).toEqual({ permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true });
+    expect(permissionOptions("plan", false)).toEqual({ permissionMode: "plan" });
+    expect(permissionOptions("default", false)).toEqual({ permissionMode: "default" });
+    expect(permissionOptions("plan", true)).toEqual({ permissionMode: "plan", allowDangerouslySkipPermissions: true });
   });
 });
 

@@ -28,7 +28,7 @@ export async function runServe(context: CommandContext): Promise<number> {
     const streamRouter = hub === null ? {} : { streamRouter: createStreamRouter(hub) };
     const wiring = hub === null ? null : { hub, config };
     await serveOnAddresses(context, literal, async (address) => {
-      const listen = { address, port: config.bind.port, tls: config.tls, pingMs: config.intervals.pingMs, ...streamRouter };
+      const listen = { address, port: config.bind.port, pingMs: config.intervals.pingMs, ...streamRouter };
       const running = await startServer(createApp(services, undefined, wiring), listen, services.bus, services);
       io.stdout(`fardeskd listening on ${daemonUrl(config, running.address)}`);
       return running;
@@ -46,10 +46,10 @@ export function runInit(context: CommandContext): number {
     return EXIT_USAGE;
   }
   writeInitialConfig(context.configPath, context.name);
-  context.io.stdout(`wrote ${context.configPath} (machine name ${context.name}); run \`fardeskd install-hooks\` and \`fardeskd pair\` next`);
+  context.io.stdout(`wrote ${context.configPath} (machine name ${context.name})`);
+  context.io.stdout("run `fardeskd install-hooks` and `fardeskd pair` next");
   return EXIT_OK;
 }
-
 
 async function daemonAnswer(url: string, token: string): Promise<string> {
   try {
@@ -87,7 +87,7 @@ export async function runStatus(context: CommandContext): Promise<number> {
     io.stdout(`bind address: not resolved (${(error as Error).message})`);
   }
   for (const path of settingsPathsOf(config)) io.stdout(`hooks ${path}: ${hookStateOf(path, config)}`);
-  for (const home of config.claudeHomes) io.stdout(`crossSessionInbound ${home}: ${readCrossSessionInbound(home) ?? "not set"}`);
+  for (const { path: home } of config.claudeHomes) io.stdout(`crossSessionInbound ${home}: ${readCrossSessionInbound(home) ?? "not set"}`);
   await printUnconfiguredHomes(context, config);
   return EXIT_OK;
 }

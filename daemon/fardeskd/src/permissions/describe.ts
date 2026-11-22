@@ -39,8 +39,12 @@ export type ParsedAskUserQuestion = {
   options: string[];
 };
 
+export const EXIT_PLAN_MODE = "ExitPlanMode";
+export const PLAN_TITLE = "Ready to code?";
+const HEADING_MARKS = /^#+\s*/;
+
 export type RequestDescription =
-  | { kind: "permission"; title: string; summary: string; destructive: boolean }
+  | { kind: "permission"; title: string; summary: string; destructive: boolean; plan?: string }
   | { kind: "question"; text: string; options: string[] };
 
 export function parseAskUserQuestion(toolInput: unknown): ParsedAskUserQuestion {
@@ -88,7 +92,24 @@ function describeMcp(toolName: string, input: unknown): RequestDescription | nul
   return permission(`Allow ${parts.slice(2).join(MCP_SEPARATOR)}?`, server, input);
 }
 
+function firstLine(text: string): string {
+  const line = text.split("\n").map((l) => l.trim()).find((l) => l !== "") ?? "";
+  const plain = line.replace(HEADING_MARKS, "");
+  return plain.length > SUMMARY_MAX_LENGTH ? `${plain.slice(0, SUMMARY_MAX_LENGTH)}${ELLIPSIS}` : plain;
+}
+
+/** The plan request of ExitPlanMode: the whole plan travels in `plan`, the summary is only its first line. Null when the input holds no plan text. */
+function describePlan(input: unknown): PermissionDescription | null {
+  const plan = stringField(input, "plan");
+  if (plan === undefined || plan.trim() === "") return null;
+  return { ...permission(PLAN_TITLE, firstLine(plan), input), plan };
+}
+
 export function describeRequest(toolName: string, toolInput: unknown): RequestDescription {
+  if (toolName === EXIT_PLAN_MODE) {
+    const planRequest = describePlan(toolInput);
+    if (planRequest !== null) return planRequest;
+  }
   if (toolName === ASK_USER_QUESTION) {
     const { text, options } = parseAskUserQuestion(toolInput);
     return { kind: "question", text, options };

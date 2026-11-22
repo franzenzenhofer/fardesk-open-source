@@ -78,7 +78,7 @@ struct Workspace: Sendable {
         do {
             return try await operation((quick ? probeAccess : access).api(for: endpoint))
         } catch {
-            if error.isTokenRevoked { try tokens.deleteAll() }
+            if error.isTokenRevoked || error.isDeviceMoved { try tokens.deleteAll() }
             throw error
         }
     }

@@ -32,11 +32,13 @@ extension AppModel {
         wipeEverything(reason: nil)
     }
 
-    /// Pairs by a `fardesk://pair?...` link, no password: a one-time code is exchanged for this device's own
-    /// token (an old link carries the permanent token and is used as is); the machine and the token are stored.
+    /// Pairs by a `fardesk://pair?...` link: the one-time code in it is exchanged for this device's own
+    /// token; the machine and the token are stored.
     public func pair(link: String) async {
+        guard configuration.tailscaleIsOn() else { return refusePairingWithoutTailscale() }
         do {
             let payload = try PairingLink.parse(link)
+            if payload.hub, access.hub == nil { return await pairNewHub(payload) }
             if let hub = access.hubEndpoint {
                 return await pairHub(payload, hub: hub)
             }
@@ -54,6 +56,29 @@ extension AppModel {
         } catch {
             loginError = "Pairing failed: \(ErrorText.detail(error))"
         }
+    }
+
+    /// Tailscale off: nothing is exchanged and the screen says why, in the words every pairing entry point uses.
+    private func refusePairingWithoutTailscale() {
+        loginError = TailscaleRequirement.offMessage
+    }
+
+    /// The link of a hub machine switches this app to hub mode: the hub is saved, the one token is checked against
+    /// it, and the machines come from the hub. A refused link leaves the app as it was.
+    private func pairNewHub(_ payload: PairingPayload) async {
+        let before = machines
+        let phaseBefore = phase
+        machines.setHub(HubLink(url: payload.url))
+        rebuildAccess()
+        guard let hub = access.hubEndpoint else { return }
+        hubStatus = .connecting
+        await pairHub(payload, hub: hub)
+        if phase == .ready { return cacheWriter.saveMachines(machines) }
+        machines = before
+        hubStatus = nil
+        rebuildAccess()
+        phase = phaseBefore
+        if phaseBefore == .ready { connectAll() }
     }
 
     /// A link for the hub is the one token every machine is reached with. It is checked against the

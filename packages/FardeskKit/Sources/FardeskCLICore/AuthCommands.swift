@@ -11,6 +11,7 @@ struct PairCommand: AsyncParsableCommand {
     var link: String
 
     func run(context: CLIContext) async throws {
+        guard context.tailscaleIsOn() else { throw CLIError.failed(TailscaleRequirement.offMessage) }
         let workspace = try Workspace(context: context, format: output.format)
         let payload = try PairingLink.parse(link)
         if let hub = workspace.access.hubEndpoint, hub.url.sameOrigin(as: payload.url) {
@@ -35,47 +36,6 @@ struct PairCommand: AsyncParsableCommand {
 
     private func exchange(_ payload: PairingPayload, workspace: Workspace) async throws -> String {
         try await PairingExchange.token(for: payload, deviceName: workspace.context.defaultDeviceName, access: workspace.access)
-    }
-
-    mutating func run() async throws { try await run(context: .current) }
-}
-
-struct LoginCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-        commandName: "login", abstract: "Log in to every paired machine with one password."
-    )
-    @OptionGroup var output: OutputOptions
-    @Option(name: .customLong("machine-url"), help: "Add and log in to a machine at this address.")
-    var machineURL: String?
-    @Option(name: .long, help: "Name for the machine given with --machine-url.")
-    var name: String?
-
-    func run(context: CLIContext) async throws {
-        let workspace = try Workspace(context: context, format: output.format)
-        let address = try machineURL.map(Self.parse)
-        guard address != nil || workspace.machines.hub != nil || !workspace.machines.endpoints.isEmpty else {
-            throw CLIError.usage("No machines paired. Pass --machine-url http://host:4780 or run `fardesk pair <link>`.")
-        }
-        let password = try context.input.readSecret("Password: ")
-        guard !password.isEmpty else { throw CLIError.usage("The password is empty") }
-        let auth = AuthSession(access: workspace.access)
-        let device = context.defaultDeviceName
-        let outcome = if let address {
-            await auth.add(url: address, name: name ?? "", password: password, deviceName: device, machines: workspace.machines)
-        } else {
-            await auth.login(password: password, deviceName: device, machines: workspace.machines)
-        }
-        try workspace.machinesFile.save(outcome.machines)
-        workspace.print(try LoginRenderer.render(outcome.results, options: workspace.options))
-        guard outcome.succeeded else { throw CLIError.failed(outcome.failureMessage) }
-        if workspace.machines.hub != nil { try await workspace.saveHubMachines() }
-    }
-
-    private static func parse(_ text: String) throws -> URL {
-        guard let url = URL(string: text), ["http", "https"].contains(url.scheme), url.host() != nil else {
-            throw CLIError.usage("--machine-url must look like http://host:4780")
-        }
-        return url
     }
 
     mutating func run() async throws { try await run(context: .current) }
@@ -151,56 +111,6 @@ struct RevokeCommand: AsyncParsableCommand {
         }
         workspace.print(try RevokeRenderer.render(lines, options: workspace.options))
         guard lines.count == endpoints.count else { throw CLIError.failed("Not every machine could be reached") }
-    }
-
-    mutating func run() async throws { try await run(context: .current) }
-}
-
-struct RotatePasswordCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-        commandName: "rotate-password", abstract: "Change the password on every machine (signs every device out)."
-    )
-    @OptionGroup var output: OutputOptions
-
-    func run(context: CLIContext) async throws {
-        let workspace = try await Workspace.open(context: context, format: output.format)
-        let current = try context.input.readSecret("Current password: ")
-        let next = try context.input.readSecret("New password: ")
-        guard try context.input.readSecret("Repeat new password: ") == next else {
-            throw CLIError.usage("The two new passwords do not match")
-        }
-        var lines: [PerMachineRenderer.Line] = []
-        var changed = MachineList()
-        for endpoint in workspace.machines.endpoints {
-            do {
-                try await workspace.call(endpoint) { try await $0.changePassword(current: current, next: next) }
-                changed.add(endpoint)
-                lines.append(PerMachineRenderer.Line(machine: endpoint.name, problem: nil))
-            } catch {
-                lines.append(PerMachineRenderer.Line(machine: endpoint.name, problem: error.localizedDescription))
-            }
-        }
-        lines = await Self.loginAgain(lines, changed: changed, password: next, workspace: workspace)
-        workspace.print(try PerMachineRenderer.render(lines, done: "password changed", options: workspace.options))
-        guard lines.allSatisfy({ $0.problem == nil }) else { throw CLIError.failed("Not every machine accepted the change") }
-    }
-
-    /// A password change signs every device out, this CLI included: log in again with the new one.
-    private static func loginAgain(
-        _ lines: [PerMachineRenderer.Line],
-        changed: MachineList,
-        password: String,
-        workspace: Workspace
-    ) async -> [PerMachineRenderer.Line] {
-        let outcome = await AuthSession(access: workspace.access).login(
-            password: password, deviceName: workspace.context.defaultDeviceName, machines: changed
-        )
-        let failed = Dictionary(
-            uniqueKeysWithValues: outcome.results.filter { !$0.succeeded }.map { ($0.endpoint.name, "\($0.status)") }
-        )
-        return lines.map { line in
-            failed[line.machine].map { PerMachineRenderer.Line(machine: line.machine, problem: "changed, but logging in again failed: \($0)") } ?? line
-        }
     }
 
     mutating func run() async throws { try await run(context: .current) }

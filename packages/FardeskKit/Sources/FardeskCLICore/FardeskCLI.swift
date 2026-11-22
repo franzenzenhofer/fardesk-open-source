@@ -18,8 +18,8 @@ public struct FardeskCommand: AsyncParsableCommand {
             MachinesCommand.self, SessionsCommand.self, ActivityCommand.self, DetailCommand.self,
             ReplyCommand.self, ApproveCommand.self, DenyCommand.self, AnswerCommand.self,
             StopCommand.self, KillCommand.self, ResumeCommand.self, TakeoverCommand.self, ForkCommand.self,
-            NewCommand.self, ClearCommand.self, CompactCommand.self, HubCommand.self, PauseCommand.self, EventsCommand.self, CoordinatorCommand.self, FoldersCommand.self, ErrorsCommand.self, PairCommand.self, LoginCommand.self, LogoutCommand.self,
-            DevicesCommand.self, RevokeCommand.self, RotatePasswordCommand.self,
+            NewCommand.self, ClearCommand.self, CompactCommand.self, HubCommand.self, PauseCommand.self, EventsCommand.self, CoordinatorCommand.self, FoldersCommand.self, ErrorsCommand.self, PairCommand.self, LogoutCommand.self,
+            DevicesCommand.self, RevokeCommand.self,
         ]
     )
 
@@ -28,7 +28,7 @@ public struct FardeskCommand: AsyncParsableCommand {
 
 public enum FardeskCLI {
     /// What `errors --report` tells the daemon about this tool.
-    public static let version = "2.1.0"
+    public static let version = "4.4.1"
     public static let build = "cli"
 
     /// Parses and runs one command line and returns the process exit status:

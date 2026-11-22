@@ -11,6 +11,9 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   rate_limited: 429,
   forbidden: 403,
   machine_offline: 503,
+  tailscale_unavailable: 503,
+  device_moved: 401,
+  master_token_wrong_node: 401,
 };
 
 export class FardeskError extends Error {

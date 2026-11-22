@@ -31,11 +31,16 @@ export type AssistantLine = LineBase & {
   blocks: ContentBlock[];
 };
 
+/** The system line Claude Code writes where a compaction (a summary) replaced the conversation before it. */
+export const COMPACT_SUBTYPE = "compact_boundary";
+
 export type SystemLine = LineBase & {
   type: "system";
   subtype: string;
   content: string | null;
   errorMessage: string | null;
+  /** Context size right after a compaction (`compactMetadata.postTokens` of a compact boundary); null otherwise. */
+  compactPostTokens: number | null;
 };
 
 export type TitleLine = { type: "title"; source: "ai" | "custom"; title: string };

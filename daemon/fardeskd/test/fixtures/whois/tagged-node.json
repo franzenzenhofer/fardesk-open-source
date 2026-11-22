@@ -1,0 +1,17 @@
+{
+  "Node": {
+    "ID": 1000000000000009,
+    "StableID": "nSTABLETAGGED09CNTRL",
+    "Name": "runner.example.ts.net.",
+    "User": 100000000000002,
+    "Key": "nodekey:0000000000000000000000000000000000000000000000000000000000000009",
+    "Addresses": ["100.64.0.9/32"],
+    "AllowedIPs": ["100.64.0.9/32"],
+    "Tags": ["tag:ci"],
+    "Hostinfo": { "OS": "linux", "Hostname": "runner" },
+    "Created": "2026-01-03T00:00:00Z",
+    "MachineAuthorized": true
+  },
+  "UserProfile": { "ID": 100000000000002, "LoginName": "tagged-devices", "DisplayName": "Tagged Devices" },
+  "CapMap": {}
+}

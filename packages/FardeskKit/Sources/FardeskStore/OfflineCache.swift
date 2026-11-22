@@ -25,6 +25,13 @@ public struct OfflineCache: Sendable {
         try AtomicFile.write(try FardeskJSON.makeEncoder().encode(feed), to: feedFile(machineID: machineID, sessionID: sessionID))
     }
 
+    /// Deletes one session's cached rows (Reload chat); a missing file is fine.
+    public func removeFeed(machineID: UUID, sessionID: String) throws {
+        let file = feedFile(machineID: machineID, sessionID: sessionID)
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        try FileManager.default.removeItem(at: file)
+    }
+
     /// A missing or unreadable file is no cache: the refresh fills the feed anyway.
     public func loadFeed(machineID: UUID, sessionID: String) -> FeedSnapshot? {
         guard let data = try? Data(contentsOf: feedFile(machineID: machineID, sessionID: sessionID)) else { return nil }

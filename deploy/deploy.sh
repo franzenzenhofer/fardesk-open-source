@@ -2,6 +2,8 @@
 # Builds fardeskd and installs it on one machine.
 # Usage: bash deploy/deploy.sh <ssh-host|local> <machine-name>
 # Example: bash deploy/deploy.sh laptop "Laptop"
+# The installed tarball stays next to dist/ as release.tgz: the daemon serves it (GET /v1/update/package) and installs a
+# newer one it is given (POST /v1/machine/update), so machines can update each other without this script.
 # The launchd label is <FARDESK_BUNDLE_PREFIX>.fardeskd; the prefix comes from fardesk.env (see fardesk.env.example).
 set -euo pipefail
 
@@ -15,7 +17,7 @@ FARDESK_LABEL="$(fardesk_label)"
 DAEMON="$ROOT/daemon/fardeskd"
 REMOTE_DIR=".local/share/fardeskd"
 STAGE="$(mktemp -d)"
-TARBALL="$STAGE/fardeskd.tgz"
+TARBALL="$STAGE/release.tgz"
 
 build_release() {
   (cd "$DAEMON" && npm run build)
@@ -29,13 +31,14 @@ build_release() {
 install_local() {
   mkdir -p "$HOME/$REMOTE_DIR"
   tar -xzf "$TARBALL" -C "$HOME/$REMOTE_DIR"
+  cp "$TARBALL" "$HOME/$REMOTE_DIR/release.tgz"
   FARDESK_LABEL="$FARDESK_LABEL" FARDESK_SKIP_HOOKS="${FARDESK_SKIP_HOOKS:-}" bash "$HOME/$REMOTE_DIR/install-local.sh" "$MACHINE_NAME"
 }
 
 install_remote() {
   ssh "$TARGET" "mkdir -p ~/$REMOTE_DIR"
-  scp -q "$TARBALL" "$TARGET:$REMOTE_DIR/fardeskd.tgz"
-  ssh "$TARGET" "tar -xzf ~/$REMOTE_DIR/fardeskd.tgz -C ~/$REMOTE_DIR"
+  scp -q "$TARBALL" "$TARGET:$REMOTE_DIR/release.tgz"
+  ssh "$TARGET" "tar -xzf ~/$REMOTE_DIR/release.tgz -C ~/$REMOTE_DIR"
   ssh "$TARGET" "FARDESK_LABEL='$FARDESK_LABEL' FARDESK_SKIP_HOOKS='${FARDESK_SKIP_HOOKS:-}' bash -l ~/$REMOTE_DIR/install-local.sh '$MACHINE_NAME'"
 }
 

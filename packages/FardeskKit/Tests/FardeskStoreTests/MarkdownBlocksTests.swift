@@ -6,6 +6,15 @@ import Testing
         #expect(MarkdownBlocks.split("Hello\n**bold** line") == [.prose("Hello\n**bold** line")])
     }
 
+    /// Plans are full of headings: they render as headings, not as "## What changes".
+    @Test func headingLinesBecomeHeadings() {
+        let blocks = MarkdownBlocks.split("# Plan\nIntro\n## What changes\n- a\n#hashtag stays\n####### seven stays")
+        #expect(blocks == [
+            .heading(level: 1, text: "Plan"), .prose("Intro"), .heading(level: 2, text: "What changes"),
+            .prose("- a\n#hashtag stays\n####### seven stays"),
+        ])
+    }
+
     @Test func pipeTableBetweenProseBecomesATable() {
         let text = "Before\n| Drill | Result |\n|---|:---:|\n| a | ok |\n| b | fail |\nAfter"
         #expect(MarkdownBlocks.split(text) == [

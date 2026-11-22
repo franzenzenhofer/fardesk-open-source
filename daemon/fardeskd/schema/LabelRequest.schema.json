@@ -18,12 +18,7 @@
       "anyOf": [
         {
           "type": "string",
-          "enum": [
-            "blue",
-            "teal",
-            "purple",
-            "pink"
-          ]
+          "pattern": "^#[0-9A-F]{6}$"
         },
         {
           "type": "null"

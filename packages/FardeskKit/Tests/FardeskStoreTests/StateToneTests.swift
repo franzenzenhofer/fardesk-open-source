@@ -7,7 +7,7 @@ struct StateToneTests {
     @Test func aWorkingSessionIsGreenNotBlue() {
         #expect(StateTone(status: .working) == .ok)
         #expect(StateTone(status: .waiting) == .needsYou)
-        #expect(StateTone(status: .idle) == .inactive)
+        #expect(StateTone(status: .idle) == .ready, "your turn is black, not grey like stopped")
         #expect(StateTone(status: .ended) == .inactive)
     }
 
@@ -30,7 +30,6 @@ struct StateToneTests {
         #expect(StateTone(outbox: .sending) == .inactive)
         #expect(StateTone(outbox: .sent) == .ok)
         #expect(StateTone(outbox: .failed("offline")) == .broken)
-        #expect(StateTone(outbox: .held) == .needsYou)
     }
 
     @Test func noticesAndSteps() {
@@ -43,9 +42,4 @@ struct StateToneTests {
         #expect(StateTone(step: .failed("not found")) == .broken)
     }
 
-    @Test func theHeaderLineToneFollowsTheSameRule() {
-        #expect(SessionHeaderLine.Tone.working.state == .ok)
-        #expect(SessionHeaderLine.Tone.attention.state == .needsYou)
-        #expect(SessionHeaderLine.Tone.quiet.state == .inactive)
-    }
 }

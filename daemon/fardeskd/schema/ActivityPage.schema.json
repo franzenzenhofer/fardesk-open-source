@@ -230,6 +230,65 @@
               },
               "kind": {
                 "type": "string",
+                "const": "dialog"
+              },
+              "requestId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dialogKind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payload": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "choices": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "answered",
+                  "expired"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "ts",
+              "kind",
+              "requestId",
+              "dialogKind",
+              "payload",
+              "choices",
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ts": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "kind": {
+                "type": "string",
                 "const": "permission"
               },
               "requestId": {
@@ -266,6 +325,20 @@
               },
               "typable": {
                 "type": "boolean"
+              },
+              "plan": {
+                "type": "string"
+              },
+              "planChoices": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "approve_bypass",
+                    "approve_manual",
+                    "revise"
+                  ]
+                }
               }
             },
             "required": [

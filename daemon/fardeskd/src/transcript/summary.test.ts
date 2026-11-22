@@ -4,24 +4,14 @@ import { fixturePath } from "../../test/support/env.js";
 import { CWD, at, parseFixture, parseObject, say, toolResult, toolUse, user } from "../../test/support/transcriptLines.js";
 import type { TranscriptLine } from "./lineTypes.js";
 import { mapActivities } from "./mapper.js";
+import { EMPTY_SUMMARY } from "../sessions/storeEntry.js";
 import { summarise } from "./summary.js";
 
 const MAX = 80;
 
 describe("summarise", () => {
   it("is empty for no lines", () => {
-    expect(summarise([], MAX)).toEqual({
-      title: null,
-      summary: "",
-      cwd: null,
-      model: null,
-      permissionMode: null,
-      startedAt: null,
-      updatedAt: null,
-      pendingToolUse: false,
-      contextTokens: null,
-      cacheExpiresAt: null,
-    });
+    expect(summarise([], MAX)).toEqual(EMPTY_SUMMARY);
   });
 
   it("takes the last sentence of the last assistant text and the header facts", () => {
@@ -39,8 +29,10 @@ describe("summarise", () => {
       startedAt: at(1),
       updatedAt: at(3),
       pendingToolUse: false,
+      backgroundTasks: 0,
       contextTokens: null,
       cacheExpiresAt: null,
+      lastTurnAt: null,
     });
   });
 

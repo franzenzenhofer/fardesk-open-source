@@ -74,3 +74,26 @@ fardesk_machine_field() {
 
 fardesk_machine_target() { fardesk_machine_field "$1" TARGET; }
 fardesk_machine_host() { fardesk_machine_field "$1" HOST; }
+
+# fardesk_tailnet_address HOST: the tailnet IPv4 address (100.64.0.0/10) of a machine, for a peer URL. A literal
+# tailnet address passes; a name is resolved with `tailscale ip -4`; anything else is refused with a plain message
+# (the daemon accepts only tailnet addresses as peers: Tailscale only).
+fardesk_tailnet_address() {
+  local host="$1" address o1 o2 rest
+  if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    address="$host"
+  else
+    address="$(tailscale ip -4 "$host" 2>/dev/null | head -n 1)"
+    if [[ -z "$address" ]]; then
+      printf '%s is not a tailnet address and `tailscale ip -4 %s` found no machine of that name: use its 100.64.x.x address as the host in FARDESK_MACHINES\n' "$host" "$host" >&2
+      return 1
+    fi
+  fi
+  IFS=. read -r o1 o2 rest <<< "$address"
+  if [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$o1" -eq 100 && "$o2" -ge 64 && "$o2" -le 127 ]]; then
+    printf '%s\n' "$address"
+    return 0
+  fi
+  printf '%s is not in the tailnet range 100.64.0.0/10: Tailscale only, no other way\n' "$address" >&2
+  return 1
+}

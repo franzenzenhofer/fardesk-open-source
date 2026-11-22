@@ -1,4 +1,5 @@
 import FardeskClient
+import FardeskDemo
 import FardeskModels
 import Foundation
 import Observation
@@ -9,8 +10,6 @@ public struct AppModelConfiguration: Sendable {
     public let tokens: TokenStore
     public let cache: OfflineCache
     public let deviceName: String
-    /// The machines to start with when the machine file is still empty (from a build setting).
-    public let seedMachines: [Peer]
     public let requestTimeout: TimeInterval
     public let backoff: BackoffPolicy
     /// Whether this device is on Tailscale; read only when no machine answers.
@@ -19,44 +18,46 @@ public struct AppModelConfiguration: Sendable {
     public let telemetry: TelemetryQueue
     public let telemetryIdentity: TelemetryIdentity
     /// The hub to go through, or nil to talk to every machine itself.
-    public let hub: URL?
+    public let hub: HubLink?
     public let hubPollInterval: TimeInterval
     /// A hub that does not answer within this is reported unreachable (the normal timeout is 15 s).
     public let hubPollTimeout: TimeInterval
-    /// Test builds treat every session as cold (UI tests cannot wait for a real cache to expire).
-    public let treatsEverySessionAsCold: Bool
     /// How long cache writes wait for more changes.
     public let cacheWriteDelay: TimeInterval
     /// Requests go to this address while the app stays logged in to `hub` (DEBUG: simulates a hub that is down).
     public let hubTransport: URL?
     public let telemetryInterval: TimeInterval
-    /// Machine names listed first in the session list (the owner's order; empty = alphabetical).
-    public let machineOrder: [String]
+    /// Where the order the user chose in the app is kept (nil = alphabetical, nothing kept).
+    public let machineOrderFile: MachineOrderFile?
+    /// How often an update is followed, and when it is given up (docs/VERSIONING.md: every 3 s, after 5 minutes).
+    public let updatePollInterval: TimeInterval
+    public let updateGiveUpAfter: TimeInterval
 
     public init(
         machinesFile: MachineListFile,
         tokens: TokenStore,
         cache: OfflineCache,
         deviceName: String,
-        seedMachines: [Peer] = [],
         requestTimeout: TimeInterval = FardeskAPI.defaultTimeout,
         backoff: BackoffPolicy = .standard,
         tailscaleIsOn: @escaping @Sendable () -> Bool = TailscaleInterface.isUp,
         telemetryFile: URL? = nil,
         telemetryIdentity: TelemetryIdentity = .current,
         telemetryInterval: TimeInterval = 60,
-        hub: URL? = nil,
+        hub: HubLink? = nil,
         hubPollInterval: TimeInterval = 5,
         hubPollTimeout: TimeInterval = 4,
-        treatsEverySessionAsCold: Bool = false,
         hubTransport: URL? = nil,
         cacheWriteDelay: TimeInterval = CacheWriter.delay,
-        machineOrder: [String] = []
+        machineOrderFile: MachineOrderFile? = nil,
+        updatePollInterval: TimeInterval = 3,
+        updateGiveUpAfter: TimeInterval = 300
     ) {
         self.cacheWriteDelay = cacheWriteDelay
-        self.machineOrder = machineOrder
+        self.updatePollInterval = updatePollInterval
+        self.updateGiveUpAfter = updateGiveUpAfter
+        self.machineOrderFile = machineOrderFile
         self.hubTransport = hubTransport
-        self.treatsEverySessionAsCold = treatsEverySessionAsCold
         self.hubPollTimeout = hubPollTimeout
         self.hub = hub
         self.hubPollInterval = hubPollInterval
@@ -68,7 +69,6 @@ public struct AppModelConfiguration: Sendable {
         self.tokens = tokens
         self.cache = cache
         self.deviceName = deviceName
-        self.seedMachines = seedMachines
         self.requestTimeout = requestTimeout
         self.backoff = backoff
     }
@@ -107,6 +107,10 @@ public final class AppModel {
     /// Called when a session's feed changed through a stream row (the pinned Live Activity follows one feed).
     @ObservationIgnored public var onFeedChange: ((SessionRef, SessionFeed) -> Void)?
     public internal(set) var phase = Phase.launching
+    /// The pretend machines this model shows instead of real ones (nil = a normal model). See `AppModel+Demo.swift`.
+    public internal(set) var demo: DemoWorld?
+    @ObservationIgnored var demoEvents: Task<Void, Never>?
+    @ObservationIgnored var demoScratch: URL?
     public internal(set) var loginError: String?
     /// The one alert on screen (nil = none). Set only through `raise`.
     public internal(set) var lastError: String?
@@ -130,13 +134,16 @@ public final class AppModel {
     /// The online machines with what the New Session sheet needs of them, set only when it changes (the sheet does not
     /// read the whole state, so a stream of activity rows does not rebuild it).
     public internal(set) var onlineMachines: [OnlineMachine] = []
+    /// Chats whose image the coordinator is making: the Image section shows it and does not offer the button again.
+    public internal(set) var pendingImageRequests = PendingImageRequests()
     /// The coordinator's session on the hub machine; nil until it exists. Cached on disk.
     public internal(set) var coordinatorSessionID: String?
+    /// How the update of each machine stands while **Update all** runs, and after it.
+    public internal(set) var machineUpdates: [UUID: MachineUpdateProgress] = [:]
+    @ObservationIgnored var updateRun: Task<Void, Never>?
     /// Called after every state change with the new state (cheap: a value copy); the app hands it to the ExtensionWriter.
     @ObservationIgnored public var onStateChange: ((AppState) -> Void)?
     @ObservationIgnored var startInFlight = false
-    /// Sessions waiting for the user to choose how to continue (the cold card): the held message, if any.
-    public internal(set) var coldHolds: [SessionRef: ColdHold] = [:]
     @ObservationIgnored var noticeClears: [NoticeScope: Task<Void, Never>] = [:]
     @ObservationIgnored var knownHubName: String?
     @ObservationIgnored var alertGate = AlertGate()
@@ -156,8 +163,8 @@ public final class AppModel {
     }
 
     let configuration: AppModelConfiguration
-    let access: MachineAccess
-    let auth: AuthSession
+    var access: MachineAccess
+    var auth: AuthSession
     let localWipe: LocalWipe
     /// Every cache write goes through here: off the main thread, coalesced, only when something changed.
     public let cacheWriter: CacheWriter
@@ -174,9 +181,9 @@ public final class AppModel {
 
     public init(configuration: AppModelConfiguration) {
         self.configuration = configuration
-        state = AppState(machineOrder: configuration.machineOrder)
-        access = MachineAccess(tokens: configuration.tokens, timeout: configuration.requestTimeout, hub: configuration.hub, transport: configuration.hubTransport)
-        auth = AuthSession(access: access)
+        let initialAccess = MachineAccess(tokens: configuration.tokens, timeout: configuration.requestTimeout, hub: configuration.hub, transport: configuration.hubTransport)
+        access = initialAccess
+        auth = AuthSession(access: initialAccess)
         localWipe = LocalWipe(tokens: configuration.tokens, cache: configuration.cache)
         let telemetry = configuration.telemetry
         let identity = configuration.telemetryIdentity
@@ -188,22 +195,27 @@ public final class AppModel {
                 appVersion: identity.appVersion, build: identity.build, platform: identity.platform
             ))
         }
+        loadMachineOrder()
     }
 
     public var isLoggedIn: Bool { phase == .ready }
 
+    /// A clean start: nothing is paired and there is no hub, so a password has nothing to log in to. The app shows
+    /// the onboarding (pair a machine) instead of the password form.
+    public var needsOnboarding: Bool { phase == .loggedOut && machines.endpoints.isEmpty && !isHubMode }
+
     /// Loads the machine list and tokens; when logged in, shows the cached sessions at once and
     /// connects a live stream per machine.
     public func start() async {
+        if demo != nil { return startDemo() }
         guard !startInFlight else { return }
         startInFlight = true
         defer { startInFlight = false }
         Breadcrumbs.mark("start")
         defer { Breadcrumbs.mark("idle") }
         do {
-            // Before the switch to hub mode empties the old list (it holds the older build's logins).
-            try adoptDirectTokenForHub(from: try configuration.machinesFile.load())
             machines = try loadMachines()
+            if machines.hub != access.hub { rebuildAccess() }
             hubStatus = isHubMode ? .connecting : nil
             state.sync(endpoints: machines.endpoints)
             guard try auth.isLoggedIn() else { return phase = .loggedOut }
@@ -213,14 +225,21 @@ public final class AppModel {
             recordEvent("app", "start (launch or foreground)")
             connectAll()
             startTelemetryLoop()
+        } catch is MachineAddressError {
+            // Machines saved by an older version (https, with a pin): start clean once and say why.
+            wipeEverything(reason: Self.repairReason)
         } catch {
             phase = .loggedOut
             raise("Fardesk: could not read the saved machines: \(ErrorText.detail(error))", area: "start", error: error)
         }
     }
 
+    static let repairReason =
+        "Fardesk 4 works only over Tailscale, which encrypts the link; it has no certificate of its own any more. Pair once more: run `fardeskd pair` on your computer (with a hub: on the hub) and scan the code."
+
     /// Stops every live stream (the app goes to the background or the model goes away).
     public func stop() {
+        if demo != nil { return }
         streams.values.forEach { $0.cancel() }
         streams = [:]
         hubPoll?.cancel()
@@ -309,6 +328,7 @@ public final class AppModel {
     /// for a user-started call. Every alert names the machine and the action.
     func handleFailure(_ error: any Error, machineID: UUID, action: String, origin: CallOrigin) {
         if error.isTokenRevoked { return wipeEverything(reason: "This device was signed out. Log in again.") }
+        if error.isDeviceMoved { return wipeEverything(reason: error.deviceMovedMessage) }
         if error.isCancellation { return }
         if let problem = error.machineOfflineMessage { return markMachineOffline(machineID, problem: problem) }
         report(error, area: action, machineID: machineID)
@@ -327,7 +347,7 @@ public final class AppModel {
 
     private func overview(of endpoint: MachineEndpoint) async -> Result<StreamEvent, any Error> {
         do {
-            let api = try access.api(for: endpoint)
+            let api = try service(for: endpoint)
             async let machine = api.machine()
             async let sessions = api.sessions()
             return try await .success(.hello(machine: machine, sessions: sessions))
@@ -338,18 +358,9 @@ public final class AppModel {
 
     private func loadMachines() throws -> MachineList {
         var stored = try configuration.machinesFile.load()
-        let previous = stored.endpoints
-        stored.setHub(configuration.hub)
-        if let hub = configuration.hub {
-            if stored.endpoints.isEmpty, !previous.isEmpty { try migrate(previous, into: &stored, hub: hub) }
-            return stored
-        }
-        guard stored.endpoints.isEmpty, !configuration.seedMachines.isEmpty else { return stored }
-        let seeded = MachineList(
-            endpoints: configuration.seedMachines.map { MachineEndpoint(name: $0.name, url: $0.url) }
-        )
-        try configuration.machinesFile.save(seeded)
-        return seeded
+        // Hub mode comes from pairing and is kept on disk; the configuration hub is a debug/test override that wins.
+        if let hub = configuration.hub { stored.setHub(hub) }
+        return stored
     }
 
     /// Reads the cached machine snapshots on a background thread (the launch screen shows meanwhile) and puts them in place.

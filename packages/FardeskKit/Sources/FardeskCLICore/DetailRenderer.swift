@@ -19,7 +19,7 @@ public enum DetailRenderer {
     private static func section(_ kind: DetailKind, _ section: DetailSection) -> String {
         let lines = switch kind {
         case .diff: diffLines(section.lines)
-        case .output: section.lines.map { TextTable.rstrip($0.text) }
+        case .output, .unknown: section.lines.map { TextTable.rstrip($0.text) }
         }
         return ([header(kind, section)] + lines).joined(separator: "\n")
     }

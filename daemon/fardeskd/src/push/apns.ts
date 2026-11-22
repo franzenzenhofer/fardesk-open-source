@@ -15,10 +15,12 @@ const HTTP_GONE = 410;
 const UNPARSEABLE_REASON = "UnparseableResponse";
 const DEAD_TOKEN_REASONS: readonly string[] = ["BadDeviceToken", "Unregistered"];
 const TIME_SENSITIVE_CATEGORIES: readonly string[] = ["PERMISSION", "QUESTION", "TERMINAL"];
+const RESOLVED_CATEGORY: ApnsCategory = "RESOLVED";
 
 export type ApnsEnvironment = keyof typeof APNS_HOSTS;
 export type ApnsHosts = Record<ApnsEnvironment, string>;
-export type ApnsCategory = "PERMISSION" | "QUESTION" | "TERMINAL" | "DONE" | "ENDED";
+/** RESOLVED: the quiet replacement of a request push that was answered, expired or dropped (passive, no sound, no actions; its data has `kind: "resolved"` and the `requestId`). */
+export type ApnsCategory = "PERMISSION" | "QUESTION" | "TERMINAL" | "DONE" | "ENDED" | "RESOLVED";
 
 export type ApnsNotification = {
   title: string;
@@ -70,15 +72,22 @@ function parseReason(body: string): string {
   }
 }
 
+const isResolved = (notification: ApnsNotification): boolean => notification.category === RESOLVED_CATEGORY;
+
+function interruptionOf(notification: ApnsNotification): "passive" | "time-sensitive" | "active" {
+  if (isResolved(notification)) return "passive";
+  return TIME_SENSITIVE_CATEGORIES.includes(notification.category) ? "time-sensitive" : "active";
+}
+
 export function buildPayload(notification: ApnsNotification): string {
-  const interruption = TIME_SENSITIVE_CATEGORIES.includes(notification.category) ? "time-sensitive" : "active";
   return JSON.stringify({
     aps: {
       alert: { title: notification.title, body: notification.body },
-      sound: "default",
+      // A resolved notice only swaps the stale request on the device: no sound.
+      ...(isResolved(notification) ? {} : { sound: "default" }),
       category: notification.category,
       "thread-id": notification.threadId,
-      "interruption-level": interruption,
+      "interruption-level": interruptionOf(notification),
     },
     ...notification.data,
   });
@@ -156,7 +165,7 @@ export function createApnsClient(options: ApnsClientOptions): ApnsClient {
     send: async (deviceToken, environment, notification): Promise<void> =>
       deliver(deviceToken, environment, {
         pushType: "alert",
-        priority: ALERT_PRIORITY,
+        priority: isResolved(notification) ? BACKGROUND_PRIORITY : ALERT_PRIORITY,
         collapseId: notification.collapseId,
         payload: buildPayload(notification),
       }),

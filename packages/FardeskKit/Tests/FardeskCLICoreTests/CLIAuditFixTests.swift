@@ -7,13 +7,12 @@ import Testing
 
 /// The CLI findings of the 2026-11-16 audit (F6, F7, F8).
 struct CLIAuditFixTests {
-    /// A CLI logged in to a REAL hub (hub set, one login), for the tests that need hub mode.
+    /// A CLI paired with a REAL hub (hub set, one pairing link), for the tests that need hub mode.
     private func withHubCLI(_ body: (CLIHarness, HubRig) async throws -> Void) async throws {
         try await HubRig.with { rig in
-            try await rig.hub.setPassword("hub-password")
             let cli = try CLIHarness()
             _ = await cli.run(["hub", "--set", rig.hub.url.absoluteString])
-            _ = await cli.run(["login"], secrets: ["hub-password"])
+            _ = await cli.run(["pair", try await PairingLinks.make(for: rig.hub, name: HubRig.hubName, hub: true)])
             try await body(cli, rig)
         }
     }
@@ -32,14 +31,14 @@ struct CLIAuditFixTests {
         }
     }
 
-    @Test func replyToAColdSessionStopsWithTheWarningUntilToldHowToGoOn() async throws {
+    @Test func replyToALongIdleSessionGoesToTheDaemonAtOnce() async throws {
         try await CLIHarness.withPairedDaemon { cli, _ in
-            let session = shortID(SeedSession.endedSessionID)
-            let stopped = await cli.run(["reply", session, "hello"])
-            #expect(stopped.status == 64, "\(stopped.errText)")
-            #expect(stopped.errText.contains("Resume this conversation? Inactive for ") && stopped.errText.contains("--resume full"))
-            let went = await cli.run(["reply", session, "hello", "--resume", "full"])
-            #expect(went.status != 64, "--resume full goes on to the daemon: \(went.errText)")
+            // The edits seed: 112k tokens, last turn long ago. The CLI decides nothing about that: it just sends.
+            let went = await cli.run(["reply", shortID(SeedSession.editsSessionID), "hello"])
+            #expect(went.status != 64, "the message goes on to the daemon: \(went.errText)")
+            #expect(!went.errText.contains("New task?") && !went.errText.contains("--resume"))
+            let refused = await cli.run(["reply", shortID(SeedSession.editsSessionID), "hello", "--resume", "full"])
+            #expect(refused.status == 64, "the option is gone")
         }
     }
 
@@ -78,7 +77,7 @@ struct CLIAuditFixTests {
     @Test func reportingWithSeveralMachinesAndNoFlagStillAsksWhichOne() async throws {
         try await CLIHarness.withPairedDaemon { cli, _ in
             try await TestDaemon.with { second in
-                _ = await cli.run(["pair", try CLIHarness.pairingLink(second, name: "other")])
+                _ = await cli.run(["pair", try await CLIHarness.pairingLink(second, name: "other")])
                 let result = await cli.run(["errors", "--report", "x"])
                 #expect(result.status == 64 && result.errText.contains("--machine"), "\(result.errText)")
             }

@@ -2,11 +2,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { WebSocket } from "ws";
-import { authOverrides, loginAs } from "../../test/support/auth.js";
+import type { WebSocket } from "ws";
+import { pairAs } from "../../test/support/auth.js";
+import { hubConfig } from "../../test/support/hubRig.js";
 import { TEST_TOKEN, startTestDaemon } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
-import { freePort, waitUntil } from "../../test/support/env.js";
+import { waitUntil } from "../../test/support/env.js";
+import { NOT_LINKED, SERVICE_NOT_RUNNING } from "./failure.js";
 import { activityPageSchema, authDeviceListSchema, errorResponseSchema, hubStateSchema, machineSchema, sessionSummarySchema, streamEventSchema } from "../contract/schema.js";
 import type { StreamEvent } from "../contract/schema.js";
 
@@ -14,14 +16,7 @@ let peer: TestDaemon;
 let hub: TestDaemon;
 
 async function startHub(extra: Record<string, unknown> = {}): Promise<TestDaemon> {
-  const dead = await freePort();
-  return startTestDaemon({
-    name: "hub-box",
-    hub: { enabled: true, probeMs: 200 },
-    peers: [{ name: "Peer A", url: peer.url }, { name: "dead", url: `http://127.0.0.1:${dead}` }, { name: "unlinked", url: peer.url }],
-    coordinator: { peerTokens: { "Peer A": TEST_TOKEN, dead: TEST_TOKEN } },
-    ...extra,
-  });
+  return startTestDaemon({ ...(await hubConfig(peer.url)), ...extra });
 }
 
 const state = async (): Promise<ReturnType<typeof hubStateSchema.parse>> => hubStateSchema.parse((await hub.call("GET", "/v1/hub")).json);
@@ -69,8 +64,9 @@ describe("GET /v1/hub", () => {
     expect(hubState.machines[1]?.latencyMs).not.toBeNull();
     const dead = await waitForProblem("dead");
     expect(dead).toMatchObject({ online: false, latencyMs: null });
-    expect(dead.problem).toContain("connection refused");
-    expect((await entry("unlinked"))?.problem).toBe("not linked: no token for it in coordinator.peerTokens");
+    expect(dead.problem).toBe(SERVICE_NOT_RUNNING);
+    expect(dead.detail).toContain("ECONNREFUSED");
+    expect(await entry("unlinked")).toMatchObject({ problem: NOT_LINKED.problem, detail: NOT_LINKED.detail });
   });
 
   it("counts sessions of a peer from its stream", async () => {
@@ -144,12 +140,28 @@ describe("/m/<machine>", () => {
     const id = await addSession();
     const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x80]);
     const headers = { authorization: `Bearer ${TEST_TOKEN}` };
-    const stored = await fetch(`${peer.url}/v1/sessions/${id}/attachments`, { method: "POST", headers: { ...headers, "content-type": "image/png" }, body: bytes });
+    const stored = await peer.fetch(`/v1/sessions/${id}/attachments`, { method: "POST", headers: { ...headers, "content-type": "image/png" }, body: bytes });
     const { path } = (await stored.json()) as { path: string };
-    const viaHub = await fetch(`${hub.url}/m/Peer%20A/v1/sessions/${id}/attachment?path=${encodeURIComponent(path)}`, { headers });
+    const viaHub = await hub.fetch(`/m/Peer%20A/v1/sessions/${id}/attachment?path=${encodeURIComponent(path)}`, { headers });
     expect(viaHub.status).toBe(200);
     expect(viaHub.headers.get("content-type")).toBe("image/png");
     expect(Buffer.from(await viaHub.arrayBuffer())).toEqual(bytes);
+  });
+
+  it("passes a chat image of 1.5 MB up to a peer and back unchanged, and its clear", async () => {
+    await untilPeerLive();
+    const id = await addSession();
+    const bytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(1_500_000, 7)]);
+    const headers = { authorization: `Bearer ${TEST_TOKEN}` };
+    const stored = await hub.fetch(`/m/Peer%20A/v1/sessions/${id}/image`, { method: "POST", headers: { ...headers, "content-type": "image/jpeg" }, body: bytes });
+    expect(stored.status).toBe(200);
+    const { image } = (await stored.json()) as { image: string };
+    expect(peer.services.sessions().find((session) => session.id === id)?.label.image).toBe(image);
+    const viaHub = await hub.fetch(`/m/Peer%20A/v1/sessions/${id}/image?v=${image}`, { headers });
+    expect(viaHub.headers.get("content-type")).toBe("image/jpeg");
+    expect(Buffer.from(await viaHub.arrayBuffer())).toEqual(bytes);
+    expect((await hub.call("POST", `/m/Peer%20A/v1/sessions/${id}/image/clear`)).json).toEqual({ ok: true });
+    expect(peer.services.sessions().find((session) => session.id === id)?.label.image).toBeNull();
   });
 
   it("answers 503 machine_offline at once for an offline peer and 404 for an unknown machine", async () => {
@@ -160,7 +172,7 @@ describe("/m/<machine>", () => {
     expect(offline.status).toBe(503);
     const error = errorResponseSchema.parse(offline.json).error;
     expect(error.code).toBe("machine_offline");
-    expect(error.message).toContain("dead is offline: connection refused");
+    expect(error.message).toContain(`dead is offline: ${SERVICE_NOT_RUNNING} (connection refused (ECONNREFUSED))`);
     const unlinked = await hub.call("POST", "/m/unlinked/v1/sessions/x/stop");
     expect(unlinked.status).toBe(503);
     const unknown = await hub.call("GET", "/m/Nowhere/v1/sessions");
@@ -195,10 +207,10 @@ describe("devices of a phone in hub mode", () => {
   it("answers /m/<peer>/v1/auth/devices from the peer, not from the hub's own devices", async () => {
     await hub.close();
     await peer.close();
-    peer = await startTestDaemon({ name: "Peer A", ...(await authOverrides()) });
-    hub = await startHub(await authOverrides());
-    await loginAs(peer, "Peer Phone");
-    const { token } = await loginAs(hub, "Hub Phone");
+    peer = await startTestDaemon({ name: "Peer A" });
+    hub = await startHub();
+    await pairAs(peer, "Peer Phone");
+    const { token } = await pairAs(hub, "Hub Phone");
     await untilPeerLive();
     const names = async (path: string): Promise<string[]> => authDeviceListSchema.parse((await hub.call("GET", path)).json).devices.map((device) => device.name);
     expect(await names("/m/Peer%20A/v1/auth/devices")).toEqual(["Peer Phone"]);
@@ -218,11 +230,12 @@ describe("auth", () => {
     }
   });
 
-  it("routes /m/<any>/v1/auth/login to the hub's own login without a bearer (501 until a password is set)", async () => {
+  it("has no login route on any machine: only the bearer or a pairing code gets in", async () => {
     for (const machine of ["Peer%20A", "hub-box", "Nowhere"]) {
       const login = await hub.call("POST", `/m/${machine}/v1/auth/login`, { password: "whatever1", deviceName: "cli" }, null);
-      expect(login.status).toBe(501);
+      expect(login.status).toBe(401);
     }
+    expect((await hub.call("POST", "/v1/auth/login", { password: "whatever1", deviceName: "cli" })).status).toBe(404);
     expect((await hub.call("GET", "/m/Peer%20A/v1/auth/devices")).status).toBe(200);
   });
 
@@ -244,7 +257,7 @@ describe("auth", () => {
 });
 
 function openRelay(path: string, token = TEST_TOKEN): { events: StreamEvent[]; ws: WebSocket; opened: Promise<void> } {
-  const ws = new WebSocket(`${hub.url.replace("http", "ws")}${path}`, { headers: { authorization: `Bearer ${token}` } });
+  const ws = hub.connectStream(path, { authorization: `Bearer ${token}` });
   const events: StreamEvent[] = [];
   ws.on("message", (data: Buffer) => { events.push(streamEventSchema.parse(JSON.parse(data.toString()))); });
   const opened = new Promise<void>((resolve, reject) => {
@@ -255,7 +268,7 @@ function openRelay(path: string, token = TEST_TOKEN): { events: StreamEvent[]; w
 }
 
 function upgradeStatus(path: string, token = TEST_TOKEN): Promise<number> {
-  const ws = new WebSocket(`${hub.url.replace("http", "ws")}${path}`, { headers: { authorization: `Bearer ${token}` } });
+  const ws = hub.connectStream(path, { authorization: `Bearer ${token}` });
   return new Promise((resolve, reject) => {
     ws.once("unexpected-response", (_request, response) => { resolve(response.statusCode ?? 0); });
     ws.once("open", () => { ws.close(); reject(new Error("upgrade accepted")); });

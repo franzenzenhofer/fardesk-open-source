@@ -1,4 +1,5 @@
 import type { FixtureCases } from "./fixtureTypes.js";
+import { planActivityFixtures } from "./fixturesPlan.js";
 
 export const activityFixtures: FixtureCases<"Activity"> = {
   user: { id: "act_0001", ts: "2026-11-14T09:00:05.000Z", kind: "user", text: "Make the brush smear softer." },
@@ -167,6 +168,45 @@ export const activityFixtures: FixtureCases<"Activity"> = {
     state: "terminal",
     typable: false,
   },
+  dialogColdResumePending: {
+    id: "req-req_d1",
+    ts: "2026-11-22T09:12:00.000Z",
+    kind: "dialog",
+    requestId: "req_d1",
+    dialogKind: "cold_resume_quota",
+    payload: {
+      inactiveSince: 1795338000000,
+      contextTokens: 182000,
+      percentOfFiveHourLimit: 14,
+      trigger: "resume",
+      focusedAction: "resume",
+      offersLookUp: false,
+      offersSummary: true,
+    },
+    choices: ["resume", "new_conversation", "compact", "dismiss"],
+    state: "pending",
+  },
+  dialogColdResumeAnswered: {
+    id: "req-req_d2",
+    ts: "2026-11-22T09:13:00.000Z",
+    kind: "dialog",
+    requestId: "req_d2",
+    dialogKind: "cold_resume_quota",
+    payload: { inactiveSince: 1795338000000, contextTokens: 90000, percentOfFiveHourLimit: 6, trigger: "idle", focusedAction: "none", offersLookUp: false, offersSummary: false },
+    choices: ["resume", "new_conversation", "dismiss"],
+    state: "answered",
+  },
+  dialogColdResumeExpired: {
+    id: "req-req_d3",
+    ts: "2026-11-22T09:14:00.000Z",
+    kind: "dialog",
+    requestId: "req_d3",
+    dialogKind: "cold_resume_quota",
+    payload: { inactiveSince: 1795338000000, contextTokens: 120000, percentOfFiveHourLimit: 9, trigger: "resume", focusedAction: "new_conversation", offersLookUp: true, offersSummary: false },
+    choices: ["resume", "new_conversation", "dismiss"],
+    state: "expired",
+  },
+  ...planActivityFixtures,
 };
 
 export const activityPageFixtures: FixtureCases<"ActivityPage"> = {

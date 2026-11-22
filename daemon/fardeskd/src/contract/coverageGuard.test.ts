@@ -103,6 +103,9 @@ describe("fixture coverage guard", () => {
     expect([...required].filter((key) => !shown.has(key))).toEqual([
       valueKey("", "decision", "deny"),
       valueKey("", "decision", "allow_always"),
+      valueKey("", "decision", "approve_bypass"),
+      valueKey("", "decision", "approve_manual"),
+      valueKey("", "decision", "revise"),
     ]);
   });
 });

@@ -1,4 +1,13 @@
 name: Fardesk
+# The one App Transport Security setting of every Fardesk target. Fardesk has no TLS of its own: Tailscale (WireGuard)
+# encrypts the link, the daemon speaks plain HTTP on its tailnet address, and since iOS 17 ATS only lets an IP address
+# through when it is listed here (https://developer.apple.com/tutorials/data/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsexceptiondomains.json).
+# scripts/check-ats.sh reads this block from the generated Info.plist and proves a CLI carrying exactly it can pair.
+x-app-transport-security: &appTransportSecurity
+  NSAllowsLocalNetworking: true
+  NSExceptionDomains:
+    100.64.0.0/10:
+      NSExceptionAllowsInsecureHTTPLoads: true
 options:
   deploymentTarget:
     iOS: "26.0"
@@ -30,6 +39,8 @@ targets:
         product: FardeskStore
       - package: FardeskKit
         product: FardeskClient
+      - package: FardeskKit
+        product: FardeskDemo
       - target: FardeskWidgets
         platformFilter: iOS
     settings:
@@ -45,7 +56,7 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_NSCameraUsageDescription: "Scan the pairing code shown by fardeskd, and take photos to send with your replies."
+        INFOPLIST_KEY_NSCameraUsageDescription: "Fardesk uses the camera to scan the pairing code shown on your computer, and to take photos you choose to send with a reply. The live camera picture is not stored or sent; only a photo you send goes to your own computer."
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "Dictate replies to your sessions."
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Turn your voice into reply text."
         INFOPLIST_KEY_NSFaceIDUsageDescription: "Confirm destructive actions."
@@ -53,9 +64,6 @@ targets:
       path: Config/Info.plist
       properties:
         UILaunchScreen: {}
-        FardeskBootstrapMachines: $(FARDESK_BOOTSTRAP_MACHINES)
-        FardeskHub: $(FARDESK_HUB)
-        FardeskMachineOrder: $(FARDESK_MACHINE_ORDER)
         FardeskAppGroup: group.$(FARDESK_BUNDLE_PREFIX).fardesk
         UIBackgroundModes:
           - remote-notification
@@ -63,8 +71,7 @@ targets:
         LSApplicationQueriesSchemes:
           - tailscale
         ITSAppUsesNonExemptEncryption: false
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+        NSAppTransportSecurity: *appTransportSecurity
   FardeskWidgets:
     type: app-extension
     supportedDestinations: [iOS]
@@ -78,6 +85,7 @@ targets:
       properties:
         CFBundleDisplayName: Fardesk Widgets
         FardeskAppGroup: group.$(FARDESK_BUNDLE_PREFIX).fardesk
+        NSAppTransportSecurity: *appTransportSecurity
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     dependencies:

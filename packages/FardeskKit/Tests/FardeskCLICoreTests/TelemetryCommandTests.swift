@@ -42,7 +42,7 @@ struct ErrorsCommandTests {
                 let early = TelemetryReport(at: Date(timeIntervalSince1970: 1_800_000_000), message: "shared", area: "a", appVersion: "1", build: "2", platform: "p")
                 let late = TelemetryReport(at: Date(timeIntervalSince1970: 1_800_000_100), message: "only on other", area: "b", appVersion: "1", build: "2", platform: "p")
                 for (daemon, reports) in [(first, [early]), (second, [early, late])] {
-                    let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token)
+                    let api = daemon.api(token: TestDaemon.token)
                     _ = try await api.reportTelemetry(reports)
                 }
                 let both = await cli.run(["errors", "--json"])
@@ -92,7 +92,7 @@ struct AttachAndKillCommandTests {
             let wav = cli.home.appending(path: "note.WAV")
             try Data([1, 2, 3]).write(to: png)
             try Data([4, 5]).write(to: wav)
-            let result = await cli.run(["reply", endedShort, "see", "this", "--attach", png.path, "--attach", wav.path, "--resume", "full"])
+            let result = await cli.run(["reply", endedShort, "see", "this", "--attach", png.path, "--attach", wav.path])
             #expect(result.status == 1 && result.errText.hasPrefix("error: "), "an ended session cannot be reached, but both files were stored first")
             let index = try String(contentsOf: daemon.stateDirectory.appending(path: "attachments-index.json"), encoding: .utf8)
             #expect(index.contains("shot.png") && index.contains("note.WAV"))

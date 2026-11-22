@@ -35,7 +35,7 @@ struct SessionTitleView: View {
     private var dotColor: Color { StateColor.color(line.tone) }
 
     /// The word is only coloured when it needs the user; "Working" next to a green dot says enough in grey.
-    private var statusColor: Color { line.tone == .attention ? StateColor.needsYou : StateColor.inactive }
+    private var statusColor: Color { line.tone == .needsYou ? StateColor.needsYou : StateColor.inactive }
 }
 
 /// The full name and every fact about a session, in one sheet.

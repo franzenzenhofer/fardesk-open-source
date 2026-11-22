@@ -31,7 +31,8 @@
           "enum": [
             "permission",
             "question",
-            "terminal"
+            "terminal",
+            "dialog"
           ]
         },
         {
@@ -41,6 +42,13 @@
     },
     "owned": {
       "type": "boolean"
+    },
+    "agent": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "codex"
+      ]
     },
     "replyMode": {
       "type": "string",
@@ -52,6 +60,11 @@
     },
     "canStop": {
       "type": "boolean"
+    },
+    "background": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "summary": {
       "type": "string"
@@ -68,6 +81,17 @@
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "home": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
         },
         {
           "type": "null"
@@ -96,12 +120,7 @@
           "anyOf": [
             {
               "type": "string",
-              "enum": [
-                "blue",
-                "teal",
-                "purple",
-                "pink"
-              ]
+              "pattern": "^#[0-9A-F]{6}$"
             },
             {
               "type": "null"
@@ -110,14 +129,37 @@
         },
         "pinned": {
           "type": "boolean"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
         "name",
         "color",
-        "pinned"
+        "pinned",
+        "image"
       ],
       "additionalProperties": false
+    },
+    "autoColor": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^#[0-9A-F]{6}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "permissionMode": {
       "anyOf": [
@@ -161,6 +203,18 @@
         }
       ]
     },
+    "lastTurnAt": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "startedAt": {
       "type": "string",
       "format": "date-time",
@@ -179,16 +233,21 @@
     "status",
     "waitingFor",
     "owned",
+    "agent",
     "replyMode",
     "canStop",
+    "background",
     "summary",
     "model",
     "pid",
+    "home",
     "muted",
     "label",
+    "autoColor",
     "permissionMode",
     "contextTokens",
     "cacheExpiresAt",
+    "lastTurnAt",
     "startedAt",
     "updatedAt"
   ],

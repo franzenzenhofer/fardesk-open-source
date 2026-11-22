@@ -1,12 +1,11 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { closeSync, openSync } from "node:fs";
 import { FardeskError } from "../core/errors.js";
 import type { Config } from "./config.js";
-import { isLoopbackAddress, isTailnetAddress } from "./tailnetAddress.js";
 import { TAILSCALE_COMMAND, createTailscaleProbe, describeState } from "./tailscale.js";
+import { TAILSCALE_KEYWORD, bindAddressProblem } from "./tailnetOnly.js";
 
 export type RunCommand = (command: string, args: string[]) => Promise<string>;
-
-const TAILSCALE_KEYWORD = "tailscale";
 
 export type RunWithInput = (command: string, args: string[], input: string) => Promise<string>;
 
@@ -54,22 +53,25 @@ export async function runCommandWithInput(command: string, args: string[], input
   return execute(command, args, input, COMMAND_TIMEOUT_MS);
 }
 
-/** Only the tailnet and loopback are safe for plain-HTTP bearer tokens; anything else needs TLS and an explicit opt-in. */
-function requireSafeBind(config: Config): void {
-  const { address } = config.bind;
-  if (isLoopbackAddress(address) || isTailnetAddress(address)) return;
-  if (config.tls !== null && config.bind.allowNonTailnet) return;
-  throw new FardeskError(
-    "invalid_request",
-    `bind.address ${JSON.stringify(address)} is outside the tailnet (100.64.0.0/10) and loopback: bearer tokens and session content would cross that network. Use "tailscale", or set both \`tls\` and \`bind.allowNonTailnet: true\` if you accept the risk.`,
-  );
+export type DetachedJob = { command: string; args: string[]; env: NodeJS.ProcessEnv; logPath: string; onError: (error: Error) => void };
+
+/**
+ * The one process without a deadline: the self-update installer restarts the daemon's own service, so it must outlive
+ * this process (new session via `detached`, `unref`). Its output goes to `logPath`; `onError` = it could not be started.
+ */
+export function spawnDetached(job: DetachedJob): void {
+  const log = openSync(job.logPath, "a", 0o600);
+  const child = spawn(job.command, job.args, { detached: true, stdio: ["ignore", log, log], env: job.env });
+  closeSync(log);
+  child.once("error", job.onError);
+  child.unref();
 }
 
-/** The checked literal bind address, or null when the config says "tailscale" (the address then comes from the tailnet). */
+/** The checked literal bind address (a test daemon's loopback), or null when the config says "tailscale" (the address then comes from the tailnet). */
 export function literalBindAddress(config: Config): string | null {
-  if (config.bind.address === TAILSCALE_KEYWORD) return null;
-  requireSafeBind(config);
-  return config.bind.address;
+  const problem = bindAddressProblem(config.bind.address);
+  if (problem !== null) throw new FardeskError("invalid_request", problem);
+  return config.bind.address === TAILSCALE_KEYWORD ? null : config.bind.address;
 }
 
 export async function resolveBindAddress(config: Config, run: RunCommand, commands: string[] = [TAILSCALE_COMMAND]): Promise<string> {

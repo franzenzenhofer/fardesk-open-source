@@ -13,17 +13,37 @@ struct FardeskApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            AppContent(demo: AppServices.shared.demo)
                 #if DEBUG
                 .overlay(alignment: .topLeading) { TapClockProbe() }
                 #endif
-                .environment(AppServices.shared.model)
-                .environment(AppServices.shared.coordinator)
                 .environment(AppServices.shared.voice)
                 .tint(.primary)
         }
         #if os(macOS)
         .defaultSize(width: 1100, height: 760)
         #endif
+    }
+}
+
+/// The real app, or the demo in its place. Each has its own model and coordinator; the identity of the demo's root changes
+/// on every start, so nothing of one run carries into the next.
+private struct AppContent: View {
+    let demo: DemoMode
+
+    var body: some View {
+        Group {
+            if let running = demo.running {
+                RootView()
+                    .environment(running.model)
+                    .environment(running.coordinator)
+                    .id(running.id)
+            } else {
+                RootView()
+                    .environment(AppServices.shared.model)
+                    .environment(AppServices.shared.coordinator)
+            }
+        }
+        .environment(demo)
     }
 }

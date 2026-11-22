@@ -6,12 +6,12 @@ import type { AskInput, Broker } from "../../src/permissions/broker.js";
 
 export const BROKER_NOW = new Date("2026-11-15T10:00:00.000Z");
 
-export function setupBroker(timeoutMs: number): { broker: Broker; events: StreamEvent[] } {
+export function setupBroker(timeoutMs: number, allowBypass = true): { broker: Broker; events: StreamEvent[] } {
   const bus = createBus();
   const events: StreamEvent[] = [];
   bus.subscribe((event) => events.push(event));
   let counter = 0;
-  const broker = createBroker({ timeoutMs, bus, now: () => BROKER_NOW, newId: () => `id${String(++counter)}` });
+  const broker = createBroker({ timeoutMs, bus, now: () => BROKER_NOW, newId: () => `id${String(++counter)}`, allowBypass });
   return { broker, events };
 }
 

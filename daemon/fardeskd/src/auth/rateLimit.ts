@@ -1,13 +1,13 @@
-// Sliding-window limiter for password attempts: per source IP, plus a global cap against rotating IPs.
+// Sliding-window limiter for failed pairing attempts: per source IP, plus a global cap against rotating IPs.
 import { FardeskError } from "../core/errors.js";
 
 export const GLOBAL_CAP_FACTOR = 10;
 const MAX_PENDING_CHECKS = 4;
 const limited = (): FardeskError => new FardeskError("rate_limited", "too many failed attempts, try again later");
 
-export type LoginLimiterOptions = { maxFailures: number; windowMs: number; now: () => number };
+export type AttemptLimiterOptions = { maxFailures: number; windowMs: number; now: () => number };
 
-export type LoginLimiter = {
+export type AttemptLimiter = {
   /** Throws `rate_limited` when this IP (or everybody together) has used up its failures. */
   check: (ip: string) => void;
   reserve: (ip: string) => () => void;
@@ -15,7 +15,7 @@ export type LoginLimiter = {
   recordSuccess: (ip: string) => void;
 };
 
-export function createLoginLimiter({ maxFailures, windowMs, now }: LoginLimiterOptions): LoginLimiter {
+export function createAttemptLimiter({ maxFailures, windowMs, now }: AttemptLimiterOptions): AttemptLimiter {
   let failures: { ip: string; time: number }[] = [];
   const pending = new Map<string, number>();
   let pendingCount = 0;

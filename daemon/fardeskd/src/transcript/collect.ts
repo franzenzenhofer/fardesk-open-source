@@ -2,7 +2,7 @@
 // tool call joined with its result. Tool rows are resolved later, once it is known how the
 // conversation went on after each call.
 import type { Activity } from "../contract/schema.js";
-import { isConversationLine } from "./lineTypes.js";
+import { COMPACT_SUBTYPE, isConversationLine } from "./lineTypes.js";
 import type { AssistantLine, SystemLine, TranscriptLine, UserLine } from "./lineTypes.js";
 import { resultFromBlock } from "./toolCalls.js";
 import type { ToolCall } from "./toolCalls.js";
@@ -11,7 +11,6 @@ import { userRowOf } from "./userText.js";
 
 export const ERROR_TEXT_MAX = 200;
 export const COMPACTED_TEXT = "Conversation compacted";
-export const COMPACT_SUBTYPE = "compact_boundary";
 export const API_ERROR_SUBTYPE = "api_error";
 export const API_ERROR_FALLBACK = "API error";
 

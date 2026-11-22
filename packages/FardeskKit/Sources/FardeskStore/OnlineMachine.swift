@@ -10,13 +10,16 @@ public struct OnlineMachine: Equatable, Sendable, Identifiable {
     public let allowBypass: Bool
     /// The daemon runs a Coordinator (config `coordinator.enabled`).
     public let coordinatorEnabled: Bool
+    /// The names of the daemon's Claude homes; the New Session sheet asks which one when there are several.
+    public let homes: [String]
 
-    public init(id: UUID, name: String, models: [String], allowBypass: Bool = true, coordinatorEnabled: Bool = true) {
+    public init(id: UUID, name: String, models: [String], allowBypass: Bool = true, coordinatorEnabled: Bool = true, homes: [String] = []) {
         self.id = id
         self.name = name
         self.models = models
         self.allowBypass = allowBypass
         self.coordinatorEnabled = coordinatorEnabled
+        self.homes = homes
     }
 }
 
@@ -24,6 +27,7 @@ extension OnlineMachine {
     init(state: MachineState) {
         self.init(
             id: state.id, name: state.endpoint.name, models: state.machine?.models ?? [],
-            allowBypass: state.machine?.allowBypass ?? true, coordinatorEnabled: state.machine?.coordinatorEnabled ?? true)
+            allowBypass: state.machine?.allowBypass ?? true, coordinatorEnabled: state.machine?.coordinatorEnabled ?? true,
+            homes: state.machine?.homes ?? [])
     }
 }

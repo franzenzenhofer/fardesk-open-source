@@ -12,13 +12,13 @@ struct RootView: View {
             switch model.phase {
             case .launching: LaunchView()
             case .ready: MachinesView()
-            case .loggedOut, .loggingIn: LoginView()
+            case .loggedOut, .loggingIn: OnboardingView()
             }
         }
         .task { await startModel() }
         .onChange(of: model.phase) { _, phase in
             coordinator.reset()
-            PlatformPush.phaseChanged(to: phase)
+            if !model.isDemo { PlatformPush.phaseChanged(to: phase) }
         }
         .onChange(of: scenePhase) { _, phase in
             model.noteActivity(phase == .active ? .active : .away)
@@ -35,7 +35,7 @@ struct RootView: View {
 
     private func startModel() async {
         while model.phase == .launching { try? await Task.sleep(for: .milliseconds(50)) }
-        PlatformPush.phaseChanged(to: model.phase)
+        if !model.isDemo { PlatformPush.phaseChanged(to: model.phase) }
         #if DEBUG
         if model.phase != .ready, let link = UserDefaults.standard.string(forKey: "FardeskPairLink") {
             await model.pair(link: link)

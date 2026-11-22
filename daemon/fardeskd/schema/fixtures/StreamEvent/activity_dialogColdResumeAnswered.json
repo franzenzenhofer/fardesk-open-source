@@ -1,0 +1,26 @@
+{
+  "type": "activity",
+  "sessionId": "sess_7f3a91",
+  "activity": {
+    "id": "req-req_d2",
+    "ts": "2026-11-22T09:13:00.000Z",
+    "kind": "dialog",
+    "requestId": "req_d2",
+    "dialogKind": "cold_resume_quota",
+    "payload": {
+      "inactiveSince": 1795338000000,
+      "contextTokens": 90000,
+      "percentOfFiveHourLimit": 6,
+      "trigger": "idle",
+      "focusedAction": "none",
+      "offersLookUp": false,
+      "offersSummary": false
+    },
+    "choices": [
+      "resume",
+      "new_conversation",
+      "dismiss"
+    ],
+    "state": "answered"
+  }
+}

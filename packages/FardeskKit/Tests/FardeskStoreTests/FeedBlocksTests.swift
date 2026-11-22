@@ -45,13 +45,13 @@ struct FeedBlocksTests {
     }
 
     @Test func headerLineCarriesTheTone() throws {
-        let working = SessionHeaderLine(session: try Fixtures.session("working"), machineName: "Mac")
-        #expect(working.tone == .working)
+        let working = SessionHeaderLine(session: try Fixtures.session("working"), machineName: "Mac", homeTag: nil)
+        #expect(working.tone == .ok)
         #expect(working.statusLabel == "Working")
         #expect(working.leadText.hasPrefix("Mac \u{00B7} "))
-        let waiting = SessionHeaderLine(session: try Fixtures.session("waitingPermission"), machineName: "Mac")
-        #expect(waiting.tone == .attention)
-        let idle = SessionHeaderLine(session: try Fixtures.session("idleResume"), machineName: "Mac")
-        #expect(idle.tone == .quiet)
+        let waiting = SessionHeaderLine(session: try Fixtures.session("waitingPermission"), machineName: "Mac", homeTag: nil)
+        #expect(waiting.tone == .needsYou)
+        let idle = SessionHeaderLine(session: try Fixtures.session("idleResume"), machineName: "Mac", homeTag: nil)
+        #expect(idle.tone == .ready)
     }
 }

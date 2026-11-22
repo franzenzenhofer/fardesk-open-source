@@ -39,8 +39,8 @@ struct SessionFeedTests {
     @Test func pendingRequestsAreOldestFirstAndLeaveTheRows() throws {
         let feed = SessionFeed(page: try Fixtures.page("everyActivityKind"))
         let pending = feed.pendingRequests
-        #expect(pending.map(\.id) == ["act_0007", "act_0010"])
-        #expect(feed.rows.count == feed.activities.count - 2 - feed.terminalRequests.count)
+        #expect(pending.map(\.id) == ["act_0007", "act_0010", "req-req_d1", "req-req_p1", "req-req_p2"], "a permission, a question, an open dialog and two open plans")
+        #expect(feed.rows.count == feed.activities.count - pending.count - feed.terminalRequests.count)
         #expect(feed.rows.allSatisfy { !$0.isPendingRequest })
     }
 
@@ -48,7 +48,7 @@ struct SessionFeedTests {
         let kinds = try Fixtures.activities()
         #expect(Set(kinds.map(\.timestamp)).count == kinds.count)
         let flags = kinds.map(\.isPendingRequest)
-        #expect(flags.filter { $0 }.count == 2)
+        #expect(flags.filter { $0 }.count == 5, "the open permission, question, dialog and two plans")
     }
 
     @Test(arguments: ["permissionAllowed", "permissionExpired", "questionAnswered", "questionExpired", "toolOk"])

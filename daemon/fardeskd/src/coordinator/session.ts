@@ -12,7 +12,7 @@ export const COORDINATOR_TITLE = "Coordinator";
 export const COORDINATOR_DIR = "coordinator";
 
 const FARDESK_TOOLS_SENTENCE =
-  "With the fardesk tools you list, search, read, message, start, stop, resume, clear, compact and end sessions on any machine; search_sessions also finds old sessions the phone no longer lists.";
+  "With the fardesk tools you list, search, read, message, start, stop, resume, clear, compact and end sessions on any machine, and set or clear the picture of a chat (set_session_image, clear_session_image) and bring every machine to the newest Fardesk version (update_machines); search_sessions also finds old sessions the phone no longer lists.";
 
 const WAITING_RULE =
   "When a session waits (status waiting), call pending_requests to see exactly what it asks, then ";

@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 
 export const AUDIT_FILE = "audit.jsonl";
-/** Rejected logins, pairings and bearers (no device id), rotated on their own. */
+/** Rejected pairings and bearers (no device id), rotated on their own. */
 export const UNAUTHENTICATED_AUDIT_FILE = "audit-unauthenticated.jsonl";
 export const AUDIT_MAX_BYTES = 1_000_000;
 const FILE_MODE = 0o600;
@@ -13,8 +13,8 @@ const ROTATED_SUFFIX = ".1";
 
 export const auditEntrySchema = z.strictObject({
   time: z.iso.datetime(),
-  /** `login_failed` is a rejected login or pairing attempt; `pairing_locked` is a pairing window closed by 5 wrong codes; `request` is every other state-changing call. */
-  event: z.enum(["request", "login_failed", "pairing_locked"]),
+  /** `pairing_failed` is a rejected pairing attempt; `pairing_locked` is a pairing window closed by 5 wrong codes; `request` is every other state-changing call. */
+  event: z.enum(["request", "pairing_failed", "pairing_locked"]),
   deviceId: z.string().min(1).nullable(),
   method: z.string().min(1),
   route: z.string().min(1),

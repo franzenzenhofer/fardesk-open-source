@@ -27,6 +27,11 @@ public struct ResolvedRequestPresentation: Equatable, Sendable {
         symbolName = FardeskSymbol.question
         text = "\(question.text) (\(question.state.rawValue))"
     }
+
+    public init(dialog: DialogActivity) {
+        symbolName = FardeskSymbol.question
+        text = "\(DialogPresentation(dialog, now: dialog.ts).title) (\(dialog.state?.rawValue ?? "pending"))"
+    }
 }
 
 extension ActivityDetail {
@@ -54,6 +59,7 @@ public struct NotificationPreferences: Sendable {
         case .permission: "Needs approval"
         case .question: "Needs answer"
         case .ended: "Session ended"
+        case .unknown: unknownStateText
         }
     }
 

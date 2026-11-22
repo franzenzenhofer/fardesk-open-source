@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "FardeskModels", targets: ["FardeskModels"]),
         .library(name: "FardeskClient", targets: ["FardeskClient"]),
+        .library(name: "FardeskDemo", targets: ["FardeskDemo"]),
         .library(name: "FardeskStore", targets: ["FardeskStore"]),
         .library(name: "FardeskCLICore", targets: ["FardeskCLICore"]),
         .executable(name: "fardesk", targets: ["fardesk"]),
@@ -17,7 +18,12 @@ let package = Package(
     targets: [
         .target(name: "FardeskModels"),
         .target(name: "FardeskClient", dependencies: ["FardeskModels"]),
-        .target(name: "FardeskStore", dependencies: ["FardeskModels", "FardeskClient"]),
+        .target(
+            name: "FardeskDemo",
+            dependencies: ["FardeskModels", "FardeskClient"],
+            resources: [.copy("Resources/Demo")]
+        ),
+        .target(name: "FardeskStore", dependencies: ["FardeskModels", "FardeskClient", "FardeskDemo"]),
         .target(
             name: "FardeskCLICore",
             dependencies: [
@@ -31,8 +37,9 @@ let package = Package(
             dependencies: ["FardeskModels", "FardeskStore", "FardeskClient", "FardeskTestDaemon"],
             path: "Tests/FardeskFixtures"
         ),
-        .target(name: "FardeskTestDaemon", path: "Tests/FardeskTestDaemon"),
+        .target(name: "FardeskTestDaemon", dependencies: ["FardeskModels", "FardeskClient"], path: "Tests/FardeskTestDaemon"),
         .testTarget(name: "FardeskModelsTests", dependencies: ["FardeskModels"]),
+        .testTarget(name: "FardeskDemoTests", dependencies: ["FardeskDemo", "FardeskClient", "FardeskModels"]),
         .testTarget(
             name: "FardeskClientTests",
             dependencies: ["FardeskClient", "FardeskModels", "FardeskFixtures", "FardeskTestDaemon"]
@@ -40,7 +47,7 @@ let package = Package(
         .testTarget(
             name: "FardeskStoreTests",
             dependencies: [
-                "FardeskStore", "FardeskModels", "FardeskClient", "FardeskFixtures", "FardeskTestDaemon",
+                "FardeskStore", "FardeskModels", "FardeskClient", "FardeskDemo", "FardeskFixtures", "FardeskTestDaemon",
             ]
         ),
         .testTarget(

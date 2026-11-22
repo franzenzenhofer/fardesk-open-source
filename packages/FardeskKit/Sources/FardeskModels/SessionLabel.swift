@@ -6,16 +6,28 @@ public struct SessionLabel: Codable, Sendable, Hashable {
     public let name: String?
     public let color: LabelColor?
     public let pinned: Bool
+    /// 16-hex content hash of the chat's own image; nil when it has none. Changes whenever the image changes.
+    public let image: String?
 
     public static let none = SessionLabel(name: nil, color: nil, pinned: false)
 
-    public init(name: String?, color: LabelColor?, pinned: Bool) {
+    public init(name: String?, color: LabelColor?, pinned: Bool, image: String? = nil) {
         self.name = name
         self.color = color
         self.pinned = pinned
+        self.image = image
     }
 
-    private enum CodingKeys: String, CodingKey { case name, color, pinned }
+    private enum CodingKeys: String, CodingKey { case name, color, pinned, image }
+
+    /// The image key is optional on the wire (null or missing means no image) so an older machine still decodes.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String?.self, forKey: .name)
+        color = try c.decode(LabelColor?.self, forKey: .color)
+        pinned = try c.decode(Bool.self, forKey: .pinned)
+        image = try c.decodeIfPresent(String.self, forKey: .image)
+    }
 
     /// Writes null for no name or no colour: the contract always carries all three keys.
     public func encode(to encoder: any Encoder) throws {
@@ -23,16 +35,14 @@ public struct SessionLabel: Codable, Sendable, Hashable {
         try c.encode(name, forKey: .name)
         try c.encode(color, forKey: .color)
         try c.encode(pinned, forKey: .pinned)
+        try c.encode(image, forKey: .image)
     }
 }
 
-/// Label colours. Never red, grey, orange or green: those are the status colours (COLOUR-CODING.md).
-public enum LabelColor: String, Codable, Sendable, Hashable, CaseIterable {
-    case blue, teal, purple, pink
-
-    public var displayName: String {
-        rawValue.prefix(1).uppercased() + rawValue.dropFirst()
-    }
+/// `POST /v1/sessions/:id/image`: the content hash of the stored image.
+public struct ImageResult: Codable, Sendable, Hashable {
+    public let ok: Bool
+    public let image: String
 }
 
 /// `POST /v1/sessions/:id/label`: a patch, every key optional. `.some(nil)` clears a name or colour.
@@ -84,4 +94,10 @@ public enum SessionLabelName {
 extension SessionSummary {
     /// The name the list and the chat header show: the user's own name, else the session title.
     public var displayTitle: String { label.name ?? title }
+
+    /// The colour the list shows next to the session: the user's own pick always wins; the daemon's automatic
+    /// colour only while automatic colour coding is on (`ColourCoding`).
+    public func shownColor(automatic: Bool) -> LabelColor? {
+        label.color ?? (automatic ? autoColor : nil)
+    }
 }

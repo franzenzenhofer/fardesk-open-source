@@ -2,51 +2,7 @@ import FardeskClient
 import FardeskModels
 import Foundation
 
-extension LoginOutcome {
-    /// The one sentence the login screen shows when no machine accepted the password.
-    public var failureMessage: String {
-        let statuses = results.map(\.status)
-        if statuses.contains(.wrongPassword) { return "Wrong password." }
-        if statuses.contains(.rateLimited) { return "Too many attempts. Try again in a few minutes." }
-        let unreachable = results.filter { if case .unreachable = $0.status { true } else { false } }
-        guard let first = unreachable.first else { return "Login failed." }
-        return "Cannot reach \(first.endpoint.name)."
-    }
-}
-
 extension AppModel {
-    /// Logs in to every machine with one password. The password is not kept.
-    public func login(password: String) async {
-        phase = .loggingIn
-        loginError = nil
-        let outcome = await auth.login(password: password, deviceName: configuration.deviceName, machines: machines)
-        adopt(outcome)
-        if outcome.succeeded { showNotice(ActionFeedback(text: "Logged in", state: .succeeded), in: .list) }
-        guard outcome.succeeded else {
-            phase = .loggedOut
-            loginError = outcome.failureMessage
-            return
-        }
-        phase = .ready
-        connectAll()
-    }
-
-    /// Adds a machine by address and logs in to it with the same password.
-    @discardableResult
-    public func addMachine(url: URL, name: String, password: String) async -> Bool {
-        let outcome = await auth.add(
-            url: url, name: name, password: password, deviceName: configuration.deviceName, machines: machines
-        )
-        guard outcome.succeeded else {
-            enqueueReport(message: outcome.failureMessage, area: "add the machine", code: nil, machineID: nil)
-            raise("\(name): could not add the machine: \(outcome.failureMessage)")
-            return false
-        }
-        adopt(outcome)
-        connectAll()
-        return true
-    }
-
     /// Tells every machine to forget this device, then wipes everything local.
     public func logout(apnsToken: String?) async {
         stop()
@@ -64,11 +20,16 @@ extension AppModel {
         pushRegistrationKey = nil
         access.tokenCache.invalidate()
         do {
-            try cacheWriter.wipe { try localWipe.wipe() }
+            try cacheWriter.wipe {
+                try localWipe.wipe()
+                machines = MachineList()
+                try configuration.machinesFile.save(machines)
+            }
+            rebuildAccess()
         } catch {
             raise("Fardesk: could not wipe everything on this device: \(ErrorText.detail(error))", area: "wipe the device", error: error)
         }
-        state = AppState(endpoints: machines.endpoints, machineOrder: configuration.machineOrder)
+        state = AppState(endpoints: machines.endpoints, machineOrder: state.machineOrder)
         feeds.removeAll()
         pausedUntil = nil
         phase = .loggedOut
@@ -102,14 +63,14 @@ extension AppModel {
         }
         await withTaskGroup(of: Void.self) { group in
             for endpoint in machines.endpoints {
-                group.addTask { _ = await self.perform(on: endpoint.id, action: "register for notifications", origin: .background) { try await $0.registerDevice(request) } }
+                group.addTask { _ = await self.performOnMachine(on: endpoint.id, action: "register for notifications", origin: .background) { try await $0.registerDevice(request) } }
             }
         }
     }
 
     /// Revokes one device (id or name) or, with nil, every device on a machine. Returns the count.
     public func revoke(device: String?, on machineID: UUID) async -> Int? {
-        await perform(on: machineID, action: "sign the device out") { try await $0.revoke(device: device) }?.revoked
+        await performOnMachine(on: machineID, action: "sign the device out") { try await $0.revoke(device: device) }?.revoked
     }
 
     /// Forgets one machine on this device: its token, its cache and its place in the list.
@@ -125,11 +86,5 @@ extension AppModel {
         }
         state.sync(endpoints: machines.endpoints)
         connectAll()
-    }
-
-    private func adopt(_ outcome: LoginOutcome) {
-        machines = outcome.machines
-        state.sync(endpoints: machines.endpoints)
-        cacheWriter.saveMachines(machines)
     }
 }

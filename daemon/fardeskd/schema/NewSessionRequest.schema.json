@@ -35,6 +35,10 @@
         "dontAsk",
         "auto"
       ]
+    },
+    "home": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [

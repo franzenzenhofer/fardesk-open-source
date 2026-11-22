@@ -1,8 +1,10 @@
 // Config files and a capturing CliIo for the CLI tests.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { CliIo } from "../../src/cli/types.js";
+import { runCli } from "../../src/cli/index.js";
+import type { CliDeps, CliIo } from "../../src/cli/types.js";
 import { runCommand } from "../../src/config/bind.js";
+import { createRealOwned } from "../../src/service/ownedFactory.js";
 import type { RunCommand } from "../../src/config/bind.js";
 import { TEST_TOKEN } from "./daemon.js";
 import { makeTempDir } from "./env.js";
@@ -35,7 +37,7 @@ export type CapturedIo = CliIo & { out: string[]; err: string[]; stop(): void };
 export const runWithoutProcesses: RunCommand = (command, args) => (command === "ps" ? Promise.resolve("") : runCommand(command, args));
 
 /** An io whose env always has a temporary HOME (never the real one), unless the test passes its own HOME. */
-export function captureIo(env: NodeJS.ProcessEnv = {}, password = ""): CapturedIo {
+export function captureIo(env: NodeJS.ProcessEnv = {}): CapturedIo {
   const out: string[] = [];
   const err: string[] = [];
   let stop: () => void = () => undefined;
@@ -49,9 +51,17 @@ export function captureIo(env: NodeJS.ProcessEnv = {}, password = ""): CapturedI
     stdout: (line) => out.push(line),
     stderr: (line) => err.push(line),
     untilStop: async () => stopped,
-    readPassword: () => Promise.resolve(password),
     stop: (): void => {
       stop();
     },
   };
+}
+
+export type CliRun = { code: number; out: string[]; err: string[] };
+
+/** Runs one CLI command line for real with a capturing io (the owned-session runner is the real one). */
+export async function runCaptured(argv: string[], deps: Partial<CliDeps> = {}): Promise<CliRun> {
+  const io = captureIo();
+  const code = await runCli(argv, io, { createOwned: createRealOwned, ...deps });
+  return { code, out: io.out, err: io.err };
 }

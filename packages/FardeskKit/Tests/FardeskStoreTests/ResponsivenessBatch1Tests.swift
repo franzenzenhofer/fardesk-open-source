@@ -12,12 +12,12 @@ import Testing
 @MainActor
 struct ResponsivenessBatch1Tests {
     private func hubModel(
-        _ rig: HubRig, _ sandbox: StoreSandbox, token: String = TestDaemon.token, hubURL: URL? = nil,
+        _ rig: HubRig, _ sandbox: StoreSandbox, token: String = TestDaemon.token, hub hubOverride: HubLink? = nil,
         transport: URL? = nil
     ) throws -> AppModel {
-        let hub = hubURL ?? rig.hub.url
-        try sandbox.keychainTokens.save(token, HubIdentity.tokenID(hub: hub))
-        var configuration = sandbox.configuration(hubURL: hub)
+        let hub = hubOverride ?? rig.hub.link
+        try sandbox.keychainTokens.save(token, HubIdentity.tokenID(hub: hub.url))
+        var configuration = sandbox.configuration(hub: hub)
         if let transport {
             configuration = AppModelConfiguration(
                 machinesFile: sandbox.machinesFile, tokens: sandbox.keychainTokens, cache: sandbox.cache,
@@ -69,9 +69,9 @@ struct ResponsivenessBatch1Tests {
         try await HubRig.with { rig in
             try await StoreSandbox.with { sandbox in
                 var list = MachineList()
-                list.setHub(rig.hub.url)
+                list.setHub(rig.hub.link)
                 try sandbox.machinesFile.save(list)
-                let none = AppModel(configuration: sandbox.configuration(hubURL: rig.hub.url))
+                let none = AppModel(configuration: sandbox.configuration(hub: rig.hub.link))
                 await none.start()
                 #expect(none.phase == .loggedOut)
 
@@ -139,10 +139,10 @@ struct ResponsivenessBatch1Tests {
 
     @Test func theTransportMovesRequestsButNotTheIdentity() throws {
         let sandbox = try StoreSandbox()
-        let hub = URL(string: "http://100.64.0.10:4780")!
+        let hub = HubLink(url: URL(string: "http://100.64.0.10:4780")!)
         let access = MachineAccess(tokens: sandbox.fileTokens, hub: hub, transport: URL(string: "http://127.0.0.1:9")!)
         let endpoint = HubIdentity.endpoint(machine: "Mac mini Pro", hub: hub)
-        try sandbox.fileTokens.save("hub-token", HubIdentity.tokenID(hub: hub))
+        try sandbox.fileTokens.save("hub-token", HubIdentity.tokenID(hub: hub.url))
         let api = try access.api(for: endpoint)
         #expect(api.baseURL.absoluteString == "http://127.0.0.1:9/m/Mac%20mini%20Pro")
         #expect(api.token == "hub-token")

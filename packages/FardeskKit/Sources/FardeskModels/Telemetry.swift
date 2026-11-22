@@ -1,7 +1,7 @@
 import Foundation
 
-public enum TelemetryKind: String, Codable, Sendable, Hashable {
-    case error, event
+public enum TelemetryKind: String, TolerantEnum {
+    case error, event, unknown
 }
 
 /// One error an app or CLI reports back so it can be fixed without anyone describing it.
@@ -71,7 +71,7 @@ public struct TelemetryList: Codable, Sendable, Hashable {
 }
 
 /// Whether the daemon may drive Ghostty through macOS Automation.
-public enum GhosttyAutomation: String, Codable, Sendable, Hashable {
+public enum GhosttyAutomation: String, TolerantEnum {
     case ok, denied, unknown
 }
 
@@ -97,8 +97,8 @@ public struct KillRequest: Codable, Sendable, Hashable {
 }
 
 /// What a kill closed on the machine.
-public enum ClosedSurface: String, Codable, Sendable, Hashable {
-    case pane, tab, none
+public enum ClosedSurface: String, TolerantEnum {
+    case pane, tab, none, unknown
 }
 
 public struct KillResult: Codable, Sendable, Hashable {

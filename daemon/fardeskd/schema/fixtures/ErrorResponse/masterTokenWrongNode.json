@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "master_token_wrong_node",
+    "message": "the master token counts only from this computer or its hub"
+  }
+}

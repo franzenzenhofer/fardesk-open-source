@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { chmodSync, mkdirSync, symlinkSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { startTestDaemon, writeConfigFile } from "../../test/support/daemon.js";
 import type { TestDaemon } from "../../test/support/daemon.js";
 import { captureIo, writeCliConfig } from "../../test/support/cliConfig.js";
@@ -49,7 +49,7 @@ describe("homes and status", () => {
     expect(unconfigured[0]).toContain(`fardeskd homes add ${other.dir}`);
     expect(unconfigured[0]).not.toContain(`add ${configured.dir}`);
     const listed = await run(["homes", "--config", configPath], env);
-    expect(listed.out[0]).toBe(`configured ${configured.dir}: hooks no settings file`);
+    expect(listed.out[0]).toBe(`configured ${configured.dir} (named ${basename(configured.dir)}): hooks no settings file`);
     expect(listed.out[1]).toContain(`found, not configured ${other.dir}`);
   });
 
@@ -58,7 +58,7 @@ describe("homes and status", () => {
     mkdirSync(join(userHome, "lookalike", "sessions"), { recursive: true });
     writeFileSync(join(userHome, "lookalike", "sessions", "agenda.txt"), "");
     const listed = await run(["homes", "--config", configPath], { home: userHome, ps: psOf(configured.dir) });
-    expect(listed.out).toEqual([`configured ${configured.dir}: hooks no settings file`, "no other Claude home found"]);
+    expect(listed.out).toEqual([`configured ${configured.dir} (named ${basename(configured.dir)}): hooks no settings file`, "no other Claude home found"]);
     const status = await run(["status", "--config", configPath], { home: userHome, ps: [] });
     expect(status.out.some((line) => line.includes("not configured"))).toBe(false);
   });
@@ -143,6 +143,6 @@ describe("homes add", () => {
     expect(added.code).toBe(0);
     expect(added.out.at(-1)).toContain("running daemon reloaded its homes");
     expect(await listIds()).toEqual([SESSION_ID]);
-    expect(daemon.config.claudeHomes).toEqual([daemon.home.dir, other.dir]);
+    expect(daemon.config.claudeHomes.map((entry) => entry.path)).toEqual([daemon.home.dir, other.dir]);
   });
 });

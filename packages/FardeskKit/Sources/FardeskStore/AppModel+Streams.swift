@@ -38,7 +38,7 @@ extension AppModel {
             }
         } catch {
             handleFailure(error, machineID: endpoint.id, action: "keep the live connection", origin: .background)
-            if !error.isTokenRevoked { markOffline(endpoint.id, after: error) }
+            if !error.isTokenRevoked, !error.isDeviceMoved { markOffline(endpoint.id, after: error) }
         }
         if streamTokens[endpoint.id] == token { streams[endpoint.id] = nil }
     }

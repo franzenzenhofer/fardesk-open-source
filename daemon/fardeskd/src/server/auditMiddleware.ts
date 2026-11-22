@@ -1,4 +1,4 @@
-// One audit line for every state-changing request and every rejected login or pairing (no message text).
+// One audit line for every state-changing request and every rejected pairing (no message text).
 import type { MiddlewareHandler } from "hono";
 import { routePath } from "hono/route";
 import type { AuditLog } from "../audit/store.js";
@@ -19,7 +19,7 @@ export function auditMiddleware(audit: AuditLog): MiddlewareHandler<AppEnv> {
     const caller = c.get("deviceId") as string | undefined;
     const peer = c.get("peer") as string | undefined;
     audit.record({
-      event: failedAuth ? "login_failed" : "request",
+      event: failedAuth ? "pairing_failed" : "request",
       deviceId: caller ?? null,
       method,
       route: routePath(c, -1) || UNMATCHED,

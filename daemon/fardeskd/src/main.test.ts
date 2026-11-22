@@ -29,7 +29,7 @@ function start(args: string[]): { child: ChildProcess; stdout: () => string; std
 }
 
 describe("main as a real process", () => {
-  it("serves over HTTP and stops cleanly on SIGTERM, releasing the port and the hook socket", async () => {
+  it("serves plain HTTP and stops cleanly on SIGTERM, releasing the port and the hook socket", async () => {
     const home = createClaudeHome();
     const port = await freePort();
     const { path, stateDir } = writeCliConfig({ claudeHome: home.dir, port });

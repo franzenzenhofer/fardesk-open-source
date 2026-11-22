@@ -28,16 +28,6 @@ struct SafetySwitchTests {
         #expect(draft.permissionMode == .plan)
     }
 
-    @Test func aMachineAnswerWithoutTheFlagsIsAnOlderDaemonWithBothSwitchesOn() throws {
-        let json = """
-        {"contractVersion":1,"name":"m","hostname":"h","os":"linux","version":"1.0.0","claudeVersion":null,\
-        "sessionsCount":0,"models":[],"ghosttyAutomation":"unknown"}
-        """
-        let machine = try FardeskJSON.makeDecoder().decode(Machine.self, from: Data(json.utf8))
-        #expect(machine.allowBypass)
-        #expect(machine.coordinatorEnabled)
-    }
-
     @Test func aMachineAnswerWithTheFlagsOffKeepsThem() throws {
         let machine = try Fixtures.decode(Machine.self, "Machine", "linuxWithoutClaude")
         #expect(!machine.allowBypass)

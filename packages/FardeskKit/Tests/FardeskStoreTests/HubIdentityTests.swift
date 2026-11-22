@@ -5,7 +5,7 @@ import Foundation
 import Testing
 
 struct HubIdentityTests {
-    private let hub = URL(string: "http://100.64.0.10:4780")!
+    private let hub = HubLink(url: URL(string: "http://100.64.0.10:4780")!)
 
     @Test func machineIDsAreStableAndDistinctPerName() {
         let linux = HubIdentity.machineID(name: "Demo Box")
@@ -21,14 +21,14 @@ struct HubIdentityTests {
         #expect(endpoint.url.absoluteString == "http://100.64.0.10:4780/m/Mac%20mini%20Pro")
         #expect(endpoint.id == HubIdentity.machineID(name: "Mac mini Pro"))
         #expect(endpoint.name == "Mac mini Pro")
-        let slash = HubIdentity.machineURL(name: "a/b", hub: URL(string: "http://h:1/prefix/")!)
-        #expect(slash.absoluteString == "http://h:1/prefix/m/a%2Fb")
+        let slash = HubIdentity.machineURL(name: "a/b", hub: URL(string: "https://h:1/prefix/")!)
+        #expect(slash.absoluteString == "https://h:1/prefix/m/a%2Fb")
     }
 
     @Test func tokenIDDependsOnTheHubOnly() {
-        #expect(HubIdentity.tokenID(hub: hub) == HubIdentity.tokenID(hub: hub))
-        #expect(HubIdentity.tokenID(hub: hub) != HubIdentity.tokenID(hub: URL(string: "http://other:4780")!))
-        #expect(HubIdentity.tokenID(hub: hub) != HubIdentity.machineID(name: hub.absoluteString))
+        #expect(HubIdentity.tokenID(hub: hub.url) == HubIdentity.tokenID(hub: hub.url))
+        #expect(HubIdentity.tokenID(hub: hub.url) != HubIdentity.tokenID(hub: URL(string: "https://other:4780")!))
+        #expect(HubIdentity.tokenID(hub: hub.url) != HubIdentity.machineID(name: hub.url.absoluteString))
     }
 
     @Test func endpointsFollowTheHubOrder() throws {
@@ -50,7 +50,7 @@ struct HubIdentityTests {
             #expect(loaded == list)
             loaded.setHub(hub)
             #expect(loaded.endpoints.count == 1, "the same hub keeps its machines")
-            loaded.setHub(URL(string: "http://elsewhere:4780")!)
+            loaded.setHub(HubLink(url: URL(string: "https://elsewhere:4780")!))
             #expect(loaded.endpoints.isEmpty)
             loaded.setHub(nil)
             #expect(loaded.hub == nil)
@@ -62,13 +62,6 @@ struct HubIdentityTests {
             try Data(#"{"endpoints":[]}"#.utf8).write(to: file.url)
             #expect(try file.load().hub == nil)
         }
-    }
-
-    @Test func hubSettingAcceptsOnlyHTTPAddresses() {
-        #expect(HubSetting.parse("http://100.64.0.10:4780")?.port == 4780)
-        #expect(HubSetting.parse("") == nil)
-        #expect(HubSetting.parse("ftp://x") == nil)
-        #expect(HubSetting.parse("not a url") == nil)
     }
 }
 

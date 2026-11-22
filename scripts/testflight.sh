@@ -82,6 +82,14 @@ archive_app() {
     -destination "$ARCHIVE_DESTINATION" -archivePath "$BUILD_DIR/Fardesk-$number.xcarchive" \
     CURRENT_PROJECT_VERSION="$number" FARDESK_BUNDLE_PREFIX="$FARDESK_BUNDLE_PREFIX" FARDESK_TEAM_ID="$FARDESK_TEAM_ID" "${AUTH_FLAGS[@]}" > "$BUILD_DIR/archive.log" 2>&1 \
     || { tail -40 "$BUILD_DIR/archive.log" >&2; die "archive failed, see $BUILD_DIR/archive.log"; }
+  check_archive_has_no_tailnet_address "$BUILD_DIR/Fardesk-$number.xcarchive/Products/Applications/Fardesk.app"
+}
+
+# The build that is about to be uploaded holds no tailnet address anywhere in the app folder (ticket 63).
+check_archive_has_no_tailnet_address() {
+  local app="$1"
+  [[ -d "$app" ]] || die "the archive holds no app at $app"
+  bash "$SCRIPT_DIR/check-app-tailnet.sh" "$app" || die "the archive holds a tailnet address, not uploading"
 }
 
 # Export to a local file, then upload it with altool. Xcode's own upload first asks App Store Connect for the

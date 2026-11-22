@@ -46,8 +46,8 @@ struct SessionPresentationTests {
 
     @Test func waitingForPermission() throws {
         let p = try present("waitingPermission")
-        #expect(p.statusLabel == "Needs approval")
-        #expect(p.subtitleParts == ["Needs approval"])
+        #expect(p.statusLabel == "Needs your approval")
+        #expect(p.subtitleParts == ["Needs your approval"])
         #expect(p.symbolName == "exclamationmark.circle.fill")
         #expect(p.relativeTime == "2m")
         #expect(p.folderLabel == "~/crawler")
@@ -58,40 +58,45 @@ struct SessionPresentationTests {
 
     @Test func waitingForQuestion() throws {
         let p = try present("waitingQuestion")
-        #expect(p.statusLabel == "Needs answer")
-        #expect(p.subtitleParts == ["Needs answer"])
+        #expect(p.statusLabel == "Needs your answer")
+        #expect(p.subtitleParts == ["Needs your answer"])
     }
 
-    @Test func waitingWithoutReasonIsPlainWaiting() throws {
+    @Test func waitingWithoutReasonStillSaysItNeedsYou() throws {
         let p = try present("waitingPermission", ["waitingFor": NSNull()])
-        #expect(p.statusLabel == "Waiting")
+        #expect(p.statusLabel == "Needs you")
     }
 
     @Test func workingShowsTheSummary() throws {
         let p = try present("working")
         #expect(p.statusLabel == "Working")
-        #expect(p.subtitleParts == ["Edited PaintEngine.swift"])
-        #expect(p.symbolName == "circle.dotted")
+        #expect(p.subtitleParts == ["Working", "Edited PaintEngine.swift"])
+        #expect(p.symbolName == "ellipsis.circle.fill")
         let blank = try present("working", ["summary": ""])
         #expect(blank.subtitleParts == ["Working"])
     }
 
-    @Test func idleShowsTheSummaryOrItsLabelAndOffersResume() throws {
+    @Test func idleIsYourTurnWithTheLastLineAndNoPauseSign() throws {
         let p = try present("idleResume")
-        #expect(p.statusLabel == "Idle")
-        #expect(p.subtitleParts == ["Looked through 6 files"])
-        #expect(p.symbolName == "pause.circle.fill")
+        #expect(p.statusLabel == "Your turn")
+        #expect(p.subtitleParts == ["Your turn", "Looked through 6 files"])
+        #expect(p.symbolName == "arrowshape.turn.up.left.circle")
         #expect(p.composerMode == .resume(label: "Resume to reply"))
-        #expect(try present("idleResume", ["summary": ""]).subtitleParts == ["Idle"])
+        #expect(try present("idleResume", ["summary": ""]).subtitleParts == ["Your turn"])
     }
 
-    @Test func endedKeepsTwoPartsForTheMiddleDot() throws {
+    @Test func aComputerWaitNamesItsDialogOnce() throws {
+        let p = try present("waitingPermission", ["waitingFor": "terminal", "summary": "Needs you at the computer: trust prompt"])
+        #expect(p.subtitleParts == ["Needs you at the computer", "trust prompt"])
+    }
+
+    @Test func endedSaysStoppedAndNothingElse() throws {
         let p = try present("endedTakeover")
-        #expect(p.statusLabel == "Ended")
-        #expect(p.subtitleParts == ["Ended", "Can resume"])
-        #expect(p.symbolName == "checkmark.circle")
+        #expect(p.statusLabel == "Stopped")
+        #expect(p.subtitleParts == ["Stopped"])
+        #expect(p.symbolName == "stop.circle.fill")
         #expect(p.composerMode == .takeover(label: "Take over to reply"))
-        #expect(try present("endedTakeover", ["summary": "Done"]).subtitleParts == ["Done", "Can resume"])
+        #expect(try present("endedTakeover", ["summary": "Done"]).subtitleParts == ["Stopped"], "no 'Can resume', no snippet")
     }
 }
 

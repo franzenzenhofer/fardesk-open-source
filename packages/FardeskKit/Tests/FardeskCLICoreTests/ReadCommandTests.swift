@@ -18,7 +18,7 @@ struct PairAndMachinesTests {
             let machineFile = try String(contentsOf: cli.machinesURL, encoding: .utf8)
             #expect(!machineFile.contains(TestDaemon.token))
             let tokenFile = try String(contentsOf: cli.tokensURL, encoding: .utf8)
-            #expect(tokenFile.contains(TestDaemon.token))
+            #expect(!tokenFile.isEmpty && !tokenFile.contains(TestDaemon.token), "a device token of its own, never the config token")
         }
     }
 
@@ -93,7 +93,7 @@ struct SessionAndActivityTests {
             let result = await cli.run(["sessions", "--json"])
             let rows = try #require(JSONSerialization.jsonObject(with: Data(result.outText.utf8)) as? [[String: Any]])
             #expect(rows.count == 3 && rows.allSatisfy { $0["machine"] as? String == "box" })
-            let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let api = daemon.api(token: TestDaemon.token, timeout: 5)
             let sessions = try await api.sessions()
             let sent = Set(rows.compactMap { ($0["session"] as? [String: Any])?["id"] as? String })
             #expect(sent == Set(sessions.map(\.id)))
@@ -105,7 +105,7 @@ struct SessionAndActivityTests {
             let session = SeedSession.editsSessionID
             let result = await cli.run(["activity", shortID(session)])
             #expect(result.status == 0)
-            let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let api = daemon.api(token: TestDaemon.token, timeout: 5)
             let page = try await api.activity(sessionID: session)
             let expected = try FeedRenderer.render(
                 page.items,
@@ -121,7 +121,7 @@ struct SessionAndActivityTests {
     @Test func activityPagesBackWithBeforeAndAll() async throws {
         try await CLIHarness.withPairedDaemon { cli, daemon in
             let session = SeedSession.editsSessionID
-            let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let api = daemon.api(token: TestDaemon.token, timeout: 5)
             let everything = try await api.activity(sessionID: session, limit: 200).items
             #expect(everything.count > 2)
             let newest = try await api.activity(sessionID: session, limit: 1)
@@ -147,7 +147,7 @@ struct SessionAndActivityTests {
     @Test func detailPrintsTheDiffOrOutputBehindARow() async throws {
         try await CLIHarness.withPairedDaemon { cli, daemon in
             let session = SeedSession.editsSessionID
-            let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let api = daemon.api(token: TestDaemon.token, timeout: 5)
             let rows = try await api.activity(sessionID: session, limit: 200).items
             let id = try #require(rows.compactMap { item -> String? in
                 if case .tool(let tool) = item, tool.hasDetail { tool.id } else { nil }
@@ -165,7 +165,7 @@ struct SessionAndActivityTests {
         try await CLIHarness.withPairedDaemon { cli, daemon in
             let result = await cli.run(["folders", "--machine", "bo"])
             #expect(result.status == 0)
-            let api = FardeskAPI(baseURL: daemon.url, token: TestDaemon.token, timeout: 5)
+            let api = daemon.api(token: TestDaemon.token, timeout: 5)
             let count = try await api.recentFolders().folders.count
             #expect(result.out.count == max(count, 1))
             let json = await cli.run(["folders", "--json"])
@@ -208,7 +208,7 @@ struct FollowTests {
             running.cancel()
             let finished = await running.value
             #expect(seen)
-            #expect(finished.status == 0)
+            #expect(finished.status == 0, "\(finished.errText)")
         }
     }
 

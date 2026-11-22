@@ -14,10 +14,11 @@ public struct PendingMessage: Identifiable, Sendable {
         /// Accepted by the app, not on its way yet (or waiting for the machine to come back).
         case queued(waitingFor: String?)
         case sending
+        /// The computer took it; Claude is busy, so it waits for the current turn (one grey check).
         case sent
+        /// It is in the Claude session (one blue check). "Claude got it" (two blue checks) comes from the transcript.
+        case delivered
         case failed(String)
-        /// Held back: the session is cold and the user has not chosen how to continue.
-        case held
     }
 
     public let id: UUID
@@ -38,8 +39,8 @@ public struct PendingMessage: Identifiable, Sendable {
         case .queued(nil): "Queued"
         case .sending: "Sending..."
         case .sent: "Sent"
+        case .delivered: "Delivered"
         case .failed(let reason): "Not sent: \(reason)"
-        case .held: "Waiting for your choice"
         }
     }
 
@@ -47,9 +48,8 @@ public struct PendingMessage: Identifiable, Sendable {
         switch state {
         case .queued: "clock"
         case .sending: "arrow.up.circle"
-        case .sent: "checkmark"
+        case .sent, .delivered: "checkmark"
         case .failed: "exclamationmark.triangle.fill"
-        case .held: "hand.raised"
         }
     }
 
@@ -101,6 +101,12 @@ public struct Outbox: Sendable {
         messages[index].state = state
     }
 
+    /// Reload chat: drops the bubbles of messages the computer already took (sent or delivered); the fresh page shows
+    /// them as real rows. Queued and failed ones stay, they have not left this device.
+    public mutating func dropSent(for ref: SessionRef) {
+        messages.removeAll { $0.ref == ref && ($0.state == .sent || $0.state == .delivered) }
+    }
+
     public mutating func remove(_ id: UUID) {
         messages.removeAll { $0.id == id }
     }
@@ -121,7 +127,9 @@ public struct Outbox: Sendable {
             let wanted = pending.text.trimmingCharacters(in: .whitespacesAndNewlines)
             let match = rows.first { row in
                 guard case .user(let user) = row, !deliveredRows.contains(user.id), !pending.knownRows.contains(user.id) else { return false }
-                return user.ts >= pending.createdAt.addingTimeInterval(-Self.clockSkew) && user.text.hasPrefix(wanted)
+                // contains, not hasPrefix: messages sent while Claude is busy are queued, and Claude Code joins the
+                // queued ones into one user turn ("<earlier words>See attached."), so ours may sit anywhere in it.
+                return user.ts >= pending.createdAt.addingTimeInterval(-Self.clockSkew) && user.text.contains(wanted)
             }
             guard case .user(let user)? = match else { continue }
             deliveredRows.insert(user.id)

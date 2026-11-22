@@ -9,6 +9,8 @@ public struct HubMachine: Codable, Sendable, Hashable {
     public let latencyMs: Int?
     /// Why the machine is offline, in plain words; nil when online.
     public let problem: String?
+    /// The technical cause behind `problem` ("connection refused (ECONNREFUSED)"), for diagnostics; nil when online.
+    public let detail: String?
     public let sessions: Int
     public let waiting: Int
     public let working: Int
@@ -17,7 +19,7 @@ public struct HubMachine: Codable, Sendable, Hashable {
 
     public init(
         name: String, online: Bool, hub: Bool = false, lastSeen: Date? = nil, latencyMs: Int? = nil,
-        problem: String? = nil, sessions: Int = 0, waiting: Int = 0, working: Int = 0,
+        problem: String? = nil, detail: String? = nil, sessions: Int = 0, waiting: Int = 0, working: Int = 0,
         os: MachineOS? = nil
     ) {
         self.name = name
@@ -26,6 +28,7 @@ public struct HubMachine: Codable, Sendable, Hashable {
         self.lastSeen = lastSeen
         self.latencyMs = latencyMs
         self.problem = problem
+        self.detail = detail
         self.sessions = sessions
         self.waiting = waiting
         self.working = working
@@ -42,7 +45,7 @@ public struct HubMachine: Codable, Sendable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, online, hub, lastSeen, latencyMs, problem, sessions, waiting, working, os
+        case name, online, hub, lastSeen, latencyMs, problem, detail, sessions, waiting, working, os
     }
 
     public init(from decoder: any Decoder) throws {
@@ -53,6 +56,7 @@ public struct HubMachine: Codable, Sendable, Hashable {
         lastSeen = try c.decode(Date?.self, forKey: .lastSeen)
         latencyMs = try c.decode(Int?.self, forKey: .latencyMs)
         problem = try c.decode(String?.self, forKey: .problem)
+        detail = try c.decode(String?.self, forKey: .detail)
         sessions = try c.decode(Int.self, forKey: .sessions)
         waiting = try c.decode(Int.self, forKey: .waiting)
         working = try c.decode(Int.self, forKey: .working)
@@ -67,6 +71,7 @@ public struct HubMachine: Codable, Sendable, Hashable {
         try c.encode(lastSeen, forKey: .lastSeen)
         try c.encode(latencyMs, forKey: .latencyMs)
         try c.encode(problem, forKey: .problem)
+        try c.encode(detail, forKey: .detail)
         try c.encode(sessions, forKey: .sessions)
         try c.encode(waiting, forKey: .waiting)
         try c.encode(working, forKey: .working)

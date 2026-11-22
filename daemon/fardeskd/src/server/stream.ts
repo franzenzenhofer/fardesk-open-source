@@ -9,11 +9,13 @@ import { FardeskError, HTTP_STATUS } from "../core/errors.js";
 import type { Services } from "../service/types.js";
 import { requireCaller } from "./auth.js";
 import { errorBody } from "./errorBody.js";
+import { peerAddressOf } from "./peerAddress.js";
 
 export const STREAM_PATH = "/v1/stream";
 export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 const CLOSE_POLICY_VIOLATION = 1008;
 const REVOKED_REASON = "token_revoked";
+const NODE_CHECK_FAILED_REASON = "node_check_failed";
 const HTTP_STATUS_TEXT: Record<number, string> = { 401: "Unauthorized", 404: "Not Found", 429: "Too Many Requests", 503: "Service Unavailable" };
 
 /** Serves one accepted socket. */
@@ -70,12 +72,27 @@ function serve(socket: WebSocket, bus: Bus, services: Services, options: StreamO
   });
 }
 
-function upgradeTarget(request: IncomingMessage, services: Services, options: StreamOptions): { deviceId: string; target: "local" | StreamServe } {
-  const deviceId = requireCaller(services.auth, request.headers.authorization, request.socket.remoteAddress ?? "unknown");
+async function upgradeTarget(request: IncomingMessage, services: Services, options: StreamOptions): Promise<{ deviceId: string; target: "local" | StreamServe }> {
+  const deviceId = await requireCaller(services.auth, request.headers.authorization, peerAddressOf(request.socket));
   const pathname = new URL(request.url as string, "http://fardesk").pathname;
   const target = pathname === STREAM_PATH ? "local" : options.router?.(pathname);
   if (target === null || target === undefined) throw new FardeskError("not_found", "no such stream path");
   return { deviceId, target };
+}
+
+/**
+ * The token of an open stream stays valid only while Tailscale still shows the connection coming from the node the
+ * token belongs to: asked again every `nodeCheckMs` (the whois cache lifetime), a mismatch or a silent Tailscale closes
+ * the stream with 1008 and the code of the refusal.
+ */
+function watchNode(ws: WebSocket, request: IncomingMessage, services: Services): void {
+  const ip = peerAddressOf(request.socket);
+  const timer = setInterval(() => {
+    requireCaller(services.auth, request.headers.authorization, ip, true).catch((error: unknown) => {
+      ws.close(CLOSE_POLICY_VIOLATION, error instanceof FardeskError ? error.code : NODE_CHECK_FAILED_REASON);
+    });
+  }, services.auth.nodeCheckMs);
+  ws.once("close", () => { clearInterval(timer); });
 }
 
 export function attachStream(server: Server, bus: Bus, services: Services, options: StreamOptions): Stream {
@@ -89,17 +106,17 @@ export function attachStream(server: Server, bus: Bus, services: Services, optio
     // After "upgrade" the HTTP server no longer watches this socket: a client that hangs up mid-upgrade (a phone
     // going to the background) would raise an unhandled ECONNRESET and end the whole daemon.
     socket.on("error", () => { socket.destroy(); });
-    try {
-      const { deviceId, target } = upgradeTarget(request, services, options);
+    upgradeTarget(request, services, options).then(({ deviceId, target }) => {
       wss.handleUpgrade(request, socket, head, (ws) => {
         owners.set(ws, deviceId);
         ws.once("close", () => { owners.delete(ws); });
+        watchNode(ws, request, services);
         (target === "local" ? serveLocal : target)(ws);
       });
-    } catch (error) {
+    }, (error: unknown) => {
       if (!(error instanceof FardeskError)) throw error;
       rejectUpgrade(socket, error);
-    }
+    });
   });
   return {
     close(): void {

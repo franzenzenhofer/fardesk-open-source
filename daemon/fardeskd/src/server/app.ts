@@ -1,4 +1,4 @@
-// The Hono app: bearer auth for everything but login and pairing, the audit log, the routes, one error handler, JSON 404.
+// The Hono app: bearer auth for everything but pairing, the audit log, the routes, one error handler, JSON 404.
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { FardeskError, HTTP_STATUS } from "../core/errors.js";
@@ -7,6 +7,7 @@ import { createLogger, stderrSink } from "../core/log.js";
 import type { Hub } from "../hub/hub.js";
 import { hubRouteHooks } from "../hub/devices.js";
 import { registerHubRoutes } from "../hub/routes.js";
+import { registerUpdateAllRoute } from "../hub/updateRoute.js";
 import type { Logger } from "../core/log.js";
 import type { Services } from "../service/types.js";
 import { requireCaller } from "./auth.js";
@@ -24,11 +25,14 @@ export function createApp(services: Services, log?: Logger, hub?: HubWiring | nu
   app.use("*", auditMiddleware(services.audit));
   app.use("*", async (c, next) => {
     if (c.req.method === "POST" && isPublicAuthPath(c.req.path)) return next();
-    c.set("deviceId", requireCaller(services.auth, c.req.header("authorization"), clientIp(c)));
+    c.set("deviceId", await requireCaller(services.auth, c.req.header("authorization"), clientIp(c)));
     return next();
   });
   registerRoutes(app, services, hub === undefined || hub === null ? {} : hubRouteHooks(hub.hub));
-  if (hub !== undefined && hub !== null) registerHubRoutes(app, hub.hub, hub.config, services.auth);
+  if (hub !== undefined && hub !== null) {
+    registerHubRoutes(app, hub.hub, hub.config, services.auth);
+    registerUpdateAllRoute(app, services, hub.config);
+  }
   app.notFound((c) => c.json(errorBody("not_found", `no route ${c.req.method} ${c.req.path}`), 404));
   app.onError((error, c) => {
     if (error instanceof FardeskError) return c.json(errorBody(error.code, error.message), HTTP_STATUS[error.code] as ContentfulStatusCode);

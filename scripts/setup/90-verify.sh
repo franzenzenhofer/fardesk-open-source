@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verifies the whole setup, read only: on every machine of FARDESK_MACHINES the daemon answers, config.json is mode
-# 600, the bind address is a tailnet address (or loopback), and the safety settings match fardesk.env; the hub
+# 600, the bind address is tailscale (Tailscale only, no other way), and the safety settings match fardesk.env; the hub
 # answers GET /v1/hub. Prints the bypass and Coordinator state of each machine. --check is accepted (same thing).
 # Usage: bash scripts/setup/90-verify.sh [--check]
 set -uo pipefail
@@ -8,7 +8,6 @@ set -uo pipefail
 setup_init "$@"
 
 fardesk_require FARDESK_MACHINES FARDESK_PORT || exit 1
-TAILNET_ADDRESS='^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+$'
 
 verify_machine() { # name target
   local name="$1" target="$2" status mode bind
@@ -16,7 +15,7 @@ verify_machine() { # name target
   mode="$(on_machine "$target" 'stat -c %a ~/.config/fardesk/config.json 2>/dev/null || stat -f %Lp ~/.config/fardesk/config.json')"
   if [[ "$mode" == "600" ]]; then ok "$name: config.json mode 600"; else problem "$name: config.json mode is $mode, want 600"; fi
   bind="$(daemon_config_value "$target" '.bind.address')"
-  if [[ "$bind" == "tailscale" || "$bind" == "127.0.0.1" || "$bind" =~ $TAILNET_ADDRESS ]]; then ok "$name: bind address $bind"; else problem "$name: bind address $bind is not a tailnet address"; fi
+  if [[ "$bind" == "tailscale" ]]; then ok "$name: bind address $bind"; else problem "$name: bind address $bind must be tailscale (Tailscale only, no other way)"; fi
   say "         $name: bypass=$(daemon_config_value "$target" '.owned.allowBypass // false') coordinator=$(daemon_config_value "$target" '.coordinator.enabled // false') push=$(daemon_config_value "$target" '.push.content // "generic"')"
 }
 

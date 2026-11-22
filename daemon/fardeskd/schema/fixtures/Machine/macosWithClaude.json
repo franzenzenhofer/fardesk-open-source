@@ -1,5 +1,5 @@
 {
-  "contractVersion": 1,
+  "contractVersion": 4,
   "name": "Studio Mac",
   "hostname": "studio-mac.local",
   "os": "macos",
@@ -12,5 +12,24 @@
   ],
   "ghosttyAutomation": "ok",
   "allowBypass": true,
-  "coordinatorEnabled": true
+  "coordinatorEnabled": true,
+  "homes": [
+    ".claude",
+    "team"
+  ],
+  "tailscale": {
+    "state": "running"
+  },
+  "features": [
+    "chat-image",
+    "self-update",
+    "cold-last-turn"
+  ],
+  "update": {
+    "state": "done",
+    "message": null,
+    "version": "4.2.0",
+    "packageSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "at": "2026-11-22T10:00:00.000Z"
+  }
 }

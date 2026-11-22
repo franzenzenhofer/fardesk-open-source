@@ -47,7 +47,7 @@ public func waitUntil(
 
 /// What the built daemon in daemon/fardeskd/dist can do, so tests of newer routes can skip with a reason.
 public enum DaemonCapabilities {
-    /// The built daemon has the /v1/auth routes and the set-password command.
+    /// The built daemon has the /v1/auth routes.
     public static var hasAuth: Bool {
         ["dist/server/authRoutes.js", "dist/cli/authCommands.js"].allSatisfy {
             FileManager.default.fileExists(atPath: RepoPaths.daemon.appending(path: $0).path)

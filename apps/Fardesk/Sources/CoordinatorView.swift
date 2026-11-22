@@ -15,6 +15,7 @@ struct CoordinatorRow: View {
         }
         .contentShape(.rect)
         .tag(Route.coordinator)
+        .disabledInDemo(.coordinator)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("coordinator-row")

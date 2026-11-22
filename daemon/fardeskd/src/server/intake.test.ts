@@ -87,7 +87,7 @@ describe("telemetry", () => {
 });
 
 async function upload(path: string, body: Uint8Array, headers: Record<string, string>): Promise<{ status: number; json: unknown }> {
-  const response = await fetch(`${daemon.url}${path}`, { method: "POST", headers: { authorization: `Bearer ${TEST_TOKEN}`, ...headers }, body });
+  const response = await daemon.fetch(path, { method: "POST", headers: { authorization: `Bearer ${TEST_TOKEN}`, ...headers }, body });
   return { status: response.status, json: await response.json() };
 }
 
@@ -190,7 +190,7 @@ describe("attachments", () => {
     const first = await seedSession(makeTempDir("fdcwd-"));
     const second = await seedSession(makeTempDir("fdcwd-"));
     const { path } = attachmentResultSchema.parse((await upload(`/v1/sessions/${first.id}/attachments`, PNG, { "content-type": "image/png" })).json);
-    const fetched = await fetch(`${daemon.url}/v1/sessions/${first.id}/attachment?path=${encodeURIComponent(path)}`, { headers: { authorization: `Bearer ${TEST_TOKEN}` } });
+    const fetched = await daemon.fetch(`/v1/sessions/${first.id}/attachment?path=${encodeURIComponent(path)}`, { headers: { authorization: `Bearer ${TEST_TOKEN}` } });
     expect(fetched.status).toBe(200);
     expect(fetched.headers.get("content-type")).toBe("image/png");
     expect(Buffer.from(await fetched.arrayBuffer())).toEqual(PNG);

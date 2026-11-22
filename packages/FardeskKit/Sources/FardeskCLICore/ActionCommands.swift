@@ -31,8 +31,6 @@ struct ReplyCommand: AsyncParsableCommand {
     @OptionGroup var common: SessionCommandOptions
     @Option(name: .long, help: "A picture (png jpg jpeg heic) or audio (m4a mp4 wav) file to send along. Repeatable.")
     var attach: [String] = []
-    @Option(name: .long, help: "When the session is cold (cache expired, 20k+ tokens): full = send as it is, summary = summarise first, new = start fresh.")
-    var resume: ResumeOption?
     @Argument(help: "The message.")
     var text: [String] = []
 
@@ -48,24 +46,7 @@ struct ReplyCommand: AsyncParsableCommand {
             if files.isEmpty, typed.isCompactCommand {
                 return try await workspace.started(on: found) { try await $0.compact(sessionID: $1) }
             }
-            var target = found.session.id
-            if ColdSession.isCold(found.session, now: context.now()) {
-                guard let resume else { throw CLIError.usage(Self.coldWarning(found.session, now: context.now())) }
-                switch ColdSession.action(for: resume.choice, session: found.session) {
-                case .sendAsIs: break
-                case .compactThenSend:
-                    target = try await workspace.call(found.endpoint) { try await $0.compact(sessionID: target) }.sessionId
-                case .clearThenSend:
-                    target = try await workspace.call(found.endpoint) { try await $0.clear(sessionID: target) }.sessionId
-                case .newSessionWithPrompt:
-                    let request = NewSessionRequest(
-                        cwd: found.session.cwd, prompt: message, worktree: false, model: nil, permissionMode: found.session.permissionMode
-                    )
-                    let started = try await workspace.call(found.endpoint) { try await $0.newSession(request) }
-                    return workspace.print(try ActionRenderer.renderStarted(started, machine: found.endpoint.name, options: workspace.options))
-                }
-            }
-            let destination = target
+            let destination = found.session.id
             let result = try await workspace.call(found.endpoint) { api in
                 var ids: [String] = []
                 for file in files {
@@ -80,26 +61,7 @@ struct ReplyCommand: AsyncParsableCommand {
         }
     }
 
-    /// The Claude Code dialog as one warning plus the way on.
-    static func coldWarning(_ session: SessionSummary, now: Date) -> String {
-        ColdSession.warning(session, now: now)
-            + "\nGo on with --resume full (send as it is), --resume summary (summarise first) or --resume new (start fresh)."
-    }
-
     mutating func run() async throws { try await run(context: .current) }
-}
-
-/// How to go on with a cold session (`fardesk reply --resume`).
-enum ResumeOption: String, ExpressibleByArgument, CaseIterable {
-    case full, summary, new
-
-    var choice: ColdChoice {
-        switch self {
-        case .full: .resume
-        case .summary: .summary
-        case .new: .startNew
-        }
-    }
 }
 
 /// A file to upload with a reply; the media type comes from the extension.

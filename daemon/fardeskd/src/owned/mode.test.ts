@@ -1,11 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTempDir } from "../../test/support/env.js";
-import { createBus } from "../core/bus.js";
+import { neverStartingDeps } from "../../test/support/ownedDeps.js";
 import { FardeskError } from "../core/errors.js";
 import { createLogger } from "../core/log.js";
-import { createBroker } from "../permissions/broker.js";
 import { resumeMode, startMode } from "./mode.js";
 import type { ModeDeps } from "./mode.js";
 import { createOwnedRunner } from "./runner.js";
@@ -61,22 +58,7 @@ describe("resumeMode", () => {
 describe("a runner with bypass off", () => {
   it("refuses a new bypass session before it starts any process, and a session without a mode would use default", async () => {
     const dir = makeTempDir("fd-mode-");
-    const bus = createBus();
-    const runner = createOwnedRunner({
-      claudeBinary: "claude-that-must-never-start",
-      claudeHome: dir,
-      statePath: join(dir, "owned.json"),
-      permissionMode: "default",
-      allowBypass: false,
-      interruptTimeoutMs: 1000,
-      clearTimeoutMs: 1000,
-      compactTimeoutMs: 1000,
-      kill: { timeoutMs: 1000, pollMs: 50 },
-      broker: createBroker({ timeoutMs: 1000, bus, now: () => new Date(), newId: randomUUID }),
-      log: createLogger(() => undefined, () => new Date()),
-      findCwd: () => dir,
-      findMode: () => null,
-    });
+    const runner = createOwnedRunner(neverStartingDeps(dir));
     const request = { cwd: dir, prompt: "hi", worktree: false, model: null, permissionMode: "bypassPermissions" as const };
     await expect(runner.start(request)).rejects.toMatchObject({ code: "unsupported" });
     await runner.close();

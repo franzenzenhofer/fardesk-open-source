@@ -3,6 +3,7 @@
 // any other shape stays text only and is answered at the computer.
 import type { PermissionDecision } from "../contract/schema.js";
 import { FardeskError } from "../core/errors.js";
+import { isPlanChoice } from "./plan.js";
 
 const ASK_USER_QUESTION = "AskUserQuestion";
 const MCP_PREFIX = "mcp__";
@@ -56,6 +57,9 @@ export function questionKey(shape: Extract<TerminalShape, { kind: "question" }>,
 export function permissionKey(decision: PermissionDecision): TerminalKey {
   if (decision === "allow_always") {
     throw new FardeskError("conflict", "Always allow cannot be typed into the dialog from the phone: choose Allow or Deny, or answer at the computer");
+  }
+  if (isPlanChoice(decision)) {
+    throw new FardeskError("conflict", "a plan request cannot be answered by typing into the dialog from the phone: answer it at the computer");
   }
   return decision === "allow" ? { kind: "text", text: ALLOW_KEY } : { kind: "escape" };
 }
